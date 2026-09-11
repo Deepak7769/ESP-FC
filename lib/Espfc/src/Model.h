@@ -467,7 +467,7 @@ class Model
       else
       {
         // for synced and standard PWM limit loop rate and pwm pulse width
-       if(config.output.protocol == ESC_PROTOCOL_PWM)
+if(config.output.protocol == ESC_PROTOCOL_PWM)
 {
   // Conventional PWM should stay comfortably below 500Hz.
   // 450Hz ceiling allows integer gyro divisors such as:
