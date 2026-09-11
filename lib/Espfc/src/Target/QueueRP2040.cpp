@@ -13,11 +13,16 @@ void Queue::begin()
   queue_init(&_q, sizeof(Event), 128);
 }
 
-void Queue::send(const Event& e)
+bool Queue::send(const Event& e)
 {
-  if(isFull()) return;
-  //Serial1.write((uint8_t)e.type);
+  if (isFull())
+  {
+    return false;
+  }
+
   queue_add_blocking(&_q, &e);
+
+  return true;
 }
 
 Event Queue::receive()
