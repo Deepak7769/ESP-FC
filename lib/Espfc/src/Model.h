@@ -467,15 +467,26 @@ class Model
       else
       {
         // for synced and standard PWM limit loop rate and pwm pulse width
-        if(config.output.protocol == ESC_PROTOCOL_PWM && state.loopRate > 500)
-        {
-          config.loopSync = std::max(config.loopSync, (int8_t)((state.gyro.rate + 499) / 500)); // align loop rate to lower than 500Hz
-          state.loopRate = state.gyro.rate / config.loopSync;
-          if(state.loopRate > 480 && config.output.maxThrottle > 1940)
-          {
-            config.output.maxThrottle = 1940;
-          }
-        }
+       if(config.output.protocol == ESC_PROTOCOL_PWM)
+{
+  // Conventional PWM should stay comfortably below 500Hz.
+  // 450Hz ceiling allows integer gyro divisors such as:
+  // 4000 / 10 = 400Hz
+  // 4000 / 9  = 444Hz
+  constexpr uint32_t PWM_SYNC_MAX_HZ = 450;
+
+  if(state.loopRate > PWM_SYNC_MAX_HZ)
+  {
+    const int8_t minLoopSync =
+        (int8_t)((state.gyro.rate + PWM_SYNC_MAX_HZ - 1) / PWM_SYNC_MAX_HZ);
+
+    config.loopSync = std::max(config.loopSync, minLoopSync);
+    state.loopRate = state.gyro.rate / config.loopSync;
+  }
+
+  // In synchronous PWM mode, actual motor update rate follows mixer/PID rate.
+  config.output.rate = state.loopRate;
+}
         // for onshot125 limit loop rate to 2kHz
         if(config.output.protocol == ESC_PROTOCOL_ONESHOT125 && state.loopRate > 2000)
         {
