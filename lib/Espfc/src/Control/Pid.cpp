@@ -24,14 +24,18 @@ void Pid::resetIterm()
   iTerm = iReset;
 }
 
-float FAST_CODE_ATTR Pid::update(float setpoint, float measurement)
+float FAST_CODE_ATTR Pid::update(
+    float setpoint,
+    float measurement,
+    float tpaFactor)
 {
   error = setpoint - measurement;
-
+   const float tpa =
+    std::clamp(tpaFactor, 0.0f, 1.0f);
   // P-term
   pTerm = Kp * error * pScale;
   pTerm = ptermFilter.update(pTerm);
-
+   pTerm *= tpa;
   // I-term
   iTermError = error;
   if (Ki > 0.f && iScale > 0.f)
@@ -64,6 +68,7 @@ float FAST_CODE_ATTR Pid::update(float setpoint, float measurement)
     dTerm = dtermNotchFilter.update(dTerm);
     dTerm = dtermFilter.update(dTerm);
     dTerm = dtermFilter2.update(dTerm);
+      dTerm *= tpa;
   }
   else
   {
