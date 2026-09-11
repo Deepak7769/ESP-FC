@@ -12,10 +12,9 @@ void Queue::begin()
 {
 }
 
-void FAST_CODE_ATTR Queue::send(const Event& e)
+bool FAST_CODE_ATTR Queue::send(const Event& e)
 {
-  if(isFull()) return;
-  _q.push(e);
+  return _q.push(e);
 }
 
 Event FAST_CODE_ATTR Queue::receive()
