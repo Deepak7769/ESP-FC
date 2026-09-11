@@ -234,27 +234,106 @@ void Actuator::updateBuzzer()
     _model.state.gps.wasLocked = true;
   }
 }
-
 void Actuator::updateDynLpf()
 {
-  return; // temporary disable
-  int scale = std::clamp((int)_model.state.input.us[AXIS_THRUST], 1000, 2000);
-  if (_model.config.gyro.dynLpfFilter.cutoff > 0)
+  const int throttle =
+      std::clamp(
+          (int)_model.state.input.us[
+              AXIS_THRUST],
+          1000,
+          2000);
+
+  // Leave some distance below Nyquist.
+  const int safeMaxFreq =
+      std::max(
+          1,
+          (int)lrintf(
+              _model.state.loopTimer.rate *
+              0.45f));
+
+  // -----------------------------
+  // GYRO DYNAMIC LOW-PASS
+  // -----------------------------
+  if (_model.config.gyro
+          .dynLpfFilter.cutoff > 0)
   {
-    int gyroFreq =
-        Utils::map(scale, 1000, 2000, _model.config.gyro.dynLpfFilter.cutoff, _model.config.gyro.dynLpfFilter.freq);
-    for (size_t i = 0; i < AXIS_COUNT_RPY; i++)
+    const int low =
+        std::clamp(
+            (int)_model.config.gyro
+                .dynLpfFilter.cutoff,
+            1,
+            safeMaxFreq);
+
+    const int high =
+        std::clamp(
+            (int)_model.config.gyro
+                .dynLpfFilter.freq,
+            low,
+            safeMaxFreq);
+
+    const int gyroFreq =
+        std::clamp(
+            (int)lrintf(
+                Utils::map(
+                    (float)throttle,
+                    1000.f,
+                    2000.f,
+                    (float)low,
+                    (float)high)),
+            low,
+            high);
+
+    for (size_t i = 0;
+         i < AXIS_COUNT_RPY;
+         i++)
     {
-      _model.state.gyro.filter[i].reconfigure(gyroFreq);
+      _model.state.gyro
+          .filter[i]
+          .reconfigure(
+              gyroFreq);
     }
   }
-  if (_model.config.dterm.dynLpfFilter.cutoff > 0)
+
+  // -----------------------------
+  // D-TERM DYNAMIC LOW-PASS
+  // -----------------------------
+  if (_model.config.dterm
+          .dynLpfFilter.cutoff > 0)
   {
-    int dtermFreq =
-        Utils::map(scale, 1000, 2000, _model.config.dterm.dynLpfFilter.cutoff, _model.config.dterm.dynLpfFilter.freq);
-    for (size_t i = 0; i < AXIS_COUNT_RPY; i++)
+    const int low =
+        std::clamp(
+            (int)_model.config.dterm
+                .dynLpfFilter.cutoff,
+            1,
+            safeMaxFreq);
+
+    const int high =
+        std::clamp(
+            (int)_model.config.dterm
+                .dynLpfFilter.freq,
+            low,
+            safeMaxFreq);
+
+    const int dtermFreq =
+        std::clamp(
+            (int)lrintf(
+                Utils::map(
+                    (float)throttle,
+                    1000.f,
+                    2000.f,
+                    (float)low,
+                    (float)high)),
+            low,
+            high);
+
+    for (size_t i = 0;
+         i < AXIS_COUNT_RPY;
+         i++)
     {
-      _model.state.innerPid[i].dtermFilter.reconfigure(dtermFreq);
+      _model.state.innerPid[i]
+          .dtermFilter
+          .reconfigure(
+              dtermFreq);
     }
   }
 }
