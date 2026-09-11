@@ -11,7 +11,12 @@
 #include "Sensor/VoltageSensor.hpp"
 
 namespace Espfc {
-
+  enum SensorReadFlags
+{
+  SENSOR_READ_NONE = 0,
+  SENSOR_READ_CONTROL = 1 << 0,
+  SENSOR_READ_ACCEL = 1 << 1,
+};
 class SensorManager
 {
 public:
