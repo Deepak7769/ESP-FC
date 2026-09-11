@@ -205,12 +205,33 @@ void FAST_CODE_ATTR Mixer::updateMixer(const MixerConfig& mixer, float* outputs)
   }
 
   bool saturated = false;
+
   for (size_t i = 0; i < mixer.count; i++)
   {
-    const OutputChannelConfig& occ = _model.config.output.channel[i];
-    if (!occ.servo && outputs[i] >= 0.98f) saturated = true;
-    outputs[i] = limitOutput(outputs[i], occ, _model.config.output.motorLimit);
-  }
+     const OutputChannelConfig& occ =
+         _model.config.output.channel[i];
+
+     const float rawOutput = outputs[i];
+     const float limitedOutput =
+         limitOutput(rawOutput, occ, _model.config.output.motorLimit);
+
+     if (!occ.servo)
+     {
+        const bool upperSaturation = rawOutput >= 0.98f;
+        const bool lowerSaturation = rawOutput <= -0.98f;
+
+        const bool limited =
+           std::fabs(limitedOutput - rawOutput) > 0.0001f;
+
+        if (upperSaturation || lowerSaturation || limited)
+        {
+          saturated = true;
+        }
+      }
+
+      outputs[i] = limitedOutput;
+    }
+
   _model.setOutputSaturated(saturated);
 }
 
