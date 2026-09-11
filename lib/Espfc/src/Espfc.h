@@ -41,7 +41,6 @@ private:
   Blackbox::Blackbox _blackbox;
   Connect::Buzzer _buzzer;
   SerialManager _serial;
-  uint32_t _loop_next;
 };
 
 } // namespace Espfc
