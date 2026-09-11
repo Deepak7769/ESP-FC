@@ -145,7 +145,32 @@ bool MagQMC5883P::softReset()
 
 bool MagQMC5883P::testConnection()
 {
-  return true;
+  uint8_t chipId = 0;
+
+  for (uint8_t attempt = 0;
+       attempt < 3;
+       attempt++)
+  {
+    const int result =
+        _bus->read(
+            _addr,
+            QMC5883P_REG_CHIPID,
+            1,
+            &chipId);
+
+    if (result == 1)
+    {
+      // Store whatever ID the clone reports.
+      // Do not reject it merely because it is not 0x80.
+      setChipId(chipId);
+
+      return true;
+    }
+
+    delay(2);
+  }
+
+  return false;
 }
 
 uint8_t MagQMC5883P::makeControl1(uint8_t mode, uint8_t odr, uint8_t osr, uint8_t dsr)
