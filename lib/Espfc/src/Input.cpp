@@ -39,10 +39,17 @@ int Input::reload(ModelChangeEvent event)
       _model.state.input.autoFactor = 1.f / (2.f + _model.config.input.filterAutoFactor * 0.1f);
       _model.state.input.autoThrottleFactor = 1.f / (2.f + _model.config.input.filterAutoThrottleFactor * 0.1f);
       const FilterConfig rxFilter{_device && _device->needAverage() ? FILTER_FIR2 : FILTER_NONE, 1};
-      const FilterConfig inputFilter{_model.config.input.filterEnable ? _model.config.input.filter
-                                                                      : FilterConfig(FILTER_PT3, 25)};
-      const FilterConfig throtleFilter{_model.config.input.filterEnable ? _model.config.input.filterThrottle
-                                                                        : FilterConfig(FILTER_PT3, 25)};
+      const FilterConfig inputFilter{
+    _model.config.input.filterEnable
+        ? _model.config.input.filter
+        : FilterConfig(FILTER_NONE, 0)
+};
+
+const FilterConfig throtleFilter{
+    _model.config.input.filterEnable
+        ? _model.config.input.filterThrottle
+        : FilterConfig(FILTER_NONE, 0)
+};
       for (size_t i = 0; i < AXIS_COUNT_RPYT; i++)
       {
         _filter[i].begin(rxFilter, 100); // rx filter uses FIR2 on NONE, sample rate doesn't really matter here
