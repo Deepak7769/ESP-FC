@@ -36,7 +36,7 @@ int SensorManager::reload(ModelChangeEvent event)
 
 int FAST_CODE_ATTR SensorManager::read()
 {
-  _gyro.read();
+  const bool gyroReadOk = _gyro.read();
 
   if (_model.state.loopTimer.syncTo(_model.state.gyro.timer))
   {
