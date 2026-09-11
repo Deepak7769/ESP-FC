@@ -44,7 +44,10 @@ class Pid
 public:
   Pid();
   void begin();
-  float update(float setpoint, float measure);
+ float update(
+    float setpoint,
+    float measure,
+    float tpaFactor = 1.0f);
   void resetIterm();
 
   float rate;
