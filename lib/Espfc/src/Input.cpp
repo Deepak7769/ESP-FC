@@ -86,19 +86,42 @@ int16_t FAST_CODE_ATTR Input::getFailsafeValue(uint8_t c)
   }
 }
 
-void FAST_CODE_ATTR Input::setInput(Axis i, float v, bool newFrame, bool noFilter)
+void FAST_CODE_ATTR Input::setInput(
+    Axis i,
+    float v,
+    bool newFrame,
+    bool noFilter)
 {
-  const InputChannelConfig& ich = _model.config.input.channel[i];
   if (i <= AXIS_THRUST)
   {
-    const float nv = noFilter ? v : _model.state.input.filter[i].update(v);
+    const float nv =
+        noFilter
+            ? v
+            : _model.state.input.filter[i].update(v);
+
     _model.state.input.us[i] = nv;
-    _model.state.input.ch[i] = Utils::map(nv, ich.min, ich.max, -1.f, 1.f);
+
+    // processInputs() converts receiver calibration to the
+    // canonical 1000..2000 range.
+    _model.state.input.ch[i] =
+        Utils::map(
+            nv,
+            PWM_RANGE_MIN,
+            PWM_RANGE_MAX,
+            -1.f,
+            1.f);
   }
   else if (newFrame)
   {
     _model.state.input.us[i] = v;
-    _model.state.input.ch[i] = Utils::map(v, ich.min, ich.max, -1.f, 1.f);
+
+    _model.state.input.ch[i] =
+        Utils::map(
+            v,
+            PWM_RANGE_MIN,
+            PWM_RANGE_MAX,
+            -1.f,
+            1.f);
   }
 }
 
@@ -170,17 +193,57 @@ void FAST_CODE_ATTR Input::processInputs()
   {
     const InputChannelConfig& ich = _model.config.input.channel[c];
 
-    // remap channels
-    int16_t v = _model.state.input.raw[c] = (int16_t)channels[ich.map];
+    // Remap receiver channel.
+int16_t v =
+    _model.state.input.raw[c] =
+        (int16_t)channels[ich.map];
 
-    // adj midrc
-    v -= _model.config.input.midRc - PWM_RANGE_MID;
+// Preserve the existing global mid-RC correction.
+v -=
+    _model.config.input.midRc -
+    PWM_RANGE_MID;
 
-    // adj range
-    // float t = Utils::map3((float)v, (float)ich.min, (float)ich.neutral, (float)ich.max, (float)PWM_RANGE_MIN,
-    // (float)PWM_RANGE_MID, (float)PWM_RANGE_MAX);
-    float t = Utils::mapi(v, ich.min, ich.max, PWM_RANGE_MIN, PWM_RANGE_MAX);
+float t = PWM_RANGE_MID;
 
+if (c == AXIS_THRUST)
+{
+  // Throttle is endpoint-calibrated; it has no center point.
+  if (ich.min < ich.max)
+  {
+    t = Utils::map(
+        (float)v,
+        (float)ich.min,
+        (float)ich.max,
+        (float)PWM_RANGE_MIN,
+        (float)PWM_RANGE_MAX);
+  }
+  else
+  {
+    t = PWM_RANGE_MIN;
+    channelsValid = false;
+  }
+}
+else
+{
+  // Roll/Pitch/Yaw/AUX use min-neutral-max calibration.
+  if (ich.min < ich.neutral &&
+      ich.neutral < ich.max)
+  {
+    t = Utils::map3(
+        (float)v,
+        (float)ich.min,
+        (float)ich.neutral,
+        (float)ich.max,
+        (float)PWM_RANGE_MIN,
+        (float)PWM_RANGE_MID,
+        (float)PWM_RANGE_MAX);
+  }
+  else
+  {
+    t = PWM_RANGE_MID;
+    channelsValid = false;
+  }
+}
     // filter if required
     t = _filter[c].update(t);
     v = lrintf(t);
