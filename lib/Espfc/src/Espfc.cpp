@@ -139,39 +139,23 @@ int FAST_CODE_ATTR Espfc::update(bool externalTrigger)
 int FAST_CODE_ATTR Espfc::updateOther()
 {
 #if defined(ESPFC_MULTI_CORE)
+
   if (_model.state.appQueue.isEmpty())
   {
     return 0;
   }
-  Event e = _model.state.appQueue.receive();
 
-  Utils::Stats::Measure measure(_model.state.stats, COUNTER_CPU_1);
-
-  switch (e.type)
-  {
-    case EVENT_GYRO_READ:
-      _sensor.preLoop();
-      _controller.update();
-      // skip mixer and bb if earlier than half cycle, possible delay in previous iteration,
-      // to keep space to receive dshot erpm frame, but process rest
-      if (_loop_next < micros())
-      {
-        _loop_next = micros() + _model.state.loopTimer.interval / 2;
-        _mixer.update();
-        _blackbox.update();
-      }
-      _sensor.postLoop();
-      break;
-    case EVENT_ACCEL_READ:
-      _sensor.fusion();
-      break;
-    default:
-      break;
-      // nothing
-  }
-#endif
+  // Gyro/PID/IMU processing is no longer driven by this queue.
+  // Drain only legacy/non-flight-critical events.
+  (void)_model.state.appQueue.receive();
 
   return 1;
+
+#else
+
+  return 0;
+
+#endif
 }
 
 } // namespace Espfc
