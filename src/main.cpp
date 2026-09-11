@@ -41,7 +41,7 @@ Espfc::Espfc espfc;
 
     bool IRAM_ATTR gyroTimerIsr(void* args)
     {
-      BaseType_t xHigherPriorityTaskWoken;
+     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
       vTaskNotifyGiveFromISR(gyroTaskHandle, &xHigherPriorityTaskWoken);
       return xHigherPriorityTaskWoken == pdTRUE;
     }
