@@ -173,7 +173,9 @@ class Model
       return false;
 #warning "Danger macro used ESPFC_DEV_PRESET_UNSAFE_ARMING"
 #else
-      return state.mode.armingDisabledFlags != 0;
+     return
+    state.mode.armingDisabledFlags != 0 ||
+    state.pinConflict;
 #endif
     }
 
@@ -402,6 +404,200 @@ class Model
       //save();
       reload();
     }
+    bool validatePinResources()
+{
+  bool used[64] = {};
+  bool conflict = false;
+
+  auto reservePin =
+      [&](int pin)
+  {
+    if (pin < 0)
+    {
+      return;
+    }
+
+    if (pin >= 64)
+    {
+      conflict = true;
+
+      logger.err()
+          .log("PIN RANGE ")
+          .logln(pin);
+
+      return;
+    }
+
+    if (used[pin])
+    {
+      conflict = true;
+
+      logger.err()
+          .log("PIN CONFLICT ")
+          .logln(pin);
+
+      return;
+    }
+
+    used[pin] = true;
+  };
+
+  // -----------------------------
+  // MOTOR / SERVO OUTPUTS
+  // -----------------------------
+  for (size_t i = 0;
+       i < ESPFC_OUTPUT_COUNT;
+       i++)
+  {
+    reservePin(
+        config.pin[
+            PIN_OUTPUT_0 + i]);
+  }
+
+#ifdef ESPFC_INPUT
+  if (isFeatureActive(
+          FEATURE_RX_PPM))
+  {
+    reservePin(
+        config.pin[
+            PIN_INPUT_RX]);
+  }
+#endif
+
+  reservePin(
+      config.pin[
+          PIN_BUTTON]);
+
+  reservePin(
+      config.pin[
+          PIN_BUZZER]);
+
+  reservePin(
+      config.pin[
+          PIN_LED_BLINK]);
+
+  // -----------------------------
+  // UART
+  // -----------------------------
+
+#ifdef ESPFC_SERIAL_0
+  if (config.serial[
+          SERIAL_UART_0]
+          .functionMask)
+  {
+    reservePin(
+        config.pin[
+            PIN_SERIAL_0_TX]);
+
+    reservePin(
+        config.pin[
+            PIN_SERIAL_0_RX]);
+  }
+#endif
+
+#ifdef ESPFC_SERIAL_1
+  if (config.serial[
+          SERIAL_UART_1]
+          .functionMask)
+  {
+    reservePin(
+        config.pin[
+            PIN_SERIAL_1_TX]);
+
+    reservePin(
+        config.pin[
+            PIN_SERIAL_1_RX]);
+  }
+#endif
+
+#ifdef ESPFC_SERIAL_2
+  if (config.serial[
+          SERIAL_UART_2]
+          .functionMask)
+  {
+    reservePin(
+        config.pin[
+            PIN_SERIAL_2_TX]);
+
+    reservePin(
+        config.pin[
+            PIN_SERIAL_2_RX]);
+  }
+#endif
+
+  // -----------------------------
+  // I2C
+  // -----------------------------
+
+#ifdef ESPFC_I2C_0
+
+  reservePin(
+      config.pin[
+          PIN_I2C_0_SCL]);
+
+  reservePin(
+      config.pin[
+          PIN_I2C_0_SDA]);
+
+#endif
+
+  // -----------------------------
+  // SPI
+  // -----------------------------
+
+#ifdef ESPFC_SPI_0
+
+  reservePin(
+      config.pin[
+          PIN_SPI_0_SCK]);
+
+  reservePin(
+      config.pin[
+          PIN_SPI_0_MOSI]);
+
+  reservePin(
+      config.pin[
+          PIN_SPI_0_MISO]);
+
+  reservePin(
+      config.pin[
+          PIN_SPI_CS0]);
+
+  reservePin(
+      config.pin[
+          PIN_SPI_CS1]);
+
+  reservePin(
+      config.pin[
+          PIN_SPI_CS2]);
+
+#endif
+
+  // -----------------------------
+  // ADC
+  // -----------------------------
+
+#ifdef ESPFC_ADC_0
+
+  reservePin(
+      config.pin[
+          PIN_INPUT_ADC_0]);
+
+#endif
+
+#ifdef ESPFC_ADC_1
+
+  reservePin(
+      config.pin[
+          PIN_INPUT_ADC_1]);
+
+#endif
+
+  state.pinConflict =
+      conflict;
+
+  return !conflict;
+}
 
     void sanitize()
     {
@@ -520,7 +716,7 @@ if(config.output.protocol == ESC_PROTOCOL_PWM)
       {
         config.serial[i].functionMask &= serialFunctionAllowedMask;
       }
-      //validatePinResources();
+      validatePinResources();
 
       if (config.fusion.mode >= FUSION_MAX)
       {
@@ -541,6 +737,10 @@ if(config.output.protocol == ESC_PROTOCOL_PWM)
         {
           config.gyro.dynamicFilter.count = DYN_NOTCH_COUNT_MAX;
         }
+      #ifdef ESPFC_SAFE_BENCH_BUILD
+config.output.protocol =
+    ESC_PROTOCOL_DISABLED;
+#endif
     }
 
     void begin()
