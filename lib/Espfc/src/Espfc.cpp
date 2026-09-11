@@ -55,20 +55,55 @@ int FAST_CODE_ATTR Espfc::update(bool externalTrigger)
     if (!_model.state.gyro.timer.check()) return 0;
   }
   Utils::Stats::Measure measure(_model.state.stats, COUNTER_CPU_0);
-
 #if defined(ESPFC_MULTI_CORE)
 
-  _sensor.read();
-  if (_model.state.input.timer.syncTo(_model.state.gyro.timer, 1u))
+  const int sensorFlags =
+      _sensor.read();
+
+  // Receiver update first so a control iteration uses
+  // the newest available setpoint.
+  if (_model.state.input.timer.syncTo(
+          _model.state.gyro.timer,
+          1u))
   {
     _input.update();
   }
+
+  // Only preprocess gyro data when a valid gyro sample
+  // actually triggered this PID cycle.
+  if (sensorFlags & SENSOR_READ_CONTROL)
+  {
+    _sensor.preLoop();
+  }
+
+  // Fusion is executed in the same deterministic task.
+  if (sensorFlags & SENSOR_READ_ACCEL)
+  {
+    _sensor.fusion();
+  }
+
+  if (sensorFlags & SENSOR_READ_CONTROL)
+  {
+    _controller.update();
+
+    if (_model.state.mixer.timer.syncTo(
+            _model.state.loopTimer))
+    {
+      _mixer.update();
+    }
+
+    _blackbox.update();
+
+    _sensor.postLoop();
+  }
+
   if (_model.state.actuatorTimer.check())
   {
     _actuator.update();
   }
 
 #else
+
 
   _sensor.update();
   if (_model.state.loopTimer.syncTo(_model.state.gyro.timer))
