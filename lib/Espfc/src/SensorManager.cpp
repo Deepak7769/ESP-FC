@@ -36,28 +36,51 @@ int SensorManager::reload(ModelChangeEvent event)
 
 int FAST_CODE_ATTR SensorManager::read()
 {
+  int flags = SENSOR_READ_NONE;
+
   const bool gyroReadOk = _gyro.read();
 
-  if (_model.state.loopTimer.syncTo(_model.state.gyro.timer))
+  // Always advance the scheduler divider.
+  // If the gyro transaction failed, that control cycle is skipped
+  // instead of reusing an old gyro value.
+  const bool controlDue =
+      _model.state.loopTimer.syncTo(
+          _model.state.gyro.timer);
+
+  if (gyroReadOk && controlDue)
   {
-    _model.state.appQueue.send(Event(EVENT_GYRO_READ));
+    flags |= SENSOR_READ_CONTROL;
   }
 
-  if (_model.state.accel.timer.syncTo(_model.state.gyro.timer))
+  if (_model.state.accel.timer.syncTo(
+          _model.state.gyro.timer))
   {
     _accel.update();
-    _model.state.appQueue.send(Event(EVENT_ACCEL_READ));
-    _model.state.mode.button = _button.update();
-    return 1;
+
+    _model.state.mode.button =
+        _button.update();
+
+    flags |= SENSOR_READ_ACCEL;
+
+    return flags;
   }
 
-  if (_mag.update()) return 1;
+  if (_mag.update())
+  {
+    return flags;
+  }
 
-  if (_baro.update()) return 1;
+  if (_baro.update())
+  {
+    return flags;
+  }
 
-  if (_voltage.update()) return 1;
+  if (_voltage.update())
+  {
+    return flags;
+  }
 
-  return 0;
+  return flags;
 }
 
 int FAST_CODE_ATTR SensorManager::preLoop()
