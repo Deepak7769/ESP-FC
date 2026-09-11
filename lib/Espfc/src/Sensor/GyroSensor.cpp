@@ -130,7 +130,10 @@ int FAST_CODE_ATTR GyroSensor::read()
 
   Utils::Stats::Measure measure(_model.state.stats, COUNTER_GYRO_READ);
 
-  _gyro->readGyro(_model.state.gyro.raw);
+  if (!_gyro->readGyro(_model.state.gyro.raw))
+  {
+     return 0;
+  }
 
   VectorFloat input = static_cast<VectorFloat>(_model.state.gyro.raw) * _model.state.gyro.scale;
   align(input, _model.config.gyro.align);
