@@ -473,7 +473,7 @@ if(config.output.protocol == ESC_PROTOCOL_PWM)
   // 450Hz ceiling allows integer gyro divisors such as:
   // 4000 / 10 = 400Hz
   // 4000 / 9  = 444Hz
-  constexpr uint32_t PWM_SYNC_MAX_HZ = 450;
+  constexpr int32_t PWM_SYNC_MAX_HZ = 450;
 
   if(state.loopRate > PWM_SYNC_MAX_HZ)
   {
