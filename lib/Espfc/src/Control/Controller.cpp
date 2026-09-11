@@ -193,21 +193,31 @@ void FAST_CODE_ATTR Controller::innerLoop()
   auto& innerPid = _model.state.innerPid;
   auto& output = _model.state.output;
 
-  for (size_t i = 0; i < AXIS_COUNT_RPY; ++i)
+ for (size_t i = 0;
+     i < AXIS_COUNT_RPY;
+     ++i)
+{
+  auto& pid =
+      innerPid[i];
+
+  const float fScale =
+      pid.fScale;
+
+  if (_model.isModeActive(MODE_ANGLE) &&
+      i < AXIS_COUNT_RP)
   {
-    auto& pid = innerPid[i];
-    const float fScale = pid.fScale; // disable f-term in angle mode
-    if (_model.isModeActive(MODE_ANGLE) && i < AXIS_COUNT_RP)
-    {
-      pid.fScale = 0.f;
-    }
-    output.ch[i] =
-    pid.update(
-        setpoint.rate[i],
-        _model.state.gyro.adc[i],
-        tpaFactor);
-    pid.fScale = fScale;
+    pid.fScale = 0.f;
   }
+
+  output.ch[i] =
+      pid.update(
+          setpoint.rate[i],
+          _model.state.gyro.adc[i],
+          tpaFactor);
+
+  pid.fScale =
+      fScale;
+}
 
   // thrust control
   if (_model.isModeActive(MODE_ALTHOLD))
