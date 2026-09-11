@@ -521,8 +521,10 @@ struct ModelState
   SerialPortState serial[SERIAL_UART_COUNT];
   Utils::Timer serialTimer;
 
-  Target::Queue appQueue;
-  bool rebootRequired = false;
+Target::Queue appQueue;
+
+bool pinConflict = false;
+bool rebootRequired = false;
 };
 
 }
