@@ -10,13 +10,35 @@ Sma<SampleType, MaxSize>::Sma(): _idx(0), _count(MaxSize)
 {
   begin(MaxSize);
 }
-
 template<typename SampleType, size_t MaxSize>
-void Sma<SampleType, MaxSize>::begin(size_t count)
+void Sma<SampleType, MaxSize>::begin(
+    size_t count)
 {
-  _count = std::min(count, MaxSize);
-  _inv_count = 1.f / _count;
+  _count =
+      std::max<size_t>(
+          1,
+          std::min(
+              count,
+              MaxSize));
+
+  _inv_count =
+      1.f /
+      (float)_count;
+
+  _idx = 0;
+
+  _sum =
+      SampleType{};
+
+  for (size_t i = 0;
+       i < MaxSize;
+       i++)
+  {
+    _samples[i] =
+        SampleType{};
+  }
 }
+
 
 template<typename SampleType, size_t MaxSize>
 SampleType Sma<SampleType, MaxSize>::update(const SampleType& input)
