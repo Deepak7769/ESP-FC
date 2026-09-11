@@ -520,7 +520,7 @@ if(config.output.protocol == ESC_PROTOCOL_PWM)
       {
         config.serial[i].functionMask &= serialFunctionAllowedMask;
       }
-      validatePinResources();
+      //validatePinResources();
 
       if (config.fusion.mode >= FUSION_MAX)
       {
