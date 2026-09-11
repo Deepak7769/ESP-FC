@@ -49,7 +49,7 @@ class Queue
 {
   public:
     void begin();
-    void send(const Event& e);
+    bool send(const Event& e);
     Event receive();
     bool isEmpty() const;
     bool isFull() const;
