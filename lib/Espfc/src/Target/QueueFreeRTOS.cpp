@@ -13,10 +13,17 @@ void Queue::begin()
   _q = xQueueCreate(64, sizeof(Event));
 }
 
-void Queue::send(const Event& e)
+bool Queue::send(const Event& e)
 {
-  if(isFull()) return;
-  xQueueSend(_q, &e, (TickType_t)0);
+  if (!_q)
+  {
+    return false;
+  }
+
+  return xQueueSend(
+             _q,
+             &e,
+             (TickType_t)0) == pdTRUE;
 }
 
 Event Queue::receive()
