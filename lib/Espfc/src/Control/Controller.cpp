@@ -201,7 +201,11 @@ void FAST_CODE_ATTR Controller::innerLoop()
     {
       pid.fScale = 0.f;
     }
-    output.ch[i] = pid.update(setpoint.rate[i], _model.state.gyro.adc[i]) * tpaFactor;
+    output.ch[i] =
+    pid.update(
+        setpoint.rate[i],
+        _model.state.gyro.adc[i],
+        tpaFactor);
     pid.fScale = fScale;
   }
 
