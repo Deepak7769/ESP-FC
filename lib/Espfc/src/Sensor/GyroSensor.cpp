@@ -103,12 +103,22 @@ int GyroSensor::reload(ModelChangeEvent event)
         {
           for (size_t p = 0; p < _dyn_notch_count; p++)
           {
-            gyroState.dynNotchFilter[p][i].begin(FilterConfig(FILTER_NOTCH_DF1, 400, 380), gyroFilterRate);
+              gyroState.dynNotchFilter[p][i].begin(
+    FilterConfig(
+        FILTER_NOTCH_DF1,
+        400,
+        380),
+    loopFilterRate);
           }
         }
         // static notches
-        gyroState.notch1Filter[i].begin(_model.config.gyro.notch1Filter, gyroFilterRate);
-        gyroState.notch2Filter[i].begin(_model.config.gyro.notch2Filter, gyroFilterRate);
+gyroState.notch1Filter[i].begin(
+    _model.config.gyro.notch1Filter,
+    loopFilterRate);
+
+gyroState.notch2Filter[i].begin(
+    _model.config.gyro.notch2Filter,
+    loopFilterRate);
 
 #ifdef ESPFC_DSP
         _fft[i].begin(_model.state.loopTimer.rate / _dyn_notch_denom, _model.config.gyro.dynamicFilter, i);
