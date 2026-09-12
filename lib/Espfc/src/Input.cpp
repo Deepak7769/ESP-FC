@@ -13,7 +13,12 @@ Input::Input(Model& model, TelemetryManager& telemetry): _model(model), _telemet
 int Input::begin()
 {
   _device = getInputDevice();
-  _model.state.input.channelCount = _device ? _device->getChannelCount() : INPUT_CHANNELS;
+  _model.state.input.channelCount =
+    std::min<size_t>(
+        _device
+            ? _device->getChannelCount()
+            : INPUT_CHANNELS,
+        INPUT_CHANNELS);
   _model.state.input.frameDelta = FRAME_TIME_DEFAULT_US;
   _model.state.input.frameRate = 1000000ul / _model.state.input.frameDelta;
   _model.state.input.frameCount = 0;
@@ -185,18 +190,45 @@ void FAST_CODE_ATTR Input::processInputs()
 
   uint32_t startTime = micros();
 
-  uint16_t channels[INPUT_CHANNELS];
-  _device->get(channels, _model.state.input.channelCount);
+ uint16_t channels[INPUT_CHANNELS] = {};
 
-  bool channelsValid = true;
-  for (size_t c = 0; c < _model.state.input.channelCount; c++)
+const size_t channelCount =
+    std::min<size_t>(
+        _model.state.input.channelCount,
+        INPUT_CHANNELS);
+
+_device->get(channels, channelCount);
+
+bool channelsValid = true;
+
+for (size_t c = 0; c < channelCount; c++)
+{
+  const InputChannelConfig& ich =
+      _model.config.input.channel[c];
+
+  if (ich.map < 0 ||
+      static_cast<size_t>(ich.map) >= channelCount)
   {
-    const InputChannelConfig& ich = _model.config.input.channel[c];
+    const int16_t fallback =
+        getFailsafeValue(c);
 
-    // Remap receiver channel.
-int16_t v =
     _model.state.input.raw[c] =
-        (int16_t)channels[ich.map];
+        fallback;
+
+    _model.state.input.bufferPrevious[c] =
+        _model.state.input.buffer[c];
+
+    _model.state.input.buffer[c] =
+        fallback;
+
+    channelsValid = false;
+    continue;
+  }
+
+  int16_t v =
+      _model.state.input.raw[c] =
+          static_cast<int16_t>(
+              channels[ich.map]);
 
 // Preserve the existing global mid-RC correction.
 v -=
@@ -390,22 +422,40 @@ void FAST_CODE_ATTR Input::updateFrameRate()
     FilterConfig confDerivative{(FilterType)_model.config.input.filterDerivative.type,
                                 std::clamp<int16_t>(input.autoFreq, 15, 500)};
 
-    for (size_t i = 0; i < AXIS_COUNT_RPY; i++)
-    {
-      if (_model.config.input.filter.freq == 0)
-      {
-        _model.state.input.filter[i].reconfigure(conf, _model.state.loopTimer.rate);
-      }
-      if (_model.config.input.filterDerivative.freq == 0)
-      {
-        _model.state.innerPid[i].ftermFilter.reconfigure(confDerivative, _model.state.loopTimer.rate);
-      }
-    }
+for (size_t i = 0;
+     i < AXIS_COUNT_RPY;
+     i++)
+{
+  if (_model.config.input.filterEnable &&
+      _model.config.input.filter.freq == 0)
+  {
+    _model.state.input.filter[i]
+        .reconfigure(
+            conf,
+            input.timer.rate);
+  }
 
-    if (_model.config.input.filterThrottle.freq == 0)
-    {
-      _model.state.input.filter[AXIS_THRUST].reconfigure(confThrottle, _model.state.loopTimer.rate);
-    }
+  // Feed-forward derivative filter actually runs
+  // in the PID loop, so loopTimer.rate is correct here.
+  if (_model.config.input.filterDerivative.freq == 0)
+  {
+    _model.state.innerPid[i]
+        .ftermFilter
+        .reconfigure(
+            confDerivative,
+            _model.state.loopTimer.rate);
+  }
+}
+
+if (_model.config.input.filterEnable &&
+    _model.config.input.filterThrottle.freq == 0)
+{
+  _model.state.input
+      .filter[AXIS_THRUST]
+      .reconfigure(
+          confThrottle,
+          input.timer.rate);
+}
 
     if (_model.config.debug.mode == DEBUG_RC_SMOOTHING_RATE)
     {
