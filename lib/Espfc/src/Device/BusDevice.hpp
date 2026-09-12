@@ -53,13 +53,37 @@ public:
     return write(devAddr, regAddr, 1, &data);
   }
 
-  int8_t readBit(uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t* data)
+int8_t readBit(
+    uint8_t devAddr,
+    uint8_t regAddr,
+    uint8_t bitNum,
+    uint8_t* data)
+{
+  if (!data)
   {
-    uint8_t b;
-    uint8_t count = readByte(devAddr, regAddr, &b);
-    *data = Utils::getBit(b, bitNum);
+    return 0;
+  }
+
+  uint8_t b = 0;
+
+  const int8_t count =
+      readByte(
+          devAddr,
+          regAddr,
+          &b);
+
+  if (count != 1)
+  {
     return count;
   }
+
+  *data =
+      Utils::getBit(
+          b,
+          bitNum);
+
+  return count;
+}
 
   int8_t readBits(uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t* data)
   {
@@ -81,13 +105,33 @@ public:
     return count;
   }
 
-  bool writeBit(uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t data)
+bool writeBit(
+    uint8_t devAddr,
+    uint8_t regAddr,
+    uint8_t bitNum,
+    uint8_t data)
+{
+  uint8_t b = 0;
+
+  if (readByte(
+          devAddr,
+          regAddr,
+          &b) != 1)
   {
-    uint8_t b;
-    readByte(devAddr, regAddr, &b);
-    b = Utils::setBit(b, bitNum, data);
-    return writeByte(devAddr, regAddr, b);
+    return false;
   }
+
+  b =
+      Utils::setBit(
+          b,
+          bitNum,
+          data);
+
+  return writeByte(
+      devAddr,
+      regAddr,
+      b);
+}
 
   bool writeBits(uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data)
   {
