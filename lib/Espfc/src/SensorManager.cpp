@@ -55,12 +55,16 @@ int FAST_CODE_ATTR SensorManager::read()
   if (_model.state.accel.timer.syncTo(
           _model.state.gyro.timer))
   {
+const bool accelReadOk =
     _accel.update();
 
-    _model.state.mode.button =
-        _button.update();
+_model.state.mode.button =
+    _button.update();
 
-    flags |= SENSOR_READ_ACCEL;
+if (accelReadOk)
+{
+  flags |= SENSOR_READ_ACCEL;
+}
 
     return flags;
   }
