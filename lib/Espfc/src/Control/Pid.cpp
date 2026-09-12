@@ -35,7 +35,10 @@ float FAST_CODE_ATTR Pid::update(
   // P-term
   pTerm = Kp * error * pScale;
   pTerm = ptermFilter.update(pTerm);
-   pTerm *= tpa;
+  if (tpaP)
+{
+  pTerm *= tpa;
+}
   // I-term
   iTermError = error;
   if (Ki > 0.f && iScale > 0.f)
