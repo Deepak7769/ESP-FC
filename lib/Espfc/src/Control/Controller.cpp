@@ -187,6 +187,8 @@ void FAST_CODE_ATTR Controller::innerLoop()
 {
   // Roll/Pitch/Yaw rates control
   const float tpaFactor = getTpaFactor();
+  const bool tpaP =
+    _model.config.controller.tpaMode == 0;
   const auto& setpoint = _model.state.setpoint;
   const auto& altitude = _model.state.altitude;
 
@@ -210,11 +212,13 @@ void FAST_CODE_ATTR Controller::innerLoop()
   }
 
   output.ch[i] =
-      pid.update(
-          setpoint.rate[i],
-          _model.state.gyro.adc[i],
-          tpaFactor);
+    pid.update(
+        setpoint.rate[i],
+        _model.state.gyro.adc[i],
+        tpaFactor,
+        tpaP);
 
+  
   pid.fScale =
       fScale;
 }
