@@ -620,8 +620,104 @@ class Model
       //if(config.mag.dev != MAG_NONE || config.baro.dev != BARO_NONE) loopSyncMax /= 2;
 
       config.loopSync = std::max((int)config.loopSync, loopSyncMax);
-      state.loopRate = state.gyro.rate / config.loopSync;
+      config.loopSync =
+    std::max<int8_t>(
+        config.loopSync,
+        1);
 
+config.mixerSync =
+    std::max<int8_t>(
+        config.mixerSync,
+        1);
+
+config.customMixerCount =
+    std::clamp<int>(
+        config.customMixerCount,
+        0,
+        OUTPUT_CHANNELS);
+
+config.gyro.rpmFilter.harmonics =
+    std::min<uint8_t>(
+        config.gyro.rpmFilter.harmonics,
+        RPM_FILTER_HARMONICS_MAX);
+
+config.gyro.dynamicFilter.count =
+    std::min<uint8_t>(
+        config.gyro.dynamicFilter.count,
+        DYN_NOTCH_COUNT_MAX);
+
+config.gyro.dynamicFilter.q =
+    std::max<int16_t>(
+        config.gyro.dynamicFilter.q,
+        1);
+
+config.gyro.dynamicFilter.min_freq =
+    std::max<int16_t>(
+        config.gyro.dynamicFilter.min_freq,
+        1);
+
+config.gyro.dynamicFilter.max_freq =
+    std::max(
+        config.gyro.dynamicFilter.max_freq,
+        config.gyro.dynamicFilter.min_freq);
+
+config.controller.tpaScale =
+    std::clamp<int8_t>(
+        config.controller.tpaScale,
+        0,
+        100);
+
+config.controller.tpaMode =
+    std::clamp<int8_t>(
+        config.controller.tpaMode,
+        0,
+        1);
+
+config.controller.tpaBreakpoint =
+    std::clamp<int16_t>(
+        config.controller.tpaBreakpoint,
+        1000,
+        1999);
+
+config.iterm.limit =
+    std::clamp<int8_t>(
+        config.iterm.limit,
+        0,
+        100);
+
+if (config.vbat.resDiv == 0)
+{
+  config.vbat.resDiv = 1;
+}
+
+for (size_t i = 0; i < 3; i++)
+{
+  config.input.rateLimit[i] =
+      std::clamp<int16_t>(
+          config.input.rateLimit[i],
+          1,
+          1998);
+}
+
+for (size_t i = 0;
+     i < OUTPUT_CHANNELS;
+     i++)
+{
+  auto& ch = config.output.channel[i];
+
+  if (ch.min > ch.max)
+  {
+    std::swap(ch.min, ch.max);
+  }
+
+  ch.neutral =
+      std::clamp(
+          ch.neutral,
+          ch.min,
+          ch.max);
+}
+      state.loopRate = state.gyro.rate / config.loopSync;
+   
       config.output.protocol =
     ESC_PROTOCOL_SANITIZE(config.output.protocol);
 
