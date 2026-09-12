@@ -59,13 +59,26 @@ int GyroSensor::reload(ModelChangeEvent event)
       _dyn_notch_count = std::min((size_t)_model.config.gyro.dynamicFilter.count, DYN_NOTCH_COUNT_MAX);
       _dyn_notch_enabled = _dyn_notch_count > 0 && _model.state.loopTimer.rate >= DynamicFilterConfig::MIN_FREQ;
       _dyn_notch_debug = _model.config.debug.mode == DEBUG_FFT_FREQ || _model.config.debug.mode == DEBUG_FFT_TIME;
-
-      _rpm_enabled = _model.config.gyro.rpmFilter.harmonics > 0 && _model.config.output.dshotTelemetry;
+       _rpm_harmonics =
+    std::min<size_t>(
+        _model.config.gyro.rpmFilter.harmonics,
+        RPM_FILTER_HARMONICS_MAX);
+     _rpm_enabled =
+    _rpm_harmonics > 0 &&
+    _model.config.output.dshotTelemetry;
       _rpm_motor_index = 0;
-      _rpm_fade_inv = 1.0f / _model.config.gyro.rpmFilter.fade;
       _rpm_min_freq = _model.config.gyro.rpmFilter.minFreq;
       _rpm_max_freq = 0.48f * _model.state.loopTimer.rate;
-      _rpm_q = _model.config.gyro.rpmFilter.q * 0.01f;
+      const float fade =
+    _model.config.gyro.rpmFilter.fade;
+
+_rpm_fade_inv =
+    fade > 0.f ? 1.0f / fade : 0.f;
+
+_rpm_q =
+    std::max(
+        0.01f,
+        _model.config.gyro.rpmFilter.q * 0.01f);
 
       for (size_t i = 0; i < RPM_FILTER_HARMONICS_MAX; i++)
       {
@@ -90,7 +103,7 @@ int GyroSensor::reload(ModelChangeEvent event)
         for (size_t m = 0; m < RPM_FILTER_MOTOR_MAX; m++)
         {
           gyroState.rpmFreqFilter[m].begin({FILTER_PT1, _model.config.gyro.rpmFilter.freqLpf}, loopFilterRate);
-          for (size_t n = 0; n < _model.config.gyro.rpmFilter.harmonics; n++)
+          for (size_t n = 0;n < _rpm_harmonics; n++)
           {
             int center = Utils::mapi(m * RPM_FILTER_HARMONICS_MAX + n, 0,
                                      RPM_FILTER_MOTOR_MAX * _model.config.gyro.rpmFilter.harmonics,
