@@ -2,7 +2,7 @@
 #include "Hal/Time.hpp"
 #include "Utils/Math.hpp"
 #include <algorithm>
-
+#include <cmath>
 namespace Espfc::Control {
 
 Controller::Controller(Model& model): _model(model), _rates{} {}
@@ -267,10 +267,40 @@ float Controller::calcualteAltHoldSetpoint() const
 
 float Controller::getTpaFactor() const
 {
-  if (_model.config.controller.tpaScale == 0) return 1.f;
-  float t = std::clamp<float>(_model.state.input.us[AXIS_THRUST], _model.config.controller.tpaBreakpoint, 2000.f);
-  return Utils::map(t, (float)_model.config.controller.tpaBreakpoint, 2000.f, 1.f,
-                    1.f - ((float)_model.config.controller.tpaScale * 0.01f));
+  const float scale =
+      std::clamp(
+          (float)_model.config.controller.tpaScale,
+          0.f,
+          100.f);
+
+  if (scale <= 0.f)
+  {
+    return 1.f;
+  }
+
+  const float breakpoint =
+      std::clamp(
+          (float)_model.config.controller.tpaBreakpoint,
+          1000.f,
+          1999.f);
+
+  const float throttle =
+      std::clamp(
+          (float)_model.state.input.us[AXIS_THRUST],
+          breakpoint,
+          2000.f);
+
+  const float factor =
+      Utils::map(
+          throttle,
+          breakpoint,
+          2000.f,
+          1.f,
+          1.f - scale * 0.01f);
+
+  return std::isfinite(factor)
+      ? std::clamp(factor, 0.f, 1.f)
+      : 1.f;
 }
 
 void Controller::resetIterm()
