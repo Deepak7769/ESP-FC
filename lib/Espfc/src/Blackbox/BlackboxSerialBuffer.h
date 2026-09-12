@@ -22,12 +22,25 @@ class BlackboxSerialBuffer: public Stream::ReadWritable
       delete[] _data;
       _data = nullptr;
     }
+void wrap(
+    Stream::ReadWritable* s)
+{
+  if (_data)
+  {
+    delete[] _data;
+    _data = nullptr;
+  }
 
-    void wrap(Stream::ReadWritable * s)
-    {
-      _dev = s;
-      _data = new uint8_t[SIZE];
-    }
+  _dev = s;
+  _idx = 0;
+
+  if (SIZE > 0)
+  {
+    _data =
+        new uint8_t[SIZE];
+  }
+}
+ 
 
     void begin(const Hal::SerialDeviceConfig& conf) override
     {
@@ -41,6 +54,10 @@ class BlackboxSerialBuffer: public Stream::ReadWritable
 
     size_t write(uint8_t c) override
     {
+      if (!_data || SIZE == 0)
+{
+  return 0;
+}
       _data[_idx++] = c;
       if(_idx >= SIZE) flush();
       return 1;
@@ -64,7 +81,12 @@ class BlackboxSerialBuffer: public Stream::ReadWritable
       return _idx == 0;
     }
 
-    int available() override { return _dev->available(); }
+   int available() override
+{
+  return _dev
+      ? _dev->available()
+      : 0;
+}
     int read() override { return _dev->read(); }
     size_t readMany(uint8_t * c, size_t l) override
     {
