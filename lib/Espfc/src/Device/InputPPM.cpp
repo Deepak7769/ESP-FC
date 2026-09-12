@@ -1,12 +1,15 @@
 #include "Device/InputPPM.h"
+
 #include <Arduino.h>
+#include <algorithm>
+
 #include "Utils/MemoryHelper.h"
 
 namespace Espfc {
 
 namespace Device {
 
-void InputPPM::begin(uint8_t pin, int mode)
+void InputPPM::begin(int pin, int mode)
 {
   if(_pin != -1)
   {
@@ -45,15 +48,30 @@ InputStatus FAST_CODE_ATTR InputPPM::update()
 
 uint16_t FAST_CODE_ATTR InputPPM::get(uint8_t i) const
 {
+  if (i >= CHANNELS)
+  {
+    return 0;
+  }
+
   return _channels[i];
 }
 
-void FAST_CODE_ATTR InputPPM::get(uint16_t * data, size_t len) const
+void FAST_CODE_ATTR InputPPM::get(
+    uint16_t* data,
+    size_t len) const
 {
-  const uint16_t * src = const_cast<const uint16_t *>(_channels);
-  while(len--)
+  if (!data)
   {
-    *data++ = *src++;
+    return;
+  }
+
+  len = std::min(
+      len,
+      CHANNELS);
+
+  for (size_t i = 0; i < len; i++)
+  {
+    data[i] = _channels[i];
   }
 }
 
