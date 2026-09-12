@@ -4,7 +4,7 @@
 #include <algorithm>
 
 #include "Utils/MemoryHelper.h"
-
+ 
 namespace Espfc {
 
 namespace Device {
