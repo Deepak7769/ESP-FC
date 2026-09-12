@@ -1,5 +1,5 @@
 #pragma once
-
+#include <cstring>
 #include <cmath>
 #include <cstdint>
 
@@ -14,19 +14,44 @@
 // See: http://en.wikipedia.org/wiki/Fast_inverse_square_root
 inline float invSqrt(float x)
 {
-  // return 1.f / sqrt(x);
-  static_assert(sizeof(float) == sizeof(int32_t));
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstrict-aliasing"
-#pragma GCC diagnostic ignored "-Wuninitialized"
-  float halfx = 0.5f * x;
+  if (x <= 0.0f)
+  {
+    return 0.0f;
+  }
+
+  static_assert(
+      sizeof(float) == sizeof(int32_t));
+
+  const float halfx =
+      0.5f * x;
+
   float y = x;
-  int32_t i = *(int32_t*)&y;
-  i = 0x5f3759df - (i >> 1);
-  y = *(float*)&i;
-  y = y * (1.5f - (halfx * y * y));
-  y = y * (1.5f - (halfx * y * y));
-#pragma GCC diagnostic pop
+  int32_t i = 0;
+
+  std::memcpy(
+      &i,
+      &y,
+      sizeof(i));
+
+  i =
+      0x5f3759df -
+      (i >> 1);
+
+  std::memcpy(
+      &y,
+      &i,
+      sizeof(y));
+
+  y =
+      y *
+      (1.5f -
+       (halfx * y * y));
+
+  y =
+      y *
+      (1.5f -
+       (halfx * y * y));
+
   return y;
 }
 
@@ -110,11 +135,28 @@ public:
   /**
    * @brief Normalizes this quaternion in place.
    */
-  void normalize()
+void normalize()
+{
+  const float magSq =
+      w * w +
+      x * x +
+      y * y +
+      z * z;
+
+  if (magSq <= 1e-12f)
   {
-    float m = invSqrt(w * w + x * x + y * y + z * z);
-    (*this) *= m;
+    w = 1.0f;
+    x = 0.0f;
+    y = 0.0f;
+    z = 0.0f;
+    return;
   }
+
+  const float m =
+      invSqrt(magSq);
+
+  (*this) *= m;
+}
 
   /**
    * @brief Returns a normalized copy of this quaternion.
@@ -368,12 +410,28 @@ public:
    * @brief Normalizes this vector in place.
    * @return VectorBase<T>& A reference to this vector.
    */
-  VectorBase<T>& normalize()
+VectorBase<T>& normalize()
+{
+  const float magSq =
+      static_cast<float>(x) *
+          static_cast<float>(x) +
+      static_cast<float>(y) *
+          static_cast<float>(y) +
+      static_cast<float>(z) *
+          static_cast<float>(z);
+
+  if (magSq <= 1e-12f)
   {
-    float m = invSqrt(x * x + y * y + z * z);
-    (*this) *= m;
     return *this;
   }
+
+  const float m =
+      invSqrt(magSq);
+
+  (*this) *= m;
+
+  return *this;
+}
 
   /**
    * @brief Returns a new vector that is normalized.
