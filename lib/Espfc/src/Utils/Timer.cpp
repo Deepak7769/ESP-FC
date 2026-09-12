@@ -5,7 +5,16 @@
 
 namespace Espfc::Utils {
 
-Timer::Timer(): interval(0), last(0), next(0), iteration(0), delta(0) {}
+Timer::Timer():
+    interval(0),
+    rate(0),
+    denom(1),
+    last(0),
+    next(0),
+    iteration(0),
+    delta(0),
+    intervalf(0.f)
+{}
 
 int Timer::setInterval(uint32_t interval)
 {
