@@ -80,9 +80,11 @@ int FAST_CODE_ATTR AccelSensor::read()
   }
 
   Utils::Stats::Measure measure(_model.state.stats, COUNTER_ACCEL_READ);
-  _gyro->readAccel(_model.state.accel.raw);
-
-  return 1;
+return
+    _gyro->readAccel(
+        _model.state.accel.raw)
+        ? 1
+        : 0;
 }
 
 int FAST_CODE_ATTR AccelSensor::filter()
