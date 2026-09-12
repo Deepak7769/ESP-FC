@@ -18,6 +18,16 @@ Timer::Timer():
 
 int Timer::setInterval(uint32_t interval)
 {
+    if (interval == 0)
+{
+  this->interval = 0;
+  this->rate = 0;
+  this->denom = 1;
+  this->delta = 0;
+  this->intervalf = 0.f;
+  iteration = 0;
+  return 0;
+}
   this->interval = interval;
   this->rate = (1000000UL + interval / 2) / interval;
   this->denom = 1;
@@ -29,6 +39,16 @@ int Timer::setInterval(uint32_t interval)
 
 int Timer::setRate(uint32_t rate, uint32_t denom)
 {
+    if (rate == 0 || denom == 0)
+{
+  this->interval = 0;
+  this->rate = 0;
+  this->denom = 1;
+  this->delta = 0;
+  this->intervalf = 0.f;
+  iteration = 0;
+  return 0;
+}
   this->rate = (rate + denom / 2) / denom;
   this->interval = (1000000UL + this->rate / 2) / this->rate;
   this->denom = denom;
@@ -51,7 +71,10 @@ int FAST_CODE_ATTR Timer::update()
 bool FAST_CODE_ATTR Timer::check(uint32_t now)
 {
   if (interval == 0) return false;
-  if (now < next) return false;
+  if ((int32_t)(now - next) < 0)
+{
+  return false;
+}
   return update(now);
 }
 
