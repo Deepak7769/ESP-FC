@@ -81,7 +81,7 @@
 
 // #define ESPFC_FREE_RTOS_QUEUE
 #define ESPFC_ATOMIC_QUEUE
-#define ESPFC_SAFE_BENCH_BUILD
+//#define ESPFC_SAFE_BENCH_BUILD
 #define ESPFC_DSP
 
 #include "./TargetEsp32Common.h"
