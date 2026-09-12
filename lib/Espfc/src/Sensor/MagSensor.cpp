@@ -66,9 +66,11 @@ int MagSensor::read()
   if (!_mag || !_model.magActive() || !_model.state.mag.timer.check()) return 0;
 
   Utils::Stats::Measure measure(_model.state.stats, COUNTER_MAG_READ);
-  _mag->readMag(_model.state.mag.raw);
-
-  return 1;
+return
+    _mag->readMag(
+        _model.state.mag.raw)
+        ? 1
+        : 0;
 }
 
 int MagSensor::filter()
