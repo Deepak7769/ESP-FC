@@ -399,11 +399,11 @@ class Model
     }
 
     void reset()
-    {
-      initialize();
-      //save();
-      reload();
-    }
+{
+  initialize();
+  postLoad();
+  reload();
+}
     bool validatePinResources()
 {
   bool used[64] = {};
