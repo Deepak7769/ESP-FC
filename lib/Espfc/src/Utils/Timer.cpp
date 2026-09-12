@@ -49,8 +49,17 @@ int Timer::setRate(uint32_t rate, uint32_t denom)
   iteration = 0;
   return 0;
 }
-  this->rate = (rate + denom / 2) / denom;
-  this->interval = (1000000UL + this->rate / 2) / this->rate;
+  const uint64_t calculatedRate =
+      (static_cast<uint64_t>(rate) + denom / 2u) / denom;
+
+  if (calculatedRate == 0 || calculatedRate > 1000000u)
+  {
+    return setInterval(0);
+  }
+
+  this->rate = static_cast<uint32_t>(calculatedRate);
+  this->interval =
+      (1000000u + this->rate / 2u) / this->rate;
   this->denom = denom;
   this->delta = this->interval;
   this->intervalf = this->interval * 0.000001f;
