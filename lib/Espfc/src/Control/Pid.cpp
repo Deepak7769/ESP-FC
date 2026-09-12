@@ -27,14 +27,18 @@ void Pid::resetIterm()
 float FAST_CODE_ATTR Pid::update(
     float setpoint,
     float measurement,
-    float tpaFactor)
+    float tpaFactor,
+    bool tpaP)
 {
   error = setpoint - measurement;
    const float tpa =
     std::clamp(tpaFactor, 0.0f, 1.0f);
+    
   // P-term
   pTerm = Kp * error * pScale;
+    
   pTerm = ptermFilter.update(pTerm);
+    
   if (tpaP)
 {
   pTerm *= tpa;
