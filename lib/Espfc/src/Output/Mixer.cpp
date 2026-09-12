@@ -10,15 +10,31 @@ Mixer::Mixer(Model& model): _model(model), _motor(nullptr), _servo(nullptr) {}
 
 int Mixer::begin()
 {
+#ifndef ESPFC_SAFE_BENCH_BUILD
+
   EscConfig motorConf = {
       .timer = ESC_DRIVER_MOTOR_TIMER,
-      .protocol = (EscProtocol)_model.config.output.protocol,
-      .rate = _model.config.output.rate,
-      .async = !!_model.config.output.async,
-      .dshotTelemetry = !!_model.config.output.dshotTelemetry,
+      .protocol =
+          (EscProtocol)_model.config.output.protocol,
+      .rate =
+          _model.config.output.rate,
+      .async =
+          !!_model.config.output.async,
+      .dshotTelemetry =
+          !!_model.config.output.dshotTelemetry,
   };
+
   escMotor.begin(motorConf);
-  _model.state.mixer.escMotor = _motor = &escMotor;
+
+  _model.state.mixer.escMotor =
+      _motor = &escMotor;
+
+#else
+
+  _model.state.mixer.escMotor = nullptr;
+  _motor = nullptr;
+
+#endif
   _model.logger.info()
       .log("MOTOR")
       .log(EscDriver::getProtocolName((EscProtocol)_model.config.output.protocol))
@@ -27,8 +43,10 @@ int Mixer::begin()
       .log(_model.config.output.dshotTelemetry)
       .logln(ESC_DRIVER_MOTOR_TIMER);
 
-  if (_model.config.output.servoRate)
-  {
+ if (_model.config.output.servoRate)
+{
+#ifndef ESPFC_SAFE_BENCH_BUILD
+
     EscConfig servoConf = {
         .timer = ESC_DRIVER_SERVO_TIMER,
         .protocol = ESC_PROTOCOL_PWM,
@@ -36,8 +54,18 @@ int Mixer::begin()
         .async = true,
         .dshotTelemetry = false,
     };
+
     escServo.begin(servoConf);
-    _model.state.mixer.escServo = _servo = &escServo;
+
+    _model.state.mixer.escServo =
+        _servo = &escServo;
+
+#else
+
+    _model.state.mixer.escServo = nullptr;
+    _servo = nullptr;
+
+#endif
     _model.logger.info()
         .log("SERVO")
         .log(EscDriver::getProtocolName(ESC_PROTOCOL_PWM))
@@ -60,11 +88,22 @@ int Mixer::begin()
         _model.logger.info().log("SERVO").log(i).logln(_model.config.pin[PIN_OUTPUT_0 + i]);
       }
     }
-    else
-    {
-      _motor->attach(i, _model.config.pin[PIN_OUTPUT_0 + i], 1000);
-      _model.logger.info().log("MOTOR").log(i).logln(_model.config.pin[PIN_OUTPUT_0 + i]);
-    }
+else
+{
+  if (_motor)
+  {
+    _motor->attach(
+        i,
+        _model.config.pin[PIN_OUTPUT_0 + i],
+        1000);
+
+    _model.logger.info()
+        .log("MOTOR")
+        .log(i)
+        .logln(
+            _model.config.pin[PIN_OUTPUT_0 + i]);
+  }
+}
     _model.state.output.telemetry.errors[i] = 0;
     _model.state.output.telemetry.errorsSum[i] = 0;
     _model.state.output.telemetry.errorsCount[i] = 0;
@@ -75,7 +114,10 @@ int Mixer::begin()
     _model.state.output.telemetry.rpm[i] = 0;
     _model.state.output.telemetry.freq[i] = 0;
   }
+  if (_motor)
+{
   motorInitEscDevice(_motor);
+}
 
   _model.state.mixer.minThrottle = _model.config.output.minCommand + _model.config.output.motorIdle * 0.1f;
   _model.state.mixer.maxThrottle = _model.config.output.maxThrottle;
