@@ -36,6 +36,7 @@ private:
   Utils::Sma<VectorFloat, 8> _dyn_notch_sma;
   size_t _dyn_notch_denom;
   size_t _dyn_notch_count;
+  size_t _rpm_harmonics = 0;
   bool _dyn_notch_enabled;
   bool _dyn_notch_debug;
   bool _rpm_enabled;
