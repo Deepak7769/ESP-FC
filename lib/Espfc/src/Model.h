@@ -622,10 +622,13 @@ class Model
       config.loopSync = std::max((int)config.loopSync, loopSyncMax);
       state.loopRate = state.gyro.rate / config.loopSync;
 
-      config.output.protocol = ESC_PROTOCOL_SANITIZE(config.output.protocol);
+      config.output.protocol =
+    ESC_PROTOCOL_SANITIZE(config.output.protocol);
 
-      switch(config.output.protocol)
-      {
+#ifndef ESPFC_SAFE_BENCH_BUILD
+
+switch(config.output.protocol)
+{
         case ESC_PROTOCOL_BRUSHED:
           config.output.async = true;
           break;
@@ -690,7 +693,7 @@ if(config.output.protocol == ESC_PROTOCOL_PWM)
           state.loopRate = state.gyro.rate / config.loopSync;
         }
       }
-
+        #endif // !ESPFC_SAFE_BENCH_BUILD
       // sanitize throttle and motor limits
       if(config.output.throttleLimitType < 0 || config.output.throttleLimitType >= THROTTLE_LIMIT_TYPE_MAX) {
         config.output.throttleLimitType = THROTTLE_LIMIT_TYPE_NONE;
@@ -737,11 +740,7 @@ if(config.output.protocol == ESC_PROTOCOL_PWM)
         {
           config.gyro.dynamicFilter.count = DYN_NOTCH_COUNT_MAX;
         }
-      #ifdef ESPFC_SAFE_BENCH_BUILD
-config.output.protocol =
-    ESC_PROTOCOL_DISABLED;
-#endif
-    }
+
 
     void begin()
     {
