@@ -42,53 +42,106 @@ InputStatus FAST_CODE_ATTR InputIBUS::update()
   return INPUT_IDLE;
 }
 
-void FAST_CODE_ATTR InputIBUS::parse(IBusData& frameData, int d)
+void FAST_CODE_ATTR InputIBUS::parse(
+    IBusData& frameData,
+    int d)
 {
-  uint8_t* data = reinterpret_cast<uint8_t*>(&frameData);
-  uint8_t c = d & 0xff;
-  switch(_state)
+  uint8_t* data =
+      reinterpret_cast<uint8_t*>(&frameData);
+
+  const uint8_t c =
+      static_cast<uint8_t>(d & 0xff);
+
+  auto resetFrame = [&]()
+  {
+    _state = IBUS_LENGTH;
+    _idx = 0;
+  };
+
+  auto pushByte = [&](uint8_t value) -> bool
+  {
+    if (_idx >= IBUS_FRAME_SIZE)
+    {
+      resetFrame();
+      return false;
+    }
+
+    data[_idx++] = value;
+    return true;
+  };
+
+  switch (_state)
   {
     case IBUS_LENGTH:
-      if(c == IBUS_FRAME_SIZE)
+      _idx = 0;
+
+      if (c == IBUS_FRAME_SIZE)
       {
-        data[_idx++] = c;
-        _state = IBUS_CMD;
+        if (pushByte(c))
+        {
+          _state = IBUS_CMD;
+        }
       }
       break;
+
     case IBUS_CMD:
-      if(c == IBUS_COMMAND)
+      if (c == IBUS_COMMAND)
       {
-        data[_idx++] = c;
-        _state = IBUS_DATA;
+        if (pushByte(c))
+        {
+          _state = IBUS_DATA;
+        }
       }
       else
       {
-        _state = IBUS_LENGTH;
+        resetFrame();
       }
       break;
+
     case IBUS_DATA:
-      data[_idx] = c;
-      if(++_idx >= IBUS_FRAME_SIZE - 2)
+      if (!pushByte(c))
+      {
+        break;
+      }
+
+      if (_idx >= IBUS_FRAME_SIZE - 2)
       {
         _state = IBUS_CRC_LO;
       }
       break;
+
     case IBUS_CRC_LO:
-      data[_idx++] = c;
-      _state = IBUS_CRC_HI;
+      if (pushByte(c))
+      {
+        _state = IBUS_CRC_HI;
+      }
       break;
+
     case IBUS_CRC_HI:
-      data[_idx++] = c;
+    {
+      if (!pushByte(c))
+      {
+        break;
+      }
+
       uint16_t csum = 0xffff;
-      for(size_t i = 0; i < IBUS_FRAME_SIZE - 2; i++)
+
+      for (size_t i = 0;
+           i < IBUS_FRAME_SIZE - 2;
+           i++)
       {
         csum -= data[i];
       }
-      if(frameData.checksum == csum) apply(frameData);
-      _state = IBUS_LENGTH;
-      _idx = 0;
+
+      if (frameData.checksum == csum)
+      {
+        apply(frameData);
+      }
+
+      resetFrame();
       break;
     }
+  }
 }
 
 void FAST_CODE_ATTR InputIBUS::apply(IBusData& data)
