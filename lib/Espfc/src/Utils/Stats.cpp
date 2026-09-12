@@ -47,7 +47,11 @@ uint32_t Stats::loopTime() const
 
 void Stats::update()
 {
-  if (!timer.check()) return;
+  if (!timer.check())
+  if (timer.delta == 0)
+{
+  return;
+}
   for (size_t i = 0; i < COUNTER_COUNT; i++)
   {
     _avg[i] = (float)(_sum[i] + (_count[i] >> 1)) / timer.delta;
@@ -109,7 +113,16 @@ float Stats::getCpuLoad() const
   float cpu1 = getLoad(COUNTER_CPU_1);
   float maxLoad = std::max(cpu0, cpu1);
   float minLoad = std::min(cpu0, cpu1);
-  float alpha = maxLoad / (minLoad + maxLoad);
+  const float total =
+    minLoad + maxLoad;
+
+if (total <= 0.f)
+{
+  return 0.f;
+}
+
+const float alpha =
+    maxLoad / total;
   return alpha * maxLoad + (1.f - alpha) * minLoad;
 }
 
