@@ -47,11 +47,10 @@ uint32_t Stats::loopTime() const
 
 void Stats::update()
 {
-  if (!timer.check())
-  if (timer.delta == 0)
-{
-  return;
-}
+  if (!timer.check() || timer.delta == 0)
+  {
+    return;
+  }
   for (size_t i = 0; i < COUNTER_COUNT; i++)
   {
     _avg[i] = (float)(_sum[i] + (_count[i] >> 1)) / timer.delta;
