@@ -36,8 +36,12 @@ static void IRAM_ATTR flashfsLogBegin()
 {
     uint32_t beginAddr = flashfs.address;
     size_t idx = flashfs.journalIdx;
-
+    if(idx >= FLASHFS_JOURNAL_ITEMS)
+{
+    return;
+}
     flashfs.journal[idx].logBegin = beginAddr;
+    
 
     if(!flashfs.partition) return;
 
@@ -48,14 +52,23 @@ static void IRAM_ATTR flashfsLogBegin()
 
 static bool IRAM_ATTR flashfsLogStarted()
 {
-    return flashfs.journal[flashfs.journalIdx].logBegin != FLASHFS_ERASED_VAL;
-}
+    if(flashfs.journalIdx >= FLASHFS_JOURNAL_ITEMS)
+    {
+        return false;
+    }
 
+    return
+        flashfs.journal[flashfs.journalIdx].logBegin !=
+        FLASHFS_ERASED_VAL;
+}
 static void IRAM_ATTR flashfsLogEnd()
 {
     uint32_t endAddr = flashfs.address;
     size_t idx = flashfs.journalIdx;
-
+    if(idx >= FLASHFS_JOURNAL_ITEMS)
+{
+    return;
+}
     flashfs.journal[idx].logEnd = endAddr;
 
     flashfs.journalIdx++;
@@ -181,16 +194,40 @@ void IRAM_ATTR flashfsWriteAbs(uint32_t address, const uint8_t *data, unsigned i
     esp_partition_write_raw(p, address, data, len);
 }
 
-int IRAM_ATTR flashfsReadAbs(uint32_t address, uint8_t *data, unsigned int len)
+int IRAM_ATTR flashfsReadAbs(
+    uint32_t address,
+    uint8_t *data,
+    unsigned int len)
 {
-    if(!flashfs.partition) return 0;
+    if(!flashfs.partition || !data || len == 0)
+    {
+        return 0;
+    }
 
-    const auto p = reinterpret_cast<const esp_partition_t*>(flashfs.partition);
-    len = std::min((uint32_t)len, p->size - address);
-    if(esp_partition_read_raw(p, address, data, len) == ESP_OK)
+    const auto p =
+        reinterpret_cast<
+            const esp_partition_t*>(
+                flashfs.partition);
+
+    if(address >= p->size)
+    {
+        return 0;
+    }
+
+    len =
+        std::min<uint32_t>(
+            len,
+            p->size - address);
+
+    if(esp_partition_read_raw(
+           p,
+           address,
+           data,
+           len) == ESP_OK)
     {
         return len;
     }
+
     return 0;
 }
 
@@ -211,8 +248,21 @@ bool IRAM_ATTR flashfsIsEOF(void)
 
 void flashfsEraseCompletely(void)
 {
-    const auto p = reinterpret_cast<const esp_partition_t*>(flashfs.partition);
-    esp_partition_erase_range(p, 0, p->size);
+    if(!flashfs.partition)
+    {
+        return;
+    }
+
+    const auto p =
+        reinterpret_cast<
+            const esp_partition_t*>(
+                flashfs.partition);
+
+    esp_partition_erase_range(
+        p,
+        0,
+        p->size);
+
     flashfsInit();
 }
 
