@@ -16,10 +16,26 @@ int Actuator::begin()
   _model.state.mode.maskSwitch = 0;
   for (size_t i = 0; i < ACTUATOR_CONDITIONS; i++)
   {
-    const auto& c = _model.config.conditions[i];
-    if (c.min >= c.max) continue;                          // inactive
-    if (c.ch < AXIS_AUX_1 || c.ch >= AXIS_COUNT) continue; // invalid channel
-    _model.state.mode.maskPresent |= 1 << c.id;
+const auto& c = _model.config.conditions[i];
+
+if (c.min >= c.max)
+{
+  continue;
+}
+
+if (c.ch < AXIS_AUX_1 ||
+    c.ch >= AXIS_COUNT)
+{
+  continue;
+}
+
+if (c.id >= MODE_COUNT)
+{
+  continue;
+}
+
+_model.state.mode.maskPresent |=
+    (uint32_t{1} << c.id);
   }
   _model.state.mode.airmodeAllowed = false;
   _model.state.mode.rescueConfigMode = RESCUE_CONFIG_PENDING;
@@ -56,7 +72,11 @@ void Actuator::updateScaler()
     if (!mode) continue;
 
     short c = _model.config.scaler[i].channel;
-    if (c < AXIS_AUX_1) continue;
+    if (c < AXIS_AUX_1 ||
+    c >= AXIS_COUNT)
+{
+  continue;
+}
 
     float v = _model.state.input.ch[c];
     float min = _model.config.scaler[i].minScale * 0.01f;
@@ -120,19 +140,43 @@ void Actuator::updateModeMask()
   uint32_t newMask = 0;
   for (size_t i = 0; i < ACTUATOR_CONDITIONS; i++)
   {
-    ActuatorCondition* c = &_model.config.conditions[i];
-    if (c->min >= c->max) continue; // inactive
+ ActuatorCondition* c =
+    &_model.config.conditions[i];
 
-    int16_t min = c->min;                              // * 25 + 900;
-    int16_t max = c->max;                              // * 25 + 900;
-    size_t ch = c->ch;                                 // + AXIS_AUX_1;
-    if (ch < AXIS_AUX_1 || ch >= AXIS_COUNT) continue; // invalid channel
+if (c->min >= c->max)
+{
+  continue;
+}
 
-    int16_t val = _model.state.input.us[ch];
-    if (val > min && val < max)
-    {
-      newMask |= 1 << c->id;
-    }
+if (c->id >= MODE_COUNT)
+{
+  continue;
+}
+
+int16_t min =
+    c->min;
+
+int16_t max =
+    c->max;
+
+size_t ch =
+    c->ch;
+
+if (ch < AXIS_AUX_1 ||
+    ch >= AXIS_COUNT)
+{
+  continue;
+}
+
+int16_t val =
+    _model.state.input.us[ch];
+
+if (val > min &&
+    val < max)
+{
+  newMask |=
+      (uint32_t{1} << c->id);
+}
   }
 
   _model.updateSwitchActive(newMask);
