@@ -44,7 +44,7 @@ int Mixer::begin()
       .logln(ESC_DRIVER_MOTOR_TIMER);
 
  if (_model.config.output.servoRate)
-{
+ {
 #ifndef ESPFC_SAFE_BENCH_BUILD
 
     EscConfig servoConf = {
