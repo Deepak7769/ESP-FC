@@ -740,7 +740,7 @@ if(config.output.protocol == ESC_PROTOCOL_PWM)
         {
           config.gyro.dynamicFilter.count = DYN_NOTCH_COUNT_MAX;
         }
-
+    }
 
     void begin()
     {
