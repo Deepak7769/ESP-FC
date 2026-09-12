@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <tuple>
+#include <cstring>
 
 namespace Espfc::Sensor {
 
@@ -674,7 +675,22 @@ void GpsSensor::calculateHomeVector() const
 
 void GpsSensor::handleCfgValGet() const
 {
-  const uint32_t key = *(reinterpret_cast<const uint32_t*>(_ubxMsg.payload) + sizeof(Gps::UbxCfgValsetHeader));
+  constexpr size_t headerSize =
+      sizeof(Gps::UbxCfgValsetHeader);
+
+  if (_ubxMsg.length <
+      headerSize + sizeof(uint32_t))
+  {
+    return;
+  }
+
+  uint32_t key = 0;
+
+  std::memcpy(
+      &key,
+      _ubxMsg.payload + headerSize,
+      sizeof(key));
+
   if (key == Gps::CFG_SIGNAL_GPS_L5)
   {
     _model.state.gps.support.gpsL5 = true;
