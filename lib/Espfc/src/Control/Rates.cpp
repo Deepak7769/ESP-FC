@@ -107,6 +107,10 @@ float FAST_CODE_ATTR Rates::actual(const int axis, float rcCommandf, const float
 float FAST_CODE_ATTR Rates::quick(const int axis, float rcCommandf, const float rcCommandfAbs) const
 {
   const float rcRate = this->rcRates[axis] * 2;
+  if (rcRate <= 0.f)
+{
+  return 0.f;
+}
   const float maxDPS = std::max(this->rates[axis] * 10.f, rcRate);
   const float linearity = this->rcExpo[axis] / 100.0f;
   const float superFactorConfig = (maxDPS / rcRate - 1) / (maxDPS / rcRate);
