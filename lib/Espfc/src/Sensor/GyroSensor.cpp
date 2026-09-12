@@ -50,8 +50,9 @@ int GyroSensor::reload(ModelChangeEvent event)
 
   switch (event)
   {
-    case MODEL_CHANGE_FILTER:
-      _model.state.gyro.scale = Utils::toRad(2000.f) / 32768.f;
+   case MODEL_CHANGE_FILTER:
+{
+  _model.state.gyro.scale = Utils::toRad(2000.f) / 32768.f;
 
       _sma.begin(_model.config.loopSync);
       _dyn_notch_denom = std::max((uint32_t)1, _model.state.loopTimer.rate / 1000);
@@ -106,7 +107,7 @@ _rpm_q =
           for (size_t n = 0;n < _rpm_harmonics; n++)
           {
             int center = Utils::mapi(m * RPM_FILTER_HARMONICS_MAX + n, 0,
-                                     RPM_FILTER_MOTOR_MAX * _model.config.gyro.rpmFilter.harmonics,
+                                     RPM_FILTER_MOTOR_MAX * _rpm_harmonics,
                                      _model.config.gyro.rpmFilter.minFreq, loopFilterRate / 2);
             gyroState.rpmFilter[m][n][i].begin(FilterConfig(FILTER_NOTCH_DF1, center, center * 0.98f), loopFilterRate);
           }
@@ -140,6 +141,7 @@ gyroState.notch2Filter[i].begin(
 #endif
       }
       break;
+}
     default:
       break;
   }
