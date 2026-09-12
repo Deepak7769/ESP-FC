@@ -898,7 +898,7 @@ if(config.output.protocol == ESC_PROTOCOL_PWM)
       }
     }
 
-    ModelState state;
+    ModelState state{};
     ModelConfig config;
     Utils::Logger logger;
 
@@ -934,7 +934,7 @@ if(config.output.protocol == ESC_PROTOCOL_PWM)
     #ifndef UNIT_TEST
     Utils::Storage _storage;
     #endif
-    StorageResult _storageResult;
+    StorageResult _storageResult = STORAGE_NONE;
 
     std::function<void(ModelChangeEvent)> _onConfigChange{};
 };
