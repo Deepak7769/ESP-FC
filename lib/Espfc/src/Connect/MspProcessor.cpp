@@ -1416,15 +1416,40 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       }
       break;
 
-    case MSP_SET_PID:
-      for (int i = 0; i < PID_ITEM_COUNT; i++)
+     case MSP_SET_PID:
+    {
+      constexpr size_t PID_BYTES_PER_ITEM =
+          3;
+
+      constexpr size_t REQUIRED_PID_BYTES =
+          PID_ITEM_COUNT *
+          PID_BYTES_PER_ITEM;
+
+      if (m.remain() <
+          REQUIRED_PID_BYTES)
       {
-        _model.config.pid[i].P = m.readU8();
-        _model.config.pid[i].I = m.readU8();
-        _model.config.pid[i].D = m.readU8();
+        break;
       }
-      _model.notifyConfigChange(MODEL_CHANGE_PID);
+
+      for (int i = 0;
+           i < PID_ITEM_COUNT;
+           i++)
+      {
+        _model.config.pid[i].P =
+            m.readU8();
+
+        _model.config.pid[i].I =
+            m.readU8();
+
+        _model.config.pid[i].D =
+            m.readU8();
+      }
+
+      _model.notifyConfigChange(
+          MODEL_CHANGE_PID);
+
       break;
+    }
 
     case MSP_PID_ADVANCED:
       r.writeU16(0);
