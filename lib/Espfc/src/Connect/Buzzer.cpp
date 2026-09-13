@@ -4,7 +4,13 @@
 
 namespace Espfc::Connect {
 
-Buzzer::Buzzer(Model& model): _model(model), _status(BUZZER_STATUS_IDLE), _wait(0), _scheme(nullptr), _e(BUZZER_SILENCE)
+Buzzer::Buzzer(Model& model)
+    : _model(model),
+      _status(BUZZER_STATUS_IDLE),
+      _wait(0),
+      _waiting(false),
+      _scheme(nullptr),
+      _e(BUZZER_SILENCE)
 {
 }
 
@@ -25,9 +31,26 @@ int Buzzer::update()
   //_model.state.debug[1] = _status;
   //_model.state.debug[2] = (int16_t)(millis() - _wait);
 
-  if (_model.config.pin[PIN_BUZZER] == -1) return 0;
-  if (!_model.state.buzzer.timer.check()) return 0;
-  if (_wait > millis()) return 0;
+if (_model.config.pin[PIN_BUZZER] == -1)
+{
+  return 0;
+}
+
+if (!_model.state.buzzer.timer.check())
+{
+  return 0;
+}
+
+const uint32_t now =
+    millis();
+
+if (_waiting &&
+    (int32_t)(now - _wait) < 0)
+{
+  return 0;
+}
+
+_waiting = false;
 
   switch (_status)
   {
@@ -78,7 +101,11 @@ void Buzzer::_write(bool v)
 
 void Buzzer::_delay(int time)
 {
-  _wait = millis() + time * 10;
+  _wait =
+      millis() +
+      static_cast<uint32_t>(time) * 10u;
+
+  _waiting = true;
 }
 
 const uint8_t** Buzzer::schemes()
