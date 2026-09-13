@@ -356,36 +356,63 @@ void FAST_CODE_ATTR Blackbox::updateData()
 
 void FAST_CODE_ATTR Blackbox::updateArmed()
 {
-  // log arming beep event
-  static uint32_t beep = 0;
-  if (beep != 0 && _model.state.loopTimer.last > beep)
+  const uint32_t now =
+      _model.state.loopTimer.last;
+
+  const bool armed =
+      _model.isModeActive(MODE_ARMED);
+
+  // First process an armed/disarmed state transition.
+  if (armed != ARMING_FLAG(ARMED))
   {
-    setArmingBeepTimeMicros(_model.state.loopTimer.last);
-    beep = 0;
+    if (armed)
+    {
+      ENABLE_ARMING_FLAG(ARMED);
+
+      // A new armed state cancels any pending
+      // stop from the previous disarm.
+      _stopPending = false;
+
+      _armingBeepDeadline =
+          now + 200000u;
+
+      _armingBeepPending = true;
+    }
+    else
+    {
+      DISABLE_ARMING_FLAG(ARMED);
+
+      // Do not emit a delayed arming event
+      // after the state has already changed.
+      _armingBeepPending = false;
+
+      flightLogEventData_t eventData{};
+      eventData.disarm.reason =
+          _model.state.mode.disarmReason;
+
+      blackboxLogEvent(
+          FLIGHT_LOG_EVENT_DISARM,
+          &eventData);
+
+      _stopDeadline =
+          now + 500000u;
+
+      _stopPending = true;
+    }
   }
 
-  // stop logging
-  static uint32_t stop = 0;
-  if (stop != 0 && _model.state.loopTimer.last > stop)
+  if (_armingBeepPending &&
+      (int32_t)(now - _armingBeepDeadline) >= 0)
+  {
+    setArmingBeepTimeMicros(now);
+    _armingBeepPending = false;
+  }
+
+  if (_stopPending &&
+      (int32_t)(now - _stopDeadline) >= 0)
   {
     blackboxFinish();
-    stop = 0;
-  }
-
-  bool armed = _model.isModeActive(MODE_ARMED);
-  if (armed == ARMING_FLAG(ARMED)) return;
-  if (armed)
-  {
-    ENABLE_ARMING_FLAG(ARMED);
-    beep = _model.state.loopTimer.last + 200000; // schedule arming beep event ~200ms
-  }
-  else
-  {
-    DISABLE_ARMING_FLAG(ARMED);
-    flightLogEventData_t eventData;
-    eventData.disarm.reason = _model.state.mode.disarmReason;
-    blackboxLogEvent(FLIGHT_LOG_EVENT_DISARM, &eventData);
-    stop = _model.state.loopTimer.last + 500000; // schedule stop in 500ms
+    _stopPending = false;
   }
 }
 
