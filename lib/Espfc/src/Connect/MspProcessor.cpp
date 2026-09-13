@@ -1425,9 +1425,10 @@ constexpr int REQUIRED_PID_BYTES =
     PID_ITEM_COUNT *
     PID_BYTES_PER_ITEM;
 
-      if (m.remain() <
+           if (m.remain() <
           REQUIRED_PID_BYTES)
       {
+        r.result = -1;
         break;
       }
 
