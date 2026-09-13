@@ -40,6 +40,7 @@ private:
   int32_t _counter;
   float _biasAlpha;
   bool _first{true};
+uint32_t _lastAltitudeUs{0};
 };
 
 } // namespace Espfc::Sensor
