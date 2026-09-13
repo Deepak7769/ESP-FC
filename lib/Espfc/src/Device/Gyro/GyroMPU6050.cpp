@@ -274,9 +274,24 @@ void GyroMPU6050::setRate(int rate)
 bool GyroMPU6050::testConnection()
 {
   uint8_t whoami = 0;
-  if (_bus->readByte(_addr, MPU6050_RA_WHO_AM_I, &whoami) != 1) return false;
+
+  if (_bus->readByte(
+          _addr,
+          MPU6050_RA_WHO_AM_I,
+          &whoami) != 1)
+  {
+    return false;
+  }
+
   setChipId(whoami);
-  return whoami == 0x68 || whoami == 0x72;
+
+  return whoami == 0x68 ||
+         whoami == 0x72;
+}
+
+bool GyroMPU6050::configurationValid() const
+{
+  return _configOk;
 }
 
 } // namespace Espfc::Device::Gyro
