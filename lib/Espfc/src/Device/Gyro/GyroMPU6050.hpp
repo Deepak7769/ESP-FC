@@ -28,7 +28,7 @@ public:
   bool configurationValid() const override;
 
   uint8_t _dlpf;
-
+ 
 protected:
   bool _configOk{true};
 };
