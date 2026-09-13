@@ -1,4 +1,5 @@
 #include "Hardware.h"
+#include <algorithm>
 #include "Device/Baro/BaroBMP085.hpp"
 #include "Device/Baro/BaroBMP280.hpp"
 #include "Device/Baro/BaroSPL06.hpp"
@@ -111,8 +112,17 @@ void Hardware::initBus()
       .logln(spiResult);
 #endif
 #if defined(ESPFC_I2C_0)
+  _model.config.i2cSpeed =
+      std::clamp<int16_t>(
+          _model.config.i2cSpeed,
+          10,
+          400);
+
   int i2cResult =
-      i2cBus.begin(_model.config.pin[PIN_I2C_0_SDA], _model.config.pin[PIN_I2C_0_SCL], _model.config.i2cSpeed * 1000ul);
+      i2cBus.begin(
+          _model.config.pin[PIN_I2C_0_SDA],
+          _model.config.pin[PIN_I2C_0_SCL],
+          static_cast<uint32_t>(_model.config.i2cSpeed) * 1000ul);
   i2cBus.onError = [this]() { onI2CError(); };
   _model.logger.info()
       .log("I2C")
