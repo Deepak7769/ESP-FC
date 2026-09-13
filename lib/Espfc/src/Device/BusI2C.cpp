@@ -35,10 +35,36 @@ int8_t FAST_CODE_ATTR BusI2C::read(uint8_t devAddr, uint8_t regAddr, uint8_t len
 
   // D("i2c:r0", devAddr, regAddr, length);
 
-  _dev.beginTransmission(devAddr);
-  _dev.write(regAddr);
-  _dev.endTransmission();
-  _dev.requestFrom(devAddr, length);
+_dev.beginTransmission(
+    devAddr);
+
+if (_dev.write(
+        regAddr) != 1)
+{
+  if (onError)
+  {
+    onError();
+  }
+
+  return -1;
+}
+
+const uint8_t txStatus =
+    _dev.endTransmission();
+
+if (txStatus != 0)
+{
+  if (onError)
+  {
+    onError();
+  }
+
+  return -1;
+}
+
+_dev.requestFrom(
+    devAddr,
+    length);
 
 for (;
      count < length &&
