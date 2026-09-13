@@ -203,7 +203,9 @@ int FAST_CODE_ATTR GyroSensor::filter()
   {
     for (size_t m = 0; m < RPM_FILTER_MOTOR_MAX; m++)
     {
-      for (size_t n = 0; n < _model.config.gyro.rpmFilter.harmonics; n++)
+    for (size_t n = 0;
+     n < _rpm_harmonics;
+     n++)
       {
         _model.state.gyro.adc = Utils::applyFilter(_model.state.gyro.rpmFilter[m][n], _model.state.gyro.adc);
       }
@@ -257,7 +259,9 @@ void FAST_CODE_ATTR GyroSensor::rpmFilterUpdate()
   Utils::Stats::Measure measure(_model.state.stats, COUNTER_RPM_UPDATE);
 
   const float motorFreq = _model.state.output.telemetry.freq[_rpm_motor_index];
-  for (size_t n = 0; n < _model.config.gyro.rpmFilter.harmonics; n++)
+ for (size_t n = 0;
+     n < _rpm_harmonics;
+     n++)
   {
     const float freq = std::clamp(motorFreq * (n + 1), _rpm_min_freq, _rpm_max_freq);
     const float freqMargin = freq - _rpm_min_freq;
