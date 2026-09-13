@@ -37,33 +37,54 @@ int Timer::setInterval(uint32_t interval)
   return 1;
 }
 
-int Timer::setRate(uint32_t rate, uint32_t denom)
+int Timer::setRate(
+    uint32_t rate,
+    uint32_t denom)
 {
-    if (rate == 0 || denom == 0)
-{
-  this->interval = 0;
-  this->rate = 0;
-  this->denom = 1;
-  this->delta = 0;
-  this->intervalf = 0.f;
-  iteration = 0;
-  return 0;
-}
-  const uint64_t calculatedRate =
-      (static_cast<uint64_t>(rate) + denom / 2u) / denom;
-
-  if (calculatedRate == 0 || calculatedRate > 1000000u)
+  if (rate == 0 || denom == 0)
   {
-    return setInterval(0);
+    this->interval = 0;
+    this->rate = 0;
+    this->denom = 1;
+    this->delta = 0;
+    this->intervalf = 0.f;
+    iteration = 0;
+    return 0;
   }
 
-  this->rate = static_cast<uint32_t>(calculatedRate);
+  const uint32_t effectiveRate =
+      (rate + denom / 2) /
+      denom;
+
+  if (effectiveRate == 0)
+  {
+    this->interval = 0;
+    this->rate = 0;
+    this->denom = 1;
+    this->delta = 0;
+    this->intervalf = 0.f;
+    iteration = 0;
+    return 0;
+  }
+
+  this->rate =
+      effectiveRate;
+
   this->interval =
-      (1000000u + this->rate / 2u) / this->rate;
-  this->denom = denom;
-  this->delta = this->interval;
-  this->intervalf = this->interval * 0.000001f;
+      (1000000UL + effectiveRate / 2) /
+      effectiveRate;
+
+  this->denom =
+      denom;
+
+  this->delta =
+      this->interval;
+
+  this->intervalf =
+      this->interval * 0.000001f;
+
   iteration = 0;
+
   return 1;
 }
 
