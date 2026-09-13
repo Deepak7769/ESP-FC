@@ -169,9 +169,15 @@ InputStatus FAST_CODE_ATTR Input::readInputs()
   _model.state.input.rxFailSafe = (status == INPUT_FAILSAFE);
   _model.state.input.frameCount++;
 
-  updateFrameRate();
-
   processInputs();
+
+  // frameTime represents the time of the most recent
+  // structurally valid receiver frame.
+  if (status == INPUT_RECEIVED &&
+      _model.state.input.channelsValid)
+  {
+    updateFrameRate();
+  }
 
   if (_model.config.debug.mode == DEBUG_RX_SIGNAL_LOSS)
   {
@@ -320,7 +326,27 @@ if (status == INPUT_RECEIVED)
 {
   if (!_model.state.input.channelsValid)
   {
-    failsafeStage1();
+    _model.state.input.lossTime =
+        micros() -
+        _model.state.input.frameTime;
+
+    const uint32_t stage2Timeout =
+        std::clamp<uint32_t>(
+            _model.config.failsafe.delay,
+            2u,
+            200u) *
+        TENTH_TO_US;
+
+    if (_model.state.input.lossTime >
+        stage2Timeout)
+    {
+      failsafeStage2();
+    }
+    else
+    {
+      failsafeStage1();
+    }
+
     return true;
   }
 
