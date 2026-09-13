@@ -25,8 +25,12 @@ public:
   void setRate(int rate) override;
 
   bool testConnection() override;
+  bool configurationValid() const override;
 
   uint8_t _dlpf;
+
+protected:
+  bool _configOk{true};
 };
 
 } // namespace Espfc::Device::Gyro
