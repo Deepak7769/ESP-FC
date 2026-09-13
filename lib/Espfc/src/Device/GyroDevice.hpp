@@ -40,8 +40,10 @@ public:
   virtual int getRate() const = 0;
   virtual void setRate(int rate) = 0;
 
-  virtual bool testConnection() = 0;
-
+ virtual bool configurationValid() const
+{
+  return true;
+}
   static const char** getNames();
   static const char* getName(DeviceType type);
 };
