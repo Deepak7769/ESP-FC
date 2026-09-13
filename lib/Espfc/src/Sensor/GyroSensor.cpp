@@ -21,10 +21,24 @@ int GyroSensor::begin()
   _gyro = _model.state.gyro.dev;
   if (!_gyro) return 0;
 
-  _gyro->setDLPFMode(_model.config.gyro.dlpf);
-  _gyro->setRate(_gyro->getRate());
+_gyro->setDLPFMode(
+    _model.config.gyro.dlpf);
 
-  reload(MODEL_CHANGE_FILTER);
+_gyro->setRate(
+    _gyro->getRate());
+
+if (!_gyro->configurationValid())
+{
+  _model.state.gyro.present =
+      false;
+
+  _model.state.accel.present =
+      false;
+
+  return 0;
+}
+
+reload(MODEL_CHANGE_FILTER);
 
   _model.state.gyro.calibrationState = CALIBRATION_START; // calibrate gyro on start
   _model.state.gyro.calibrationRate = _model.state.loopTimer.rate;
