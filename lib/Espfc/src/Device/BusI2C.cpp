@@ -18,9 +18,7 @@ int BusI2C::begin(int sda, int scl, uint32_t speed)
 {
   if (sda == -1 || scl == -1) return 0;
 
-  targetI2CInit(_dev, sda, scl, speed);
-
-  return 1;
+  return targetI2CInit(_dev, sda, scl, speed);
 }
 
 int8_t FAST_CODE_ATTR BusI2C::readFast(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8_t* data)
