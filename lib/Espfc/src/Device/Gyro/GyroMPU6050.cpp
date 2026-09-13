@@ -126,12 +126,55 @@ int GyroMPU6050::begin(BusDevice* bus, uint8_t addr)
   setRate(8000);
   delay(10);
 
-  // gyro range to 2000 deg/s
-  _bus->writeByte(_addr, MPU6050_RA_GYRO_CONFIG, MPU6050_GYRO_FS_2000 << 3);
+  if (!_bus->writeByte(
+          _addr,
+          MPU6050_RA_GYRO_CONFIG,
+          MPU6050_GYRO_FS_2000 << 3))
+  {
+    return 0;
+  }
 
-  // accel range to 16G
-  _bus->writeByte(_addr, MPU6050_RA_ACCEL_CONFIG, MPU6050_ACCEL_FS_16 << 3);
+  if (!_bus->writeByte(
+          _addr,
+          MPU6050_RA_ACCEL_CONFIG,
+          MPU6050_ACCEL_FS_16 << 3))
+  {
+    return 0;
+  }
 
+  uint8_t gyroConfig = 0;
+  uint8_t accelConfig = 0;
+
+  if (_bus->readByte(
+          _addr,
+          MPU6050_RA_GYRO_CONFIG,
+          &gyroConfig) != 1)
+  {
+    return 0;
+  }
+
+  if (_bus->readByte(
+          _addr,
+          MPU6050_RA_ACCEL_CONFIG,
+          &accelConfig) != 1)
+  {
+    return 0;
+  }
+
+  constexpr uint8_t FS_MASK =
+      0x18;
+
+  if ((gyroConfig & FS_MASK) !=
+      (MPU6050_GYRO_FS_2000 << 3))
+  {
+    return 0;
+  }
+
+  if ((accelConfig & FS_MASK) !=
+      (MPU6050_ACCEL_FS_16 << 3))
+  {
+    return 0;
+  }
   bool isSpi = _bus->isSPI();
 
   uint8_t userCtrl = MPU6050_I2C_MST_EN;
