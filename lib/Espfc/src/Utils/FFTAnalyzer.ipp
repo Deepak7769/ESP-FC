@@ -34,17 +34,67 @@ int FFTAnalyzer<SAMPLES>::begin(int16_t rate, const DynamicFilterConfig& config,
 
   if (!_in || !_out || !_win) std::abort();
 
-  int16_t nyquistLimit = rate / 2;
-  _rate = rate;
-  _freq_min = config.min_freq;
-  _freq_max = std::min(config.max_freq, nyquistLimit);
-  _peak_count = std::min((size_t)config.count, PEAKS_MAX);
+static_assert(
+    BINS > 2,
+    "FFT requires at least 3 bins");
 
-  _idx = axis * SAMPLES / 3;
-  _bin_width = (float)_rate / SAMPLES; // no need to dived by 2 as we next process `SAMPLES / 2` results
+_rate =
+    std::max<int16_t>(
+        rate,
+        1);
 
-  _begin = (_freq_min / _bin_width) + 1;
-  _end = std::min(BINS - 1, (size_t)(_freq_max / _bin_width)) - 1;
+const int16_t nyquistLimit =
+    std::max<int16_t>(
+        _rate / 2,
+        1);
+
+_freq_min =
+    std::clamp<int16_t>(
+        config.min_freq,
+        1,
+        nyquistLimit);
+
+_freq_max =
+    std::clamp<int16_t>(
+        config.max_freq,
+        _freq_min,
+        nyquistLimit);
+
+_peak_count =
+    std::min(
+        (size_t)config.count,
+        PEAKS_MAX);
+
+_idx =
+    axis * SAMPLES / 3;
+
+_bin_width =
+    (float)_rate /
+    SAMPLES;
+
+const size_t maxSearchBin =
+    BINS - 2;
+
+_begin =
+    std::clamp<size_t>(
+        static_cast<size_t>(
+            _freq_min /
+            _bin_width) + 1,
+        1,
+        maxSearchBin);
+
+_end =
+    std::clamp<size_t>(
+        static_cast<size_t>(
+            _freq_max /
+            _bin_width),
+        1,
+        maxSearchBin);
+
+if (_begin > _end)
+{
+  _peak_count = 0;
+}
 
   // init fft tables
   dsps_fft4r_init_fc32(nullptr, BINS);
@@ -110,10 +160,21 @@ int FFTAnalyzer<SAMPLES>::update(float v)
 
       clearPeaks();
 
-      Utils::peakDetect(_out, _begin, _end, _bin_width, peaks, _peak_count);
+if (_peak_count > 0 &&
+    _begin <= _end)
+{
+  Utils::peakDetect(
+      _out,
+      _begin,
+      _end,
+      _bin_width,
+      peaks,
+      _peak_count);
 
-      // sort peaks by freq
-      Utils::peakSort(peaks, _peak_count);
+  Utils::peakSort(
+      peaks,
+      _peak_count);
+}
 
       _phase = PHASE_COLLECT;
       return 1;
