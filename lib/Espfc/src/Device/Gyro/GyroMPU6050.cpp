@@ -243,11 +243,17 @@ if (!_bus->writeByte(
   return 0;
 }
   }
-  else
+else
+{
+  // enable I2C bypass mode
+  if (!_bus->writeByte(
+          _addr,
+          MPU6050_INT_PIN_CFG,
+          MPU6050_I2C_BYPASS_EN))
   {
-    // enable I2C bypass mode
-    res = _bus->writeByte(_addr, MPU6050_INT_PIN_CFG, MPU6050_I2C_BYPASS_EN);
+    return 0;
   }
+}
   delay(10);
 
 
