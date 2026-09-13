@@ -1418,12 +1418,12 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
 
      case MSP_SET_PID:
     {
-      constexpr size_t PID_BYTES_PER_ITEM =
-          3;
+constexpr int PID_BYTES_PER_ITEM =
+    3;
 
-      constexpr size_t REQUIRED_PID_BYTES =
-          PID_ITEM_COUNT *
-          PID_BYTES_PER_ITEM;
+constexpr int REQUIRED_PID_BYTES =
+    PID_ITEM_COUNT *
+    PID_BYTES_PER_ITEM;
 
       if (m.remain() <
           REQUIRED_PID_BYTES)
