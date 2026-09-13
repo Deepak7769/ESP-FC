@@ -721,7 +721,7 @@ for (size_t i = 0;
       config.output.protocol =
     ESC_PROTOCOL_SANITIZE(config.output.protocol);
 
-#ifndef ESPFC_SAFE_BENCH_BUILD
+
 
 switch(config.output.protocol)
 {
@@ -789,7 +789,7 @@ if(config.output.protocol == ESC_PROTOCOL_PWM)
           state.loopRate = state.gyro.rate / config.loopSync;
         }
       }
-        #endif // !ESPFC_SAFE_BENCH_BUILD
+       
       // sanitize throttle and motor limits
       if(config.output.throttleLimitType < 0 || config.output.throttleLimitType >= THROTTLE_LIMIT_TYPE_MAX) {
         config.output.throttleLimitType = THROTTLE_LIMIT_TYPE_NONE;
