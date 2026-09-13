@@ -18,10 +18,17 @@ private:
   void updateArmed();
   void updateMode();
 
-  Model& _model;
-  Stream::ReadWritable* _serial;
-  BlackboxSerialBuffer _buffer;
-  uint32_t _lastGpsTs = 0;
+Model& _model;
+Stream::ReadWritable* _serial;
+BlackboxSerialBuffer _buffer;
+
+uint32_t _lastGpsTs = 0;
+
+uint32_t _armingBeepDeadline = 0;
+uint32_t _stopDeadline = 0;
+
+bool _armingBeepPending = false;
+bool _stopPending = false;
 };
 
 } // namespace Espfc::Blackbox
