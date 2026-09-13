@@ -26,7 +26,7 @@ public:
 
 private:
   void readTemperature();
-  void readPressure();
+  bool readPressure();
   void updateAltitude();
 
   Model& _model;
