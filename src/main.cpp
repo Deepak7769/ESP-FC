@@ -36,6 +36,7 @@ Espfc::Espfc espfc;
 
   TaskHandle_t gyroTaskHandle = NULL;
 TaskHandle_t backgroundTaskHandle = NULL;
+volatile uint32_t gyroTaskMissedDeadlines = 0;
 
 static const timer_group_t TIMER_GROUP = TIMER_GROUP_0;
 static const timer_idx_t TIMER_IDX = TIMER_0;
@@ -105,11 +106,18 @@ void gyroTask(void* pvParameters)
 
   while (true)
   {
+const uint32_t notifications =
     ulTaskNotifyTake(
         pdTRUE,
         portMAX_DELAY);
 
-    espfc.update(true);
+if (notifications > 1)
+{
+  gyroTaskMissedDeadlines +=
+      notifications - 1;
+}
+
+espfc.update(true);
   }
 }
 
