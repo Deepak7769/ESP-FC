@@ -850,22 +850,95 @@ if (config.debug.axis >= AXIS_COUNT_RPY)
     {
       sanitize();
 
-      // init timers
+            // init timers
       // sample rate = clock / ( divider + 1)
-      state.gyro.timer.setRate(state.gyro.rate);
-      int accelRate = Utils::alignToClock(state.gyro.timer.rate, 500);
-      state.accel.timer.setRate(state.gyro.timer.rate, state.gyro.timer.rate / accelRate);
-      state.loopTimer.setRate(state.gyro.timer.rate, config.loopSync);
-      state.mixer.timer.setRate(state.loopTimer.rate, config.mixerSync);
-      int inputRate = Utils::alignToClock(state.gyro.timer.rate, 1000);
-      state.input.timer.setRate(state.gyro.timer.rate, state.gyro.timer.rate / inputRate);
-      state.actuatorTimer.setRate(50);
-      state.gyro.dynamicFilterTimer.setRate(50);
-      state.telemetryTimer.setInterval(config.telemetryInterval * 1000);
-      state.stats.timer.setRate(3);
-      if(magActive())
+
+      bool timersOk =
+          true;
+
+      timersOk &=
+          state.gyro.timer.setRate(
+              state.gyro.rate) != 0;
+
+      const int accelRate =
+          Utils::alignToClock(
+              state.gyro.timer.rate,
+              500);
+
+      if (accelRate <= 0)
       {
-        state.mag.timer.setRate(state.mag.rate);
+        timersOk = false;
+      }
+      else
+      {
+        timersOk &=
+            state.accel.timer.setRate(
+                state.gyro.timer.rate,
+                std::max<uint32_t>(
+                    1u,
+                    state.gyro.timer.rate /
+                        static_cast<uint32_t>(
+                            accelRate))) != 0;
+      }
+
+      timersOk &=
+          state.loopTimer.setRate(
+              state.gyro.timer.rate,
+              config.loopSync) != 0;
+
+      timersOk &=
+          state.mixer.timer.setRate(
+              state.loopTimer.rate,
+              config.mixerSync) != 0;
+
+      const int inputRate =
+          Utils::alignToClock(
+              state.gyro.timer.rate,
+              1000);
+
+      if (inputRate <= 0)
+      {
+        timersOk = false;
+      }
+      else
+      {
+        timersOk &=
+            state.input.timer.setRate(
+                state.gyro.timer.rate,
+                std::max<uint32_t>(
+                    1u,
+                    state.gyro.timer.rate /
+                        static_cast<uint32_t>(
+                            inputRate))) != 0;
+      }
+
+      timersOk &=
+          state.actuatorTimer.setRate(50) != 0;
+
+      timersOk &=
+          state.gyro.dynamicFilterTimer
+              .setRate(50) != 0;
+
+      timersOk &=
+          state.telemetryTimer
+              .setInterval(
+                  static_cast<uint32_t>(
+                      config.telemetryInterval) *
+                  1000u) != 0;
+
+      timersOk &=
+          state.stats.timer.setRate(3) != 0;
+
+      if (magActive())
+      {
+        timersOk &=
+            state.mag.timer.setRate(
+                state.mag.rate) != 0;
+      }
+
+      if (!timersOk)
+      {
+        setRebootRequired();
       }
           
       // ensure disarmed pulses
