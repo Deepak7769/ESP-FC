@@ -142,11 +142,12 @@ int MspResponse::remain() const
 
 void MspResponse::advance(size_t size)
 {
-  len =
-      static_cast<uint16_t>(
-          std::min<size_t>(
-              MSP_BUF_OUT_SIZE,
-              static_cast<size_t>(len) + size));
+  const size_t current =
+      std::min<size_t>(len, MSP_BUF_OUT_SIZE);
+
+  len = static_cast<uint16_t>(
+      current +
+      std::min(size, MSP_BUF_OUT_SIZE - current));
 }
 void MspResponse::writeData(const char* v, int size)
 {
