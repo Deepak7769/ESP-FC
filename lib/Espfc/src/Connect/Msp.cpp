@@ -6,7 +6,21 @@
 
 namespace Espfc::Connect {
 
-MspMessage::MspMessage(): state(MSP_STATE_IDLE), expected(0), received(0), read(0), sequence(0) {}
+MspMessage::MspMessage()
+    : state(MSP_STATE_IDLE),
+      dir(MSP_TYPE_CMD),
+      version(MSP_V1),
+      flags(0),
+      cmd(0),
+      expected(0),
+      received(0),
+      read(0),
+      sequence(0),
+      checksum(0),
+      checksum2(0)
+{
+  std::memset(buffer, 0, sizeof(buffer));
+}
 
 bool MspMessage::isReady() const
 {
@@ -30,36 +44,92 @@ int MspMessage::remain() const
 
 void MspMessage::advance(size_t size)
 {
-  read += size;
+  const size_t next =
+      std::min<size_t>(
+          received,
+          static_cast<size_t>(read) + size);
+
+  read =
+      static_cast<uint16_t>(next);
 }
 
 uint8_t MspMessage::readU8()
 {
+  if (read >= received)
+  {
+    read = received;
+    return 0;
+  }
+
   return buffer[read++];
 }
 
 uint16_t MspMessage::readU16()
 {
-  uint16_t ret;
-  ret = readU8();
-  ret |= (uint16_t)readU8() << 8;
+  if (remain() < 2)
+  {
+    read = received;
+    return 0;
+  }
+
+  uint16_t ret = readU8();
+
+  ret |=
+      static_cast<uint16_t>(
+          readU8()) << 8;
+
   return ret;
 }
 
 uint32_t MspMessage::readU32()
 {
-  uint32_t ret;
-  ret = readU8();
-  ret |= (uint32_t)readU8() << 8;
-  ret |= (uint32_t)readU8() << 16;
-  ret |= (uint32_t)readU8() << 24;
+  if (remain() < 4)
+  {
+    read = received;
+    return 0;
+  }
+
+  uint32_t ret = readU8();
+
+  ret |=
+      static_cast<uint32_t>(
+          readU8()) << 8;
+
+  ret |=
+      static_cast<uint32_t>(
+          readU8()) << 16;
+
+  ret |=
+      static_cast<uint32_t>(
+          readU8()) << 24;
+
   return ret;
 }
 
-uint16_t MspMessage::append(const uint8_t* data, size_t len)
+uint16_t MspMessage::append(
+    const uint8_t* data,
+    size_t len)
 {
-  std::copy(data, data + len, buffer + received);
-  received += len;
+  if (!data ||
+      received >= MSP_BUF_SIZE)
+  {
+    return received;
+  }
+
+  const size_t copyLen =
+      std::min<size_t>(
+          len,
+          MSP_BUF_SIZE - received);
+
+  std::copy_n(
+      data,
+      copyLen,
+      buffer + received);
+
+  received +=
+      static_cast<uint16_t>(
+          copyLen);
+
   return received;
 }
 
@@ -72,9 +142,12 @@ int MspResponse::remain() const
 
 void MspResponse::advance(size_t size)
 {
-  len += size;
+  len =
+      static_cast<uint16_t>(
+          std::min<size_t>(
+              MSP_BUF_OUT_SIZE,
+              static_cast<size_t>(len) + size));
 }
-
 void MspResponse::writeData(const char* v, int size)
 {
   while (size-- > 0)
@@ -97,6 +170,11 @@ void MspResponse::writePString(const char* v)
 
 void MspResponse::writeU8(uint8_t v)
 {
+  if (len >= MSP_BUF_OUT_SIZE)
+  {
+    return;
+  }
+
   data[len++] = v;
 }
 
