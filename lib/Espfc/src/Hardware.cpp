@@ -346,11 +346,16 @@ void Hardware::detectGyro()
     return;
   }
 
-  detectedGyro->setDLPFMode(
-      _model.config.gyro.dlpf);
+detectedGyro->setDLPFMode(
+    _model.config.gyro.dlpf);
 
-  _model.state.gyro.dev =
-      detectedGyro;
+if (!detectedGyro->configurationValid())
+{
+  return;
+}
+
+_model.state.gyro.dev =
+    detectedGyro;
 
   _model.state.gyro.present =
       true;
