@@ -884,7 +884,7 @@ class ModelConfig
     DebugConfig debug;
 
     // not classified yet
-    int16_t i2cSpeed = 800;
+    int16_t i2cSpeed = 400;
     int8_t loopSync = 10; // MPU 1000Hz
     int8_t mixerSync = 1;
     int32_t featureMask = ESPFC_FEATURE_MASK;
