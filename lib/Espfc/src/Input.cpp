@@ -199,7 +199,8 @@ const size_t channelCount =
 
 _device->get(channels, channelCount);
 
-bool channelsValid = true;
+bool channelsValid =
+    channelCount >= AXIS_COUNT_RPYT;
 
 for (size_t c = 0; c < channelCount; c++)
 {
@@ -315,11 +316,17 @@ bool FAST_CODE_ATTR Input::failsafe(InputStatus status)
     return false; // not real failsafe, rx link is still valid
   }
 
-  if (status == INPUT_RECEIVED)
+if (status == INPUT_RECEIVED)
+{
+  if (!_model.state.input.channelsValid)
   {
-    failsafeIdle();
-    return false;
+    failsafeStage1();
+    return true;
   }
+
+  failsafeIdle();
+  return false;
+}
 
   if (status == INPUT_FAILSAFE)
   {
