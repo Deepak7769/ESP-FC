@@ -35,16 +35,19 @@ public:
 
   virtual int readGyro(VectorInt16& v) = 0;
   virtual int readAccel(VectorInt16& v) = 0;
+virtual void setDLPFMode(uint8_t mode) = 0;
+virtual int getRate() const = 0;
+virtual void setRate(int rate) = 0;
 
-  virtual void setDLPFMode(uint8_t mode) = 0;
-  virtual int getRate() const = 0;
-  virtual void setRate(int rate) = 0;
+virtual bool testConnection() = 0;
 
- virtual bool configurationValid() const
+virtual bool configurationValid() const
 {
   return true;
 }
-  static const char** getNames();
+
+static const char** getNames();
+
   static const char* getName(DeviceType type);
 };
 
