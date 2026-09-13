@@ -61,7 +61,13 @@ int BaroSensor::read()
 {
   if (!_baro || !_model.baroActive()) return 0;
 
-  if (_wait > micros()) return 0;
+ const uint32_t now =
+    micros();
+
+if ((int32_t)(now - _wait) < 0)
+{
+  return 0;
+}
 
   Utils::Stats::Measure measure(_model.state.stats, COUNTER_BARO);
 
