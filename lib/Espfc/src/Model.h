@@ -817,10 +817,18 @@ if(config.output.protocol == ESC_PROTOCOL_PWM)
       }
       validatePinResources();
 
-      if (config.fusion.mode >= FUSION_MAX)
-      {
-        config.fusion.mode = FUSION_MAHONY;
-      }
+      if (config.fusion.mode < FUSION_NONE ||
+    config.fusion.mode >= FUSION_MAX)
+{
+  config.fusion.mode =
+      FUSION_MAHONY;
+}
+
+if (config.debug.axis >= AXIS_COUNT_RPY)
+{
+  config.debug.axis =
+      AXIS_ROLL;
+}
 
       // only few beeper modes allowed
       config.buzzer.beeperMask &=
