@@ -147,13 +147,50 @@ void BaroSensor::updateAltitude()
 
   baro.altitudeGround = altitude - baro.altitudeBias;
   baro.altitude = altitude;
-  if (_first)
+const uint32_t altitudeNow =
+    micros();
+
+if (_first)
+{
+  baro.altitudePrev =
+      altitude;
+
+  _lastAltitudeUs =
+      altitudeNow;
+
+  baro.vario =
+      0.f;
+
+  _first =
+      false;
+}
+else
+{
+  const uint32_t elapsedUs =
+      altitudeNow -
+      _lastAltitudeUs;
+
+  _lastAltitudeUs =
+      altitudeNow;
+
+  if (elapsedUs > 0)
   {
-    baro.altitudePrev = altitude;
-    _first = false;
+    const float dt =
+        elapsedUs * 0.000001f;
+
+    const float rawVario =
+        (altitude -
+         baro.altitudePrev) /
+        dt;
+
+    baro.vario =
+        _varioFilter.update(
+            rawVario);
   }
-  baro.vario = _varioFilter.update((altitude - baro.altitudePrev) * baro.rate);
-  baro.altitudePrev = altitude;
+
+  baro.altitudePrev =
+      altitude;
+}
 
   if (_model.config.debug.mode == DEBUG_BARO)
   {
