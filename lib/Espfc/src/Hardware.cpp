@@ -50,6 +50,33 @@ static Espfc::Device::Mag::MagAK8963 ak8963;
 static Espfc::Device::Baro::BaroBMP085 bmp085;
 static Espfc::Device::Baro::BaroBMP280 bmp280;
 static Espfc::Device::Baro::BaroSPL06 spl06;
+static bool busAllowed(
+    int8_t configured,
+    Espfc::BusType actual)
+{
+  return
+      configured ==
+          static_cast<int8_t>(
+              Espfc::BUS_AUTO) ||
+      configured ==
+          static_cast<int8_t>(
+              actual);
+}
+
+template<typename DeviceType>
+static bool deviceAllowed(
+    int8_t configured,
+    DeviceType automaticValue,
+    DeviceType actual)
+{
+  return
+      configured ==
+          static_cast<int8_t>(
+              automaticValue) ||
+      configured ==
+          static_cast<int8_t>(
+              actual);
+}
 } // namespace
 
 namespace Espfc {
@@ -98,102 +125,524 @@ void Hardware::initBus()
 
 void Hardware::detectGyro()
 {
-  if (_model.config.gyro.dev == GYRO_NONE) return;
+  _model.state.gyro.dev = nullptr;
+  _model.state.gyro.present = false;
+  _model.state.accel.present = false;
 
-  Device::GyroDevice* detectedGyro = nullptr;
+  const int8_t configuredDev =
+      _model.config.gyro.dev;
+
+  const int8_t configuredBus =
+      _model.config.gyro.bus;
+
+  if (configuredDev == GYRO_NONE)
+  {
+    return;
+  }
+
+  Device::GyroDevice* detectedGyro =
+      nullptr;
+
 #if defined(ESPFC_SPI_0)
-  if (_model.config.pin[PIN_SPI_CS0] != -1)
+  if (busAllowed(configuredBus, BUS_SPI) &&
+      _model.config.pin[PIN_SPI_CS0] != -1)
   {
-    Hal::Gpio::digitalWrite(_model.config.pin[PIN_SPI_CS0], Hal::Gpio::High);
-    Hal::Gpio::pinMode(_model.config.pin[PIN_SPI_CS0], Hal::Gpio::Output);
-    if (!detectedGyro && detectDevice(mpu9250, spiBus, _model.config.pin[PIN_SPI_CS0])) detectedGyro = &mpu9250;
-    if (!detectedGyro && detectDevice(mpu6500, spiBus, _model.config.pin[PIN_SPI_CS0])) detectedGyro = &mpu6500;
-    if (!detectedGyro && detectDevice(icm20602, spiBus, _model.config.pin[PIN_SPI_CS0])) detectedGyro = &icm20602;
-    if (!detectedGyro && detectDevice(icm42688, spiBus, _model.config.pin[PIN_SPI_CS0])) detectedGyro = &icm42688;
-    if (!detectedGyro && detectDevice(bmi160, spiBus, _model.config.pin[PIN_SPI_CS0])) detectedGyro = &bmi160;
-    if (!detectedGyro && detectDevice(lsm6dso, spiBus, _model.config.pin[PIN_SPI_CS0])) detectedGyro = &lsm6dso;
-    if (detectedGyro) gyroSlaveBus.begin(&spiBus, detectedGyro->getAddress());
-  }
-#endif
-#if defined(ESPFC_I2C_0)
-  if (!detectedGyro && _model.config.pin[PIN_I2C_0_SDA] != -1 && _model.config.pin[PIN_I2C_0_SCL] != -1)
-  {
-    if (!detectedGyro && detectDevice(mpu9250, i2cBus)) detectedGyro = &mpu9250;
-    if (!detectedGyro && detectDevice(mpu6500, i2cBus)) detectedGyro = &mpu6500;
-    if (!detectedGyro && detectDevice(icm20602, i2cBus)) detectedGyro = &icm20602;
-    if (!detectedGyro && detectDevice(bmi160, i2cBus)) detectedGyro = &bmi160;
-    if (!detectedGyro && detectDevice(mpu6050, i2cBus)) detectedGyro = &mpu6050;
-    if (!detectedGyro && detectDevice(lsm6dso, i2cBus)) detectedGyro = &lsm6dso;
-    if (detectedGyro) gyroSlaveBus.begin(&i2cBus, detectedGyro->getAddress());
-  }
-#endif
-  if (!detectedGyro) return;
+    const int cs =
+        _model.config.pin[PIN_SPI_CS0];
 
-  detectedGyro->setDLPFMode(_model.config.gyro.dlpf);
-  _model.state.gyro.dev = detectedGyro;
-  _model.state.gyro.present = (bool)detectedGyro;
-  _model.state.accel.present = _model.state.gyro.present && _model.config.accel.dev != GYRO_NONE;
-  _model.state.gyro.clock = detectedGyro->getRate();
+    Hal::Gpio::digitalWrite(
+        cs,
+        Hal::Gpio::High);
+
+    Hal::Gpio::pinMode(
+        cs,
+        Hal::Gpio::Output);
+
+    if (!detectedGyro &&
+        deviceAllowed(
+            configuredDev,
+            GYRO_AUTO,
+            mpu9250.getType()) &&
+        detectDevice(
+            mpu9250,
+            spiBus,
+            cs))
+    {
+      detectedGyro = &mpu9250;
+    }
+
+    if (!detectedGyro &&
+        deviceAllowed(
+            configuredDev,
+            GYRO_AUTO,
+            mpu6500.getType()) &&
+        detectDevice(
+            mpu6500,
+            spiBus,
+            cs))
+    {
+      detectedGyro = &mpu6500;
+    }
+
+    if (!detectedGyro &&
+        deviceAllowed(
+            configuredDev,
+            GYRO_AUTO,
+            icm20602.getType()) &&
+        detectDevice(
+            icm20602,
+            spiBus,
+            cs))
+    {
+      detectedGyro = &icm20602;
+    }
+
+    if (!detectedGyro &&
+        deviceAllowed(
+            configuredDev,
+            GYRO_AUTO,
+            icm42688.getType()) &&
+        detectDevice(
+            icm42688,
+            spiBus,
+            cs))
+    {
+      detectedGyro = &icm42688;
+    }
+
+    if (!detectedGyro &&
+        deviceAllowed(
+            configuredDev,
+            GYRO_AUTO,
+            bmi160.getType()) &&
+        detectDevice(
+            bmi160,
+            spiBus,
+            cs))
+    {
+      detectedGyro = &bmi160;
+    }
+
+    if (!detectedGyro &&
+        deviceAllowed(
+            configuredDev,
+            GYRO_AUTO,
+            lsm6dso.getType()) &&
+        detectDevice(
+            lsm6dso,
+            spiBus,
+            cs))
+    {
+      detectedGyro = &lsm6dso;
+    }
+
+    if (detectedGyro)
+    {
+      gyroSlaveBus.begin(
+          &spiBus,
+          detectedGyro->getAddress());
+    }
+  }
+#endif
+
+#if defined(ESPFC_I2C_0)
+  if (!detectedGyro &&
+      busAllowed(configuredBus, BUS_I2C) &&
+      _model.config.pin[PIN_I2C_0_SDA] != -1 &&
+      _model.config.pin[PIN_I2C_0_SCL] != -1)
+  {
+    if (deviceAllowed(
+            configuredDev,
+            GYRO_AUTO,
+            mpu9250.getType()) &&
+        detectDevice(
+            mpu9250,
+            i2cBus))
+    {
+      detectedGyro = &mpu9250;
+    }
+
+    if (!detectedGyro &&
+        deviceAllowed(
+            configuredDev,
+            GYRO_AUTO,
+            mpu6500.getType()) &&
+        detectDevice(
+            mpu6500,
+            i2cBus))
+    {
+      detectedGyro = &mpu6500;
+    }
+
+    if (!detectedGyro &&
+        deviceAllowed(
+            configuredDev,
+            GYRO_AUTO,
+            icm20602.getType()) &&
+        detectDevice(
+            icm20602,
+            i2cBus))
+    {
+      detectedGyro = &icm20602;
+    }
+
+    if (!detectedGyro &&
+        deviceAllowed(
+            configuredDev,
+            GYRO_AUTO,
+            bmi160.getType()) &&
+        detectDevice(
+            bmi160,
+            i2cBus))
+    {
+      detectedGyro = &bmi160;
+    }
+
+    if (!detectedGyro &&
+        deviceAllowed(
+            configuredDev,
+            GYRO_AUTO,
+            mpu6050.getType()) &&
+        detectDevice(
+            mpu6050,
+            i2cBus))
+    {
+      detectedGyro = &mpu6050;
+    }
+
+    if (!detectedGyro &&
+        deviceAllowed(
+            configuredDev,
+            GYRO_AUTO,
+            lsm6dso.getType()) &&
+        detectDevice(
+            lsm6dso,
+            i2cBus))
+    {
+      detectedGyro = &lsm6dso;
+    }
+
+    if (detectedGyro)
+    {
+      gyroSlaveBus.begin(
+          &i2cBus,
+          detectedGyro->getAddress());
+    }
+  }
+#endif
+
+  if (!detectedGyro)
+  {
+    return;
+  }
+
+  detectedGyro->setDLPFMode(
+      _model.config.gyro.dlpf);
+
+  _model.state.gyro.dev =
+      detectedGyro;
+
+  _model.state.gyro.present =
+      true;
+
+  _model.state.gyro.clock =
+      detectedGyro->getRate();
+
+  const Device::BusDevice* detectedBus =
+      detectedGyro->getBus();
+
+  const bool accelDeviceMatches =
+      _model.config.accel.dev == GYRO_AUTO ||
+      _model.config.accel.dev ==
+          static_cast<int8_t>(
+              detectedGyro->getType());
+
+  const bool accelBusMatches =
+      detectedBus &&
+      busAllowed(
+          _model.config.accel.bus,
+          detectedBus->getType());
+
+  _model.state.accel.present =
+      _model.config.accel.dev != GYRO_NONE &&
+      accelDeviceMatches &&
+      accelBusMatches;
 }
 
 void Hardware::detectMag()
 {
-  if (_model.config.mag.dev == MAG_NONE) return;
+  _model.state.mag.dev = nullptr;
+  _model.state.mag.present = false;
+  _model.state.mag.rate = 0;
 
-  Device::MagDevice* detectedMag = nullptr;
-#if defined(ESPFC_I2C_0)
-  if (_model.config.pin[PIN_I2C_0_SDA] != -1 && _model.config.pin[PIN_I2C_0_SCL] != -1)
+  const int8_t configuredDev =
+      _model.config.mag.dev;
+
+  const int8_t configuredBus =
+      _model.config.mag.bus;
+
+  if (configuredDev == MAG_NONE)
   {
-    if (!detectedMag && detectDevice(ak8963, i2cBus)) detectedMag = &ak8963;
-    if (!detectedMag && detectDevice(hmc5883l, i2cBus)) detectedMag = &hmc5883l;
-    if (!detectedMag && detectDevice(qmc5883l, i2cBus)) detectedMag = &qmc5883l;
-    if (!detectedMag && detectDevice(qmc5883p, i2cBus)) detectedMag = &qmc5883p;
+    return;
+  }
+
+  Device::MagDevice* detectedMag =
+      nullptr;
+
+#if defined(ESPFC_I2C_0)
+  if (busAllowed(configuredBus, BUS_I2C) &&
+      _model.config.pin[PIN_I2C_0_SDA] != -1 &&
+      _model.config.pin[PIN_I2C_0_SCL] != -1)
+  {
+    if (!detectedMag &&
+        deviceAllowed(
+            configuredDev,
+            MAG_DEFAULT,
+            ak8963.getType()) &&
+        detectDevice(ak8963, i2cBus))
+    {
+      detectedMag = &ak8963;
+    }
+
+    if (!detectedMag &&
+        deviceAllowed(
+            configuredDev,
+            MAG_DEFAULT,
+            hmc5883l.getType()) &&
+        detectDevice(hmc5883l, i2cBus))
+    {
+      detectedMag = &hmc5883l;
+    }
+
+    if (!detectedMag &&
+        deviceAllowed(
+            configuredDev,
+            MAG_DEFAULT,
+            qmc5883l.getType()) &&
+        detectDevice(qmc5883l, i2cBus))
+    {
+      detectedMag = &qmc5883l;
+    }
+
+    if (!detectedMag &&
+        deviceAllowed(
+            configuredDev,
+            MAG_DEFAULT,
+            qmc5883p.getType()) &&
+        detectDevice(qmc5883p, i2cBus))
+    {
+      detectedMag = &qmc5883p;
+    }
   }
 #endif
-  if (gyroSlaveBus.getBus())
+
+  if (!detectedMag &&
+      busAllowed(configuredBus, BUS_SLV) &&
+      gyroSlaveBus.getBus())
   {
-    if (!detectedMag && detectDevice(ak8963, gyroSlaveBus)) detectedMag = &ak8963;
-    if (!detectedMag && detectDevice(hmc5883l, gyroSlaveBus)) detectedMag = &hmc5883l;
-    if (!detectedMag && detectDevice(qmc5883l, gyroSlaveBus)) detectedMag = &qmc5883l;
-    if (!detectedMag && detectDevice(qmc5883p, gyroSlaveBus)) detectedMag = &qmc5883p;
+    if (deviceAllowed(
+            configuredDev,
+            MAG_DEFAULT,
+            ak8963.getType()) &&
+        detectDevice(ak8963, gyroSlaveBus))
+    {
+      detectedMag = &ak8963;
+    }
+
+    if (!detectedMag &&
+        deviceAllowed(
+            configuredDev,
+            MAG_DEFAULT,
+            hmc5883l.getType()) &&
+        detectDevice(hmc5883l, gyroSlaveBus))
+    {
+      detectedMag = &hmc5883l;
+    }
+
+    if (!detectedMag &&
+        deviceAllowed(
+            configuredDev,
+            MAG_DEFAULT,
+            qmc5883l.getType()) &&
+        detectDevice(qmc5883l, gyroSlaveBus))
+    {
+      detectedMag = &qmc5883l;
+    }
+
+    if (!detectedMag &&
+        deviceAllowed(
+            configuredDev,
+            MAG_DEFAULT,
+            qmc5883p.getType()) &&
+        detectDevice(qmc5883p, gyroSlaveBus))
+    {
+      detectedMag = &qmc5883p;
+    }
   }
-  _model.state.mag.dev = detectedMag;
-  _model.state.mag.present = (bool)detectedMag;
-  _model.state.mag.rate = detectedMag ? detectedMag->getRate() : 0;
+
+  _model.state.mag.dev =
+      detectedMag;
+
+  _model.state.mag.present =
+      detectedMag != nullptr;
+
+  _model.state.mag.rate =
+      detectedMag
+          ? detectedMag->getRate()
+          : 0;
 }
 
 void Hardware::detectBaro()
 {
-  if (_model.config.baro.dev == BARO_NONE) return;
+  _model.state.baro.dev = nullptr;
+  _model.state.baro.present = false;
 
-  Device::BaroDevice* detectedBaro = nullptr;
+  const int8_t configuredDev =
+      _model.config.baro.dev;
+
+  const int8_t configuredBus =
+      _model.config.baro.bus;
+
+  if (configuredDev == BARO_NONE)
+  {
+    return;
+  }
+
+  Device::BaroDevice* detectedBaro =
+      nullptr;
+
 #if defined(ESPFC_SPI_0)
-  if (_model.config.pin[PIN_SPI_CS1] != -1)
+  if (busAllowed(configuredBus, BUS_SPI) &&
+      _model.config.pin[PIN_SPI_CS1] != -1)
   {
-    Hal::Gpio::digitalWrite(_model.config.pin[PIN_SPI_CS1], Hal::Gpio::High);
-    Hal::Gpio::pinMode(_model.config.pin[PIN_SPI_CS1], Hal::Gpio::Output);
-    if (!detectedBaro && detectDevice(bmp280, spiBus, _model.config.pin[PIN_SPI_CS1])) detectedBaro = &bmp280;
-    if (!detectedBaro && detectDevice(bmp085, spiBus, _model.config.pin[PIN_SPI_CS1])) detectedBaro = &bmp085;
-    if (!detectedBaro && detectDevice(spl06, spiBus, _model.config.pin[PIN_SPI_CS1])) detectedBaro = &spl06;
+    const int cs =
+        _model.config.pin[PIN_SPI_CS1];
+
+    Hal::Gpio::digitalWrite(
+        cs,
+        Hal::Gpio::High);
+
+    Hal::Gpio::pinMode(
+        cs,
+        Hal::Gpio::Output);
+
+    if (!detectedBaro &&
+        deviceAllowed(
+            configuredDev,
+            BARO_DEFAULT,
+            bmp280.getType()) &&
+        detectDevice(
+            bmp280,
+            spiBus,
+            cs))
+    {
+      detectedBaro = &bmp280;
+    }
+
+    if (!detectedBaro &&
+        deviceAllowed(
+            configuredDev,
+            BARO_DEFAULT,
+            bmp085.getType()) &&
+        detectDevice(
+            bmp085,
+            spiBus,
+            cs))
+    {
+      detectedBaro = &bmp085;
+    }
+
+    if (!detectedBaro &&
+        deviceAllowed(
+            configuredDev,
+            BARO_DEFAULT,
+            spl06.getType()) &&
+        detectDevice(
+            spl06,
+            spiBus,
+            cs))
+    {
+      detectedBaro = &spl06;
+    }
   }
 #endif
+
 #if defined(ESPFC_I2C_0)
-  if (_model.config.pin[PIN_I2C_0_SDA] != -1 && _model.config.pin[PIN_I2C_0_SCL] != -1)
+  if (!detectedBaro &&
+      busAllowed(configuredBus, BUS_I2C) &&
+      _model.config.pin[PIN_I2C_0_SDA] != -1 &&
+      _model.config.pin[PIN_I2C_0_SCL] != -1)
   {
-    if (!detectedBaro && detectDevice(bmp280, i2cBus)) detectedBaro = &bmp280;
-    if (!detectedBaro && detectDevice(bmp085, i2cBus)) detectedBaro = &bmp085;
-    if (!detectedBaro && detectDevice(spl06, i2cBus)) detectedBaro = &spl06;
+    if (deviceAllowed(
+            configuredDev,
+            BARO_DEFAULT,
+            bmp280.getType()) &&
+        detectDevice(bmp280, i2cBus))
+    {
+      detectedBaro = &bmp280;
+    }
+
+    if (!detectedBaro &&
+        deviceAllowed(
+            configuredDev,
+            BARO_DEFAULT,
+            bmp085.getType()) &&
+        detectDevice(bmp085, i2cBus))
+    {
+      detectedBaro = &bmp085;
+    }
+
+    if (!detectedBaro &&
+        deviceAllowed(
+            configuredDev,
+            BARO_DEFAULT,
+            spl06.getType()) &&
+        detectDevice(spl06, i2cBus))
+    {
+      detectedBaro = &spl06;
+    }
   }
 #endif
-  if (gyroSlaveBus.getBus())
+
+  if (!detectedBaro &&
+      busAllowed(configuredBus, BUS_SLV) &&
+      gyroSlaveBus.getBus())
   {
-    if (!detectedBaro && detectDevice(bmp280, gyroSlaveBus)) detectedBaro = &bmp280;
-    if (!detectedBaro && detectDevice(bmp085, gyroSlaveBus)) detectedBaro = &bmp085;
-    if (!detectedBaro && detectDevice(spl06, gyroSlaveBus)) detectedBaro = &spl06;
+    if (deviceAllowed(
+            configuredDev,
+            BARO_DEFAULT,
+            bmp280.getType()) &&
+        detectDevice(bmp280, gyroSlaveBus))
+    {
+      detectedBaro = &bmp280;
+    }
+
+    if (!detectedBaro &&
+        deviceAllowed(
+            configuredDev,
+            BARO_DEFAULT,
+            bmp085.getType()) &&
+        detectDevice(bmp085, gyroSlaveBus))
+    {
+      detectedBaro = &bmp085;
+    }
+
+    if (!detectedBaro &&
+        deviceAllowed(
+            configuredDev,
+            BARO_DEFAULT,
+            spl06.getType()) &&
+        detectDevice(spl06, gyroSlaveBus))
+    {
+      detectedBaro = &spl06;
+    }
   }
 
-  _model.state.baro.dev = detectedBaro;
-  _model.state.baro.present = (bool)detectedBaro;
+  _model.state.baro.dev =
+      detectedBaro;
+
+  _model.state.baro.present =
+      detectedBaro != nullptr;
 }
 
 void Hardware::restart(const Model& model)
