@@ -44,13 +44,15 @@ int MspMessage::remain() const
 
 void MspMessage::advance(size_t size)
 {
-  const size_t next =
-      std::min<size_t>(
-          received,
-          static_cast<size_t>(read) + size);
+  const size_t end =
+      std::min<size_t>(received, MSP_BUF_SIZE);
 
-  read =
-      static_cast<uint16_t>(next);
+  const size_t current =
+      std::min<size_t>(read, end);
+
+  read = static_cast<uint16_t>(
+      current +
+      std::min(size, end - current));
 }
 
 uint8_t MspMessage::readU8()
