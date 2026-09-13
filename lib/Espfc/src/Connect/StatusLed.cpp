@@ -151,9 +151,13 @@ void StatusLed::update()
 {
   if (_pin == -1 || !_pattern) return;
 
-  uint32_t now = millis();
+const uint32_t now =
+    millis();
 
-  if (now < _next) return;
+if ((int32_t)(now - _next) < 0)
+{
+  return;
+}
 
   if (!_pattern[_step])
   {
