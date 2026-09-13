@@ -1,5 +1,6 @@
 #include "BaroBMP280.hpp"
 #include "Hal/Time.hpp"
+#include <limits>
 
 #define BMP280_ADDRESS_FIRST 0x76
 #define BMP280_ADDRESS_SECOND 0x77
@@ -74,7 +75,12 @@ float BaroBMP280::readTemperature()
 
 float BaroBMP280::readPressure()
 {
-  readMesurment();
+    if (!readMesurment())
+  {
+    return
+        std::numeric_limits<float>::
+            quiet_NaN();
+  }
 
   int32_t adc_T = _raw_temp;
   adc_T >>= 4;
@@ -139,13 +145,30 @@ bool BaroBMP280::testConnection()
   return true;
 }
 
-void BaroBMP280::readMesurment()
+bool BaroBMP280::readMesurment()
 {
   uint8_t buffer[6] = {};
-  if (_bus->readFast(_addr, BMP280_PRESSURE_REG, 6, buffer) != 6) return;
 
-  _raw_pressure = buffer[2] | (buffer[1] << 8) | (buffer[0] << 16);
-  _raw_temp = buffer[5] | (buffer[4] << 8) | (buffer[3] << 16);
+  if (_bus->readFast(
+          _addr,
+          BMP280_PRESSURE_REG,
+          6,
+          buffer) != 6)
+  {
+    return false;
+  }
+
+  _raw_pressure =
+      buffer[2] |
+      (buffer[1] << 8) |
+      (buffer[0] << 16);
+
+  _raw_temp =
+      buffer[5] |
+      (buffer[4] << 8) |
+      (buffer[3] << 16);
+
+  return true;
 }
 
 int8_t BaroBMP280::writeReg(uint8_t reg, uint8_t val)
