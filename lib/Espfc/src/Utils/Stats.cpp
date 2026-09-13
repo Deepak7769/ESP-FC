@@ -47,15 +47,32 @@ uint32_t Stats::loopTime() const
 
 void Stats::update()
 {
-  if (!timer.check() || timer.delta == 0)
+  if (!timer.check())
   {
     return;
   }
+
+  if (timer.delta == 0)
+  {
+    return;
+  }
+
   for (size_t i = 0; i < COUNTER_COUNT; i++)
   {
-    _avg[i] = (float)(_sum[i] + (_count[i] >> 1)) / timer.delta;
-    _freq[i] = (float)_count[i] * 1e6 / timer.delta;
-    _real[i] = _count[i] > 0 ? ((float)(_sum[i] + (_count[i] >> 1)) / _count[i]) : 0.0f;
+    _avg[i] =
+        (float)(_sum[i] + (_count[i] >> 1)) /
+        timer.delta;
+
+    _freq[i] =
+        (float)_count[i] * 1e6f /
+        timer.delta;
+
+    _real[i] =
+        _count[i] > 0
+            ? (float)(_sum[i] + (_count[i] >> 1)) /
+                  _count[i]
+            : 0.0f;
+
     _sum[i] = 0;
     _count[i] = 0;
   }
