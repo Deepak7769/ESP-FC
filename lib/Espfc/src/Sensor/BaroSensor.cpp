@@ -91,28 +91,45 @@ if ((int32_t)(now - _wait) < 0)
       _wait = micros() + _baro->getDelay(BARO_MODE_PRESS);
       _counter = 1;
       return 1;
-    case BARO_STATE_PRESS_GET:
-             const bool pressureValid =
-          readPressure();
+case BARO_STATE_PRESS_GET:
+{
+  const bool pressureValid =
+      readPressure();
 
-      if (pressureValid)
-      {
-        updateAltitude();
-      }
-      if (--_counter > 0)
-      {
-        _baro->setMode(BARO_MODE_PRESS);
-        _state = BARO_STATE_PRESS_GET;
-        _wait = micros() + _baro->getDelay(BARO_MODE_PRESS);
-      }
-      else
-      {
-        _baro->setMode(BARO_MODE_TEMP);
-        _state = BARO_STATE_TEMP_GET;
-        _wait = micros() + _baro->getDelay(BARO_MODE_TEMP);
-      }
-            return pressureValid ? 1 : 0;
-      break;
+  if (pressureValid)
+  {
+    updateAltitude();
+  }
+
+  if (--_counter > 0)
+  {
+    _baro->setMode(
+        BARO_MODE_PRESS);
+
+    _state =
+        BARO_STATE_PRESS_GET;
+
+    _wait =
+        micros() +
+        _baro->getDelay(
+            BARO_MODE_PRESS);
+  }
+  else
+  {
+    _baro->setMode(
+        BARO_MODE_TEMP);
+
+    _state =
+        BARO_STATE_TEMP_GET;
+
+    _wait =
+        micros() +
+        _baro->getDelay(
+            BARO_MODE_TEMP);
+  }
+
+  return pressureValid ? 1 : 0;
+}
     default:
       _state = BARO_STATE_INIT;
       break;
