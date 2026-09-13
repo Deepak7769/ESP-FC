@@ -27,11 +27,12 @@ private:
   static const uint8_t** schemes();
 
   Model& _model;
+BuzzerPlayStatus _status;
+uint32_t _wait;
+bool _waiting;
+const uint8_t* _scheme;
+BuzzerEvent _e;
 
-  BuzzerPlayStatus _status;
-  uint32_t _wait;
-  const uint8_t* _scheme;
-  BuzzerEvent _e;
 };
 
 } // namespace Espfc::Connect
