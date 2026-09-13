@@ -1,5 +1,6 @@
 #include "Sensor/BaroSensor.hpp"
 #include "Hal/Time.hpp"
+#include <cmath>
 
 namespace Espfc::Sensor {
 
@@ -91,8 +92,13 @@ if ((int32_t)(now - _wait) < 0)
       _counter = 1;
       return 1;
     case BARO_STATE_PRESS_GET:
-      readPressure();
-      updateAltitude();
+             const bool pressureValid =
+          readPressure();
+
+      if (pressureValid)
+      {
+        updateAltitude();
+      }
       if (--_counter > 0)
       {
         _baro->setMode(BARO_MODE_PRESS);
@@ -105,7 +111,7 @@ if ((int32_t)(now - _wait) < 0)
         _state = BARO_STATE_TEMP_GET;
         _wait = micros() + _baro->getDelay(BARO_MODE_TEMP);
       }
-      return 1;
+            return pressureValid ? 1 : 0;
       break;
     default:
       _state = BARO_STATE_INIT;
@@ -121,12 +127,25 @@ void BaroSensor::readTemperature()
   _model.state.baro.temperature = _temperatureFilter.update(temp);
 }
 
-void BaroSensor::readPressure()
+bool BaroSensor::readPressure()
 {
-  float press = _model.state.baro.pressureRaw = _baro->readPressure();
-  _model.state.baro.pressure = _pressureFilter.update(press);
-}
+  const float press =
+      _baro->readPressure();
 
+  if (!std::isfinite(press) ||
+      press <= 0.f)
+  {
+    return false;
+  }
+
+  _model.state.baro.pressureRaw =
+      press;
+
+  _model.state.baro.pressure =
+      _pressureFilter.update(press);
+
+  return true;
+}
 void BaroSensor::updateAltitude()
 {
   auto& baro = _model.state.baro;
