@@ -30,17 +30,25 @@ private:
   void updateAltitude();
 
   Model& _model;
-  Device::BaroDevice* _baro;
-  BaroState _state;
+
+  Device::BaroDevice* _baro{nullptr};
+
+  BaroState _state{BARO_STATE_INIT};
+
   Utils::Filter _temperatureFilter;
   Utils::Filter _pressureFilter;
   Utils::Filter _altitudeFilter;
   Utils::Filter _varioFilter;
-  uint32_t _wait;
-  int32_t _counter;
-  float _biasAlpha;
+
+  uint32_t _wait{0};
+
+  int32_t _counter{0};
+
+  float _biasAlpha{0.0f};
+
   bool _first{true};
-uint32_t _lastAltitudeUs{0};
+
+  uint32_t _lastAltitudeUs{0};
 };
 
 } // namespace Espfc::Sensor
