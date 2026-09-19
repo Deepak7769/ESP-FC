@@ -12,10 +12,11 @@ namespace Espfc::Control {
 class Altitude
 {
 public:
-  Altitude(Model& model):
-      _model(model),
-      _heightInitialized(false),
-      _lastBaroUpdateUs(0)
+Altitude(Model& model):
+    _model(model),
+    _heightInitialized(false),
+    _lastBaroUpdateUs(0),
+    _lastAcceptedBaroUs(0)
   {
   }
 
@@ -29,8 +30,9 @@ public:
     altitude.healthy = false;
     altitude.baroAccepted = false;
 
-    _heightInitialized = false;
-    _lastBaroUpdateUs = 0;
+ _heightInitialized = false;
+_lastBaroUpdateUs = 0;
+_lastAcceptedBaroUs = 0;
 
     reload(MODEL_CHANGE_FILTER);
 
@@ -202,12 +204,17 @@ if (newBaroSample)
               altitude.baroInnovation) <
               BARO_INNOVATION_GATE_M;
 
-      if (altitude.baroAccepted)
-      {
-        // Slow absolute-height correction while the IMU/vario
-        // path handles fast motion.
-        constexpr float HEIGHT_CORRECTION_TAU_S =
-            1.0f;
+if (altitude.baroAccepted)
+{
+  // Remember the most recent barometer measurement that
+  // actually passed the innovation gate.
+  _lastAcceptedBaroUs =
+      baro.lastUpdateUs;
+
+  // Slow absolute-height correction while the IMU/vario
+  // path handles fast motion.
+  constexpr float HEIGHT_CORRECTION_TAU_S =
+      1.0f;
 
 const float alpha =
     std::clamp(
@@ -228,11 +235,24 @@ const float alpha =
       }
     }
 
-    altitude.healthy =
-        _heightInitialized &&
-        baroFresh &&
-        std::isfinite(altitude.height) &&
-        std::isfinite(altitude.vario);
+// It is not enough for the BMP280 to simply produce recent
+// samples. At least one recent sample must also have passed
+// the estimator innovation gate.
+constexpr uint32_t ACCEPTED_BARO_STALE_US =
+    500000;
+
+const bool acceptedBaroFresh =
+    _lastAcceptedBaroUs != 0 &&
+    static_cast<uint32_t>(
+        now - _lastAcceptedBaroUs) <
+        ACCEPTED_BARO_STALE_US;
+
+altitude.healthy =
+    _heightInitialized &&
+    baroFresh &&
+    acceptedBaroFresh &&
+    std::isfinite(altitude.height) &&
+    std::isfinite(altitude.vario);
 
     if (_model.config.debug.mode ==
         DEBUG_ALTITUDE)
@@ -294,8 +314,9 @@ private:
 
   Complementary _varioFusion;
 
-  bool _heightInitialized;
-  uint32_t _lastBaroUpdateUs;
+bool _heightInitialized;
+uint32_t _lastBaroUpdateUs;
+uint32_t _lastAcceptedBaroUs;
 };
 
 } // namespace Espfc::Control
