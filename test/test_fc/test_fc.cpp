@@ -1167,12 +1167,23 @@ void test_baro_bias_seeds_first_absolute_altitude_sample()
 }
 void test_fusion_rejects_invalid_accel_without_poisoning_state()
 {
+  // Fusion::update() uses micros().
   When(
       Method(
           ArduinoFake(),
           micros))
       .AlwaysReturn(
           1000);
+
+  // Fusion::begin() writes an initialization message
+  // through Logger::info(), and Logger::info() calls
+  // millis(). ArduinoFake must therefore provide it.
+  When(
+      Method(
+          ArduinoFake(),
+          millis))
+      .AlwaysReturn(
+          1);
 
   Model model;
 
