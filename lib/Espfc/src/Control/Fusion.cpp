@@ -8,6 +8,7 @@ namespace Espfc::Control {
 
 Fusion::Fusion(Model& model): _model(model), _madgwick(), _mahony(), _rtqf(), _useMag(false) {}
 
+
 int Fusion::begin()
 {
   _model.state.attitude.healthy =
