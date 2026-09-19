@@ -413,6 +413,31 @@ const float nominalDt =
 
 const uint32_t now =
     micros();
+    
+constexpr uint32_t
+    ATTITUDE_STALE_US =
+        100000;
+
+constexpr uint32_t
+    BARO_STALE_US =
+        350000;
+
+const bool shadowAttitudeFresh =
+    attitude.healthy &&
+    static_cast<uint32_t>(
+        now -
+        attitude.lastUpdateUs) <
+        ATTITUDE_STALE_US;
+
+const auto& baro =
+    _model.state.baro;
+
+const bool shadowBaroFresh =
+    baro.sampleValid &&
+    static_cast<uint32_t>(
+        now -
+        baro.lastUpdateUs) <
+        BARO_STALE_US;
 
 float dt =
     nominalDt;
@@ -450,7 +475,7 @@ _shadowLastUpdateUs =
 
 const bool angleActive =
     _model.isModeActive(MODE_ANGLE) &&
-    _model.state.attitude.healthy;
+    shadowAttitudeFresh;
 
   if (angleActive &&
       !_shadowAngleWasActive)
@@ -549,9 +574,11 @@ const bool angleActive =
   // ALTITUDE HOLD V2
   // =====================================================
 
-  const bool altActive =
-      _model.isModeActive(MODE_ALTHOLD) &&
-      altitude.healthy;
+const bool altActive =
+    _model.isModeActive(MODE_ALTHOLD) &&
+    altitude.healthy &&
+    shadowAttitudeFresh &&
+    shadowBaroFresh;
 
   const float pilotVz =
       calculatePilotClimbRateShadow();
