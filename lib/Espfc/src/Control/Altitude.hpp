@@ -14,17 +14,20 @@ namespace Espfc::Control {
 class Altitude
 {
 public:
-  Altitude(Model& model):
-      _model(model),
-      _heightInitialized(false),
-      _filteredBaroValid(false),
-      _lastBaroUpdateUs(0),
-      _lastAcceptedBaroUs(0),
-      _filteredBaroAlt(0.0f),
-      _filteredBaroVario(0.0f)
-  {
-  }
-
+Altitude(Model& model):
+    _model(model),
+    _heightInitialized(false),
+    _filteredBaroValid(false),
+    _estimatorTimeValid(false),
+    _baroTimeValid(false),
+    _acceptedBaroTimeValid(false),
+    _lastEstimatorUpdateUs(0),
+    _lastBaroUpdateUs(0),
+    _lastAcceptedBaroUs(0),
+    _filteredBaroAlt(0.0f),
+    _filteredBaroVario(0.0f)
+{
+}
   int begin()
   {
     auto& altitude =
