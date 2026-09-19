@@ -293,11 +293,38 @@ void BaroSensor::updateAltitude()
   baro.altitudeRaw = Utils::toAltitude(baro.pressure);
   float altitude = baro.altitudeRaw;
 
-  if (baro.altitudeBiasSamples > 0)
+if (baro.altitudeBiasSamples > 0)
+{
+  const int32_t initialBiasSamples =
+      3 *
+      std::max<int32_t>(
+          baro.rate,
+          1);
+
+  // The first valid altitude sample establishes the
+  // absolute pressure reference immediately.
+  //
+  // Starting an exponential filter from zero would leave
+  // a large residual offset at locations far above sea
+  // level.
+  if (baro.altitudeBiasSamples ==
+      initialBiasSamples)
   {
-    baro.altitudeBiasSamples--;
-    baro.altitudeBias += (altitude - baro.altitudeBias) * _biasAlpha;
+    baro.altitudeBias =
+        altitude;
   }
+  else
+  {
+    // Continue gently refining the ground reference while
+    // startup calibration is active.
+    baro.altitudeBias +=
+        (altitude -
+         baro.altitudeBias) *
+        _biasAlpha;
+  }
+
+  --baro.altitudeBiasSamples;
+}
   else if (baro.altitudeBiasSamples == 0)
   {
     _model.logger.info().log("BARO BIAS").logln(baro.altitudeBias);
