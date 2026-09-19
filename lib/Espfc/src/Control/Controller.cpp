@@ -4,6 +4,17 @@
 #include <algorithm>
 #include <cmath>
 namespace Espfc::Control {
+namespace {
+
+// Legacy AltHold must remain disconnected while the
+// V2 AltHold controller is being validated in shadow mode.
+//
+// Keep this FALSE until the new controller has completed
+// non-actuating SIL/HIL verification.
+constexpr bool ENABLE_LEGACY_ALTHOLD_OUTPUT =
+    false;
+
+} // namespace
 
 Controller::Controller(Model& model): _model(model), _rates{} {}
 
@@ -13,8 +24,32 @@ int Controller::begin()
   reload(MODEL_CHANGE_RATES);
   reload(MODEL_CHANGE_FILTER);
   reload(MODEL_CHANGE_PID);
+
+  // Deterministic V2 shadow-controller reset.
+  _shadowAngleWasActive =
+      false;
+
+  _shadowAltWasActive =
+      false;
+
+  _shadowAngleTarget[AXIS_ROLL] =
+      0.0f;
+
+  _shadowAngleTarget[AXIS_PITCH] =
+      0.0f;
+
+  _shadowAltitudeTarget =
+      0.0f;
+
+  _shadowVzTarget =
+      0.0f;
+
   _shadowLastUpdateUs =
-    0;
+      0;
+
+  _model.state.assistedShadow =
+      AssistedModeShadowState{};
+
   return 1;
 }
 
@@ -174,16 +209,30 @@ void FAST_CODE_ATTR Controller::outerLoop()
   // Yaw rates control
   _model.state.setpoint.rate[AXIS_YAW] = calculateSetpointRate(AXIS_YAW, _model.state.input.ch[AXIS_YAW]);
 
-  // thrust control
-  if (_model.isModeActive(MODE_ALTHOLD))
-  {
-    _model.state.setpoint.rate[AXIS_THRUST] = calcualteAltHoldSetpoint();
-  }
-  else
-  {
-    _model.state.setpoint.rate[AXIS_THRUST] = _model.state.input.ch[AXIS_THRUST];
-  }
+// -----------------------------------------------------
+// THRUST CONTROL
+//
+// AltHold V2 currently runs in SHADOW MODE only.
+// Therefore MODE_ALTHOLD must not hand thrust control
+// to the old legacy altitude controller.
+// -----------------------------------------------------
 
+const bool legacyAltHoldActive =
+    ENABLE_LEGACY_ALTHOLD_OUTPUT &&
+    _model.isModeActive(MODE_ALTHOLD);
+
+if (legacyAltHoldActive)
+{
+  _model.state.setpoint.rate[AXIS_THRUST] =
+      calcualteAltHoldSetpoint();
+}
+else
+{
+  // Manual thrust remains authoritative while V2 is
+  // being validated in shadow mode.
+  _model.state.setpoint.rate[AXIS_THRUST] =
+      _model.state.input.ch[AXIS_THRUST];
+}
   // debug
   if (_model.config.debug.mode == DEBUG_ANGLERATE)
   {
@@ -234,18 +283,40 @@ void FAST_CODE_ATTR Controller::innerLoop()
       fScale;
 }
 
-  // thrust control
-  if (_model.isModeActive(MODE_ALTHOLD))
-  {
-    output.ch[AXIS_THRUST] = innerPid[AXIS_THRUST].update(setpoint.rate[AXIS_THRUST], altitude.vario);
-  }
-  else
-  {
-    innerPid[AXIS_THRUST].update(0, altitude.vario);
-    // follow iTerm from rc input for smooth mid-air transition
-    innerPid[AXIS_THRUST].iTerm = _model.state.input.ch[AXIS_THRUST];
-    output.ch[AXIS_THRUST] = setpoint.rate[AXIS_THRUST];
-  }
+// -----------------------------------------------------
+// THRUST OUTPUT
+//
+// Keep legacy AltHold disconnected while V2 remains
+// non-actuating.
+// -----------------------------------------------------
+
+const bool legacyAltHoldActive =
+    ENABLE_LEGACY_ALTHOLD_OUTPUT &&
+    _model.isModeActive(MODE_ALTHOLD);
+
+if (legacyAltHoldActive)
+{
+  output.ch[AXIS_THRUST] =
+      innerPid[AXIS_THRUST].update(
+          setpoint.rate[AXIS_THRUST],
+          altitude.vario);
+}
+else
+{
+  // Keep the legacy vertical PID synchronized without
+  // allowing it to command the output.
+  innerPid[AXIS_THRUST].update(
+      0.0f,
+      altitude.vario);
+
+  innerPid[AXIS_THRUST].iTerm =
+      _model.state.input.ch[
+          AXIS_THRUST];
+
+  output.ch[AXIS_THRUST] =
+      setpoint.rate[
+          AXIS_THRUST];
+}
 
   if (_model.config.debug.mode == DEBUG_STACK)
   {
