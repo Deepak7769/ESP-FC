@@ -43,10 +43,18 @@ int FAST_CODE_ATTR Controller::update()
     _model.state.debug[0] = startTime - _model.state.loopTimer.last;
   }
 
-  {
-    Utils::Stats::Measure measure(_model.state.stats, COUNTER_OUTER_PID);
-    resetIterm();
-    switch (_model.config.mixer.type)
+{
+  Utils::Stats::Measure measure(
+      _model.state.stats,
+      COUNTER_OUTER_PID);
+
+  resetIterm();
+
+  // New controller runs in parallel for comparison.
+  // It does NOT modify motor output.
+  updateAssistedModesShadow();
+
+  switch (_model.config.mixer.type)
     {
       case FC_MIXER_GIMBAL:
         outerLoopRobot();
