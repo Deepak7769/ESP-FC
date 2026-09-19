@@ -363,8 +363,11 @@ altitude.baroInnovation =
       _heightInitialized =
           true;
 
-      _lastAcceptedBaroUs =
-          baro.lastUpdateUs;
+_lastAcceptedBaroUs =
+    baro.lastUpdateUs;
+
+_acceptedBaroTimeValid =
+    true;
     }
     else
     {
@@ -431,11 +434,14 @@ altitude.baroInnovation =
             alpha *
                 altitude.baroInnovation;
 
-        altitude.baroAccepted =
-            true;
+altitude.baroAccepted =
+    true;
 
-        _lastAcceptedBaroUs =
-            baro.lastUpdateUs;
+_lastAcceptedBaroUs =
+    baro.lastUpdateUs;
+
+_acceptedBaroTimeValid =
+    true;
       }
       else
       {
@@ -488,11 +494,14 @@ bool acceptedBaroFresh =
       altitude.baroAccepted =
           true;
 
-      _lastAcceptedBaroUs =
-          baro.lastUpdateUs;
+_lastAcceptedBaroUs =
+    baro.lastUpdateUs;
 
-      acceptedBaroFresh =
-          true;
+_acceptedBaroTimeValid =
+    true;
+
+acceptedBaroFresh =
+    true;
 
       _varioFusion.begin(
           accelRate,
@@ -586,13 +595,13 @@ altitude.healthy =
               ? 1
               : 0;
 
-      const uint32_t baroAgeMs =
-          baro.lastUpdateUs != 0
-              ? static_cast<uint32_t>(
-                    now -
-                    baro.lastUpdateUs) /
-                    1000u
-              : 32000u;
+const uint32_t baroAgeMs =
+    baro.sampleValid
+        ? static_cast<uint32_t>(
+              now -
+              baro.lastUpdateUs) /
+              1000u
+        : 32000u;
 
       _model.state.debug[7] =
           static_cast<int16_t>(
@@ -612,12 +621,23 @@ private:
 
   Complementary _varioFusion;
 
+  // Estimator state
   bool _heightInitialized;
   bool _filteredBaroValid;
 
+  // Timestamp validity flags.
+  // These avoid treating micros()==0 as "invalid"
+  // after the 32-bit timer wraps.
+  bool _estimatorTimeValid;
+  bool _baroTimeValid;
+  bool _acceptedBaroTimeValid;
+
+  // Timing
+  uint32_t _lastEstimatorUpdateUs;
   uint32_t _lastBaroUpdateUs;
   uint32_t _lastAcceptedBaroUs;
 
+  // Filtered barometer state
   float _filteredBaroAlt;
   float _filteredBaroVario;
 };
