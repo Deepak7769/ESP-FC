@@ -183,7 +183,29 @@ if (val > min &&
   }
 
   _model.updateSwitchActive(newMask);
+  // -----------------------------------------------------
+// Continuous assisted-mode health validation
+// -----------------------------------------------------
 
+// ANGLE mode requires a continuously valid accelerometer/
+// attitude source, not only a valid sensor at mode entry.
+if ((newMask & (uint32_t{1} << MODE_ANGLE)) &&
+    !_model.accelActive())
+{
+  newMask &=
+      ~(uint32_t{1} << MODE_ANGLE);
+}
+
+// ALT HOLD requires a continuously healthy vertical
+// estimator. A mode that was valid when enabled must not
+// remain active after its altitude source becomes invalid.
+if ((newMask & (uint32_t{1} << MODE_ALTHOLD)) &&
+    (!_model.baroActive() ||
+     !_model.state.altitude.healthy))
+{
+  newMask &=
+      ~(uint32_t{1} << MODE_ALTHOLD);
+}
   _model.setArmingDisabled(ARMING_DISABLED_FAILSAFE, _model.state.failsafe.phase != FC_FAILSAFE_IDLE);
   _model.setArmingDisabled(ARMING_DISABLED_BOXFAILSAFE, _model.isSwitchActive(MODE_FAILSAFE));
   _model.setArmingDisabled(ARMING_DISABLED_ARM_SWITCH, _model.armingDisabled() && _model.isSwitchActive(MODE_ARMED));
