@@ -22,6 +22,8 @@ private:
   Quaternion mahonyFusion(VectorFloat g, VectorFloat a, VectorFloat m);
   Quaternion rtqfFusion(VectorFloat g, VectorFloat a, VectorFloat m);
   Quaternion filterQuaternion(const Quaternion& q);
+void resetAlgorithms(bool startupGain);
+void noteInvalidOutput();
 
   Model& _model;
   Madgwick _madgwick;
@@ -29,6 +31,7 @@ private:
   Rtqf _rtqf;
   Utils::Filter _qFilter[4];
   bool _useMag;
+uint8_t _invalidOutputCount{0};
 };
 
 } // namespace Espfc::Control
