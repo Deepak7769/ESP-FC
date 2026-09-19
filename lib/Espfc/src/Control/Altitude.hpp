@@ -3,7 +3,9 @@
 #include "Model.h"
 #include "Utils/Filter.h"
 #include "Hal/Time.hpp"
+
 #include <Complementary.hpp>
+
 #include <algorithm>
 #include <cmath>
 
@@ -12,62 +14,98 @@ namespace Espfc::Control {
 class Altitude
 {
 public:
-Altitude(Model& model):
-    _model(model),
-    _heightInitialized(false),
-    _lastBaroUpdateUs(0),
-    _lastAcceptedBaroUs(0)
+  Altitude(Model& model):
+      _model(model),
+      _heightInitialized(false),
+      _filteredBaroValid(false),
+      _lastBaroUpdateUs(0),
+      _lastAcceptedBaroUs(0),
+      _filteredBaroAlt(0.0f),
+      _filteredBaroVario(0.0f)
   {
   }
 
   int begin()
   {
-    auto& altitude = _model.state.altitude;
+    auto& altitude =
+        _model.state.altitude;
 
-    altitude.height = 0.0f;
-    altitude.vario = 0.0f;
-    altitude.baroInnovation = 0.0f;
-    altitude.healthy = false;
-    altitude.baroAccepted = false;
+    altitude.height =
+        0.0f;
 
- _heightInitialized = false;
-_lastBaroUpdateUs = 0;
-_lastAcceptedBaroUs = 0;
+    altitude.vario =
+        0.0f;
 
-    reload(MODEL_CHANGE_FILTER);
+    altitude.baroInnovation =
+        0.0f;
+
+    altitude.healthy =
+        false;
+
+    altitude.baroAccepted =
+        false;
+
+    _heightInitialized =
+        false;
+
+    _filteredBaroValid =
+        false;
+
+    _lastBaroUpdateUs =
+        0;
+
+    _lastAcceptedBaroUs =
+        0;
+
+    _filteredBaroAlt =
+        0.0f;
+
+    _filteredBaroVario =
+        0.0f;
+
+    reload(
+        MODEL_CHANGE_FILTER);
 
     return 1;
   }
 
   int reload(ModelChangeEvent event)
   {
-    switch (event)
+    if (event != MODEL_CHANGE_FILTER)
     {
-      case MODEL_CHANGE_FILTER:
-      {
-        const int rate =
-            std::max<int>(_model.state.accel.timer.rate, 1);
-
-        // These filters are deliberately not extremely slow.
-        // The estimator itself performs the long-term correction.
-        _altitudeFilter.begin(
-            FilterConfig(FILTER_PT3, 5),
-            rate);
-
-        _varioFilter.begin(
-            FilterConfig(FILTER_PT3, 5),
-            rate);
-
-        _varioFusion.begin(
-            rate,
-            _model.config.altHold.baroTau * 0.1f);
-
-        break;
-      }
-
-      default:
-        break;
+      return 1;
     }
+
+    const int accelRate =
+        std::max<int>(
+            _model.state.accel.timer.rate,
+            1);
+
+    const int baroRate =
+        std::max<int>(
+            _model.state.baro.rate,
+            1);
+
+    // IMPORTANT:
+    // These filters consume BAROMETER samples,
+    // therefore their rate must be the barometer rate,
+    // not the IMU rate.
+    _altitudeFilter.begin(
+        FilterConfig(
+            FILTER_PT3,
+            5),
+        baroRate);
+
+    _varioFilter.begin(
+        FilterConfig(
+            FILTER_PT3,
+            5),
+        baroRate);
+
+    _varioFusion.begin(
+        accelRate,
+        _model.config.altHold.baroTau *
+            0.1f);
 
     return 1;
   }
@@ -84,37 +122,23 @@ _lastAcceptedBaroUs = 0;
     const auto& baro =
         _model.state.baro;
 
-    const int rate =
+    const int accelRate =
         std::max<int>(
             _model.state.accel.timer.rate,
             1);
 
     const float dt =
-        1.0f / static_cast<float>(rate);
-
-    // Upsample filtered barometer information to the IMU update rate.
-    const float baroAlt =
-        _altitudeFilter.update(
-            baro.altitudeGround);
-
-    const float baroVario =
-        _varioFilter.update(
-            baro.vario);
-
-    // Existing fast accel/baro vertical-speed fusion.
-    const float accZ =
-        _model.state.accel.world.z;
-
-    altitude.vario =
-        _varioFusion.update(
-            accZ,
-            baroVario);
+        1.0f /
+        static_cast<float>(
+            accelRate);
 
     const uint32_t now =
         micros();
 
-    // A barometer object existing is not enough.
-    // Data must also be valid and recent.
+    // --------------------------------------------------
+    // BAROMETER FRESHNESS
+    // --------------------------------------------------
+
     constexpr uint32_t BARO_STALE_US =
         350000;
 
@@ -122,50 +146,110 @@ _lastAcceptedBaroUs = 0;
         baro.sampleValid &&
         baro.lastUpdateUs != 0 &&
         static_cast<uint32_t>(
-            now - baro.lastUpdateUs) <
+            now -
+            baro.lastUpdateUs) <
             BARO_STALE_US;
 
-float baroDt =
-    1.0f /
-    static_cast<float>(
-        std::max<int>(
-            baro.rate,
-            1));
+    // Do not allow altitude hold during startup
+    // pressure-zero calibration.
+    const bool baroBiasReady =
+        baro.altitudeBiasSamples < 0;
 
-const bool newBaroSample =
-    baro.lastUpdateUs != 0 &&
-    baro.lastUpdateUs !=
-        _lastBaroUpdateUs;
+    const bool newBaroSample =
+        baro.lastUpdateUs != 0 &&
+        baro.lastUpdateUs !=
+            _lastBaroUpdateUs;
 
-if (newBaroSample)
-{
-  if (_lastBaroUpdateUs != 0)
-  {
-    baroDt =
+    float baroDt =
+        1.0f /
         static_cast<float>(
-            static_cast<uint32_t>(
-                baro.lastUpdateUs -
-                _lastBaroUpdateUs)) *
-        0.000001f;
+            std::max<int>(
+                baro.rate,
+                1));
 
-    // Guard against corrupted or unexpectedly long timing.
-    baroDt =
-        std::clamp(
-            baroDt,
-            0.001f,
-            0.250f);
-  }
+    // --------------------------------------------------
+    // PROCESS EACH BAROMETER SAMPLE EXACTLY ONCE
+    // --------------------------------------------------
 
-  _lastBaroUpdateUs =
-      baro.lastUpdateUs;
-}
+    if (newBaroSample)
+    {
+      if (_lastBaroUpdateUs != 0)
+      {
+        baroDt =
+            static_cast<float>(
+                static_cast<uint32_t>(
+                    baro.lastUpdateUs -
+                    _lastBaroUpdateUs)) *
+            0.000001f;
+
+        baroDt =
+            std::clamp(
+                baroDt,
+                0.001f,
+                0.250f);
+      }
+
+      _lastBaroUpdateUs =
+          baro.lastUpdateUs;
+
+      if (std::isfinite(
+              baro.altitudeGround) &&
+          std::isfinite(
+              baro.vario))
+      {
+        _filteredBaroAlt =
+            _altitudeFilter.update(
+                baro.altitudeGround);
+
+        _filteredBaroVario =
+            _varioFilter.update(
+                baro.vario);
+
+        _filteredBaroValid =
+            std::isfinite(
+                _filteredBaroAlt) &&
+            std::isfinite(
+                _filteredBaroVario);
+      }
+    }
+
+    // --------------------------------------------------
+    // FAST VERTICAL VELOCITY ESTIMATION
+    // --------------------------------------------------
+
+    const float accZ =
+        _model.state.accel.world.z;
+
+    const bool accelFinite =
+        std::isfinite(accZ);
+
+    const float safeAccZ =
+        accelFinite
+            ? accZ
+            : 0.0f;
+
+    const float baroVarioMeasurement =
+        _filteredBaroValid
+            ? _filteredBaroVario
+            : 0.0f;
+
+    altitude.vario =
+        _varioFusion.update(
+            safeAccZ,
+            baroVarioMeasurement);
+
+    // --------------------------------------------------
+    // INITIALIZE ABSOLUTE HEIGHT
+    // --------------------------------------------------
 
     if (!_heightInitialized &&
+        newBaroSample &&
         baroFresh &&
-        std::isfinite(baroAlt))
+        baroBiasReady &&
+        _filteredBaroValid)
     {
       altitude.height =
-          baroAlt;
+          _filteredBaroAlt;
 
       altitude.vario =
           0.0f;
@@ -173,60 +257,85 @@ if (newBaroSample)
       altitude.baroInnovation =
           0.0f;
 
+      altitude.baroAccepted =
+          true;
+
       _heightInitialized =
           true;
+
+      _lastAcceptedBaroUs =
+          baro.lastUpdateUs;
     }
+    else
+    {
+      altitude.baroAccepted =
+          false;
+    }
+
+    // --------------------------------------------------
+    // HEIGHT PREDICTION + BAROMETER CORRECTION
+    // --------------------------------------------------
 
     if (_heightInitialized)
     {
-      // Fast prediction:
-      // height(k+1) = height(k) + Vz * dt
+      const float safeVario =
+          std::isfinite(
+              altitude.vario)
+              ? altitude.vario
+              : 0.0f;
+
       const float predictedHeight =
           altitude.height +
-          altitude.vario * dt;
+          safeVario * dt;
 
-      altitude.baroInnovation =
-          baroAlt -
-          predictedHeight;
+      bool acceptedThisSample =
+          false;
 
-      // Reject physically implausible sudden barometer steps.
-      // Diagnostic starting value; tune from logs, not by making
-      // the barometer graph artificially flat.
-      constexpr float BARO_INNOVATION_GATE_M =
-          1.5f;
-
-      altitude.baroAccepted =
-          newBaroSample &&
+      if (newBaroSample &&
           baroFresh &&
-          std::isfinite(baroAlt) &&
-          std::isfinite(altitude.vario) &&
-          std::fabs(
-              altitude.baroInnovation) <
-              BARO_INNOVATION_GATE_M;
+          baroBiasReady &&
+          _filteredBaroValid)
+      {
+        altitude.baroInnovation =
+            _filteredBaroAlt -
+            predictedHeight;
 
-if (altitude.baroAccepted)
-{
-  // Remember the most recent barometer measurement that
-  // actually passed the innovation gate.
-  _lastAcceptedBaroUs =
-      baro.lastUpdateUs;
+        constexpr float
+            BARO_INNOVATION_GATE_M =
+                1.5f;
 
-  // Slow absolute-height correction while the IMU/vario
-  // path handles fast motion.
-  constexpr float HEIGHT_CORRECTION_TAU_S =
-      1.0f;
+        acceptedThisSample =
+            std::isfinite(
+                altitude.baroInnovation) &&
+            std::fabs(
+                altitude.baroInnovation) <
+                BARO_INNOVATION_GATE_M;
+      }
 
-const float alpha =
-    std::clamp(
-        baroDt /
-        (HEIGHT_CORRECTION_TAU_S + baroDt),
-        0.0f,
-        1.0f);
+      if (acceptedThisSample)
+      {
+        constexpr float
+            HEIGHT_CORRECTION_TAU_S =
+                1.0f;
+
+        const float alpha =
+            std::clamp(
+                baroDt /
+                    (HEIGHT_CORRECTION_TAU_S +
+                     baroDt),
+                0.0f,
+                1.0f);
 
         altitude.height =
             predictedHeight +
             alpha *
-            altitude.baroInnovation;
+                altitude.baroInnovation;
+
+        altitude.baroAccepted =
+            true;
+
+        _lastAcceptedBaroUs =
+            baro.lastUpdateUs;
       }
       else
       {
@@ -235,49 +344,115 @@ const float alpha =
       }
     }
 
-// It is not enough for the BMP280 to simply produce recent
-// samples. At least one recent sample must also have passed
-// the estimator innovation gate.
-constexpr uint32_t ACCEPTED_BARO_STALE_US =
-    500000;
+    // --------------------------------------------------
+    // ACCEPTED-BARO HEALTH
+    // --------------------------------------------------
 
-const bool acceptedBaroFresh =
-    _lastAcceptedBaroUs != 0 &&
-    static_cast<uint32_t>(
-        now - _lastAcceptedBaroUs) <
-        ACCEPTED_BARO_STALE_US;
+    constexpr uint32_t
+        ACCEPTED_BARO_STALE_US =
+            500000;
 
-altitude.healthy =
-    _heightInitialized &&
-    baroFresh &&
-    acceptedBaroFresh &&
-    std::isfinite(altitude.height) &&
-    std::isfinite(altitude.vario);
+    bool acceptedBaroFresh =
+        _lastAcceptedBaroUs != 0 &&
+        static_cast<uint32_t>(
+            now -
+            _lastAcceptedBaroUs) <
+            ACCEPTED_BARO_STALE_US;
+
+    // --------------------------------------------------
+    // SAFE RE-ACQUISITION
+    //
+    // If the estimator has lost absolute reference because
+    // many barometer samples were rejected, only rebase while
+    // DISARMED. Never jump the altitude reference while armed.
+    // --------------------------------------------------
+
+    if (_heightInitialized &&
+        !acceptedBaroFresh &&
+        baroFresh &&
+        baroBiasReady &&
+        newBaroSample &&
+        _filteredBaroValid &&
+        !_model.isModeActive(
+            MODE_ARMED))
+    {
+      altitude.height =
+          _filteredBaroAlt;
+
+      altitude.vario =
+          0.0f;
+
+      altitude.baroInnovation =
+          0.0f;
+
+      altitude.baroAccepted =
+          true;
+
+      _lastAcceptedBaroUs =
+          baro.lastUpdateUs;
+
+      acceptedBaroFresh =
+          true;
+
+      _varioFusion.begin(
+          accelRate,
+          _model.config.altHold.baroTau *
+              0.1f,
+          0.0f);
+    }
+
+    // --------------------------------------------------
+    // FINAL ESTIMATOR HEALTH
+    // --------------------------------------------------
+
+    altitude.healthy =
+        _heightInitialized &&
+        _filteredBaroValid &&
+        baroBiasReady &&
+        baroFresh &&
+        acceptedBaroFresh &&
+        accelFinite &&
+        std::isfinite(
+            altitude.height) &&
+        std::isfinite(
+            altitude.vario);
+
+    // --------------------------------------------------
+    // DEBUG
+    // --------------------------------------------------
 
     if (_model.config.debug.mode ==
         DEBUG_ALTITUDE)
     {
       _model.state.debug[0] =
           std::clamp(
-              lrintf(baro.altitudeGround * 100.0f),
+              lrintf(
+                  baro.altitudeGround *
+                  100.0f),
               -32000l,
               32000l);
 
       _model.state.debug[1] =
           std::clamp(
-              lrintf(baro.vario * 100.0f),
+              lrintf(
+                  baro.vario *
+                  100.0f),
               -32000l,
               32000l);
 
       _model.state.debug[2] =
           std::clamp(
-              lrintf(altitude.height * 100.0f),
+              lrintf(
+                  altitude.height *
+                  100.0f),
               -32000l,
               32000l);
 
       _model.state.debug[3] =
           std::clamp(
-              lrintf(altitude.vario * 100.0f),
+              lrintf(
+                  altitude.vario *
+                  100.0f),
               -32000l,
               32000l);
 
@@ -290,16 +465,27 @@ altitude.healthy =
               32000l);
 
       _model.state.debug[5] =
-          altitude.healthy ? 1 : 0;
+          altitude.healthy
+              ? 1
+              : 0;
 
       _model.state.debug[6] =
-          altitude.baroAccepted ? 1 : 0;
+          altitude.baroAccepted
+              ? 1
+              : 0;
+
+      const uint32_t baroAgeMs =
+          baro.lastUpdateUs != 0
+              ? static_cast<uint32_t>(
+                    now -
+                    baro.lastUpdateUs) /
+                    1000u
+              : 32000u;
 
       _model.state.debug[7] =
           static_cast<int16_t>(
               std::min<uint32_t>(
-                  (now - baro.lastUpdateUs) /
-                      1000u,
+                  baroAgeMs,
                   32000u));
     }
 
@@ -314,9 +500,14 @@ private:
 
   Complementary _varioFusion;
 
-bool _heightInitialized;
-uint32_t _lastBaroUpdateUs;
-uint32_t _lastAcceptedBaroUs;
+  bool _heightInitialized;
+  bool _filteredBaroValid;
+
+  uint32_t _lastBaroUpdateUs;
+  uint32_t _lastAcceptedBaroUs;
+
+  float _filteredBaroAlt;
+  float _filteredBaroVario;
 };
 
 } // namespace Espfc::Control
