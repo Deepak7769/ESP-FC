@@ -45,6 +45,8 @@ private:
 
   float _shadowAltitudeTarget = 0.0f;
   float _shadowVzTarget = 0.0f;
+
+uint32_t _shadowLastUpdateUs = 0;
 };
 
 } // namespace Espfc::Control
