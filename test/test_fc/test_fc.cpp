@@ -1,11 +1,17 @@
 #include "Control/Actuator.h"
 #include "Control/Controller.h"
+#include "Control/Fusion.h"
+#include "Sensor/BaroSensor.hpp"
 #include "Model.h"
 #include "Output/Mixer.h"
 #include "Utils/Timer.h"
+
 #include <ArduinoFake.h>
 #include <Gps.hpp>
 #include <unity.h>
+
+#include <cmath>
+#include <limits>
 
 using namespace fakeit;
 using namespace Espfc;
@@ -1032,6 +1038,248 @@ void test_actuator_angle_fault_requires_switch_cycle()
       model.isModeActive(
           MODE_ANGLE));
 }
+void test_controller_althold_v2_shadow_does_not_drive_thrust()
+{
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          1000);
+
+  Model model;
+
+  model.state.gyro.clock =
+      1000;
+
+  model.config.gyro.dlpf =
+      GYRO_DLPF_256;
+
+  model.config.loopSync =
+      1;
+
+  model.config.mixerSync =
+      1;
+
+  model.config.mixer.type =
+      FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(
+      model);
+
+  controller.begin();
+
+  model.state.altitude.height =
+      2.0f;
+
+  model.state.altitude.vario =
+      0.0f;
+
+  model.state.altitude.healthy =
+      true;
+
+  constexpr float MANUAL_THRUST =
+      0.35f;
+
+  model.state.input.ch[
+      AXIS_THRUST] =
+      MANUAL_THRUST;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ALTHOLD);
+
+  controller.update();
+
+  // V2 should still run in shadow.
+  TEST_ASSERT_TRUE(
+      model.state.assistedShadow
+          .altitudeActive);
+
+  // But actual thrust setpoint must remain manual.
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      MANUAL_THRUST,
+      model.state.setpoint.rate[
+          AXIS_THRUST]);
+
+  // And the final controller output must also remain
+  // on the manual path.
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      MANUAL_THRUST,
+      model.state.output.ch[
+          AXIS_THRUST]);
+}
+void test_baro_bias_seeds_first_absolute_altitude_sample()
+{
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          1000000);
+
+  Model model;
+
+  Espfc::Sensor::BaroSensor sensor(
+      model);
+
+  model.state.baro.rate =
+      50;
+
+  model.state.baro.altitudeBiasSamples =
+      3 *
+      model.state.baro.rate;
+
+  // Valid atmospheric pressure well away from sea-level
+  // reference, so the old zero-start bias logic would
+  // leave a large initial offset.
+  model.state.baro.pressure =
+      90000.0f;
+
+  model.state.baro.altitudeBias =
+      0.0f;
+
+  sensor.updateAltitude();
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          model.state.baro.altitude));
+
+  // First valid sample must immediately establish the
+  // local ground reference.
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.001f,
+      0.0f,
+      model.state.baro.altitudeGround);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.001f,
+      model.state.baro.altitude,
+      model.state.baro.altitudeBias);
+
+  TEST_ASSERT_EQUAL_INT32(
+      149,
+      model.state.baro.altitudeBiasSamples);
+}
+void test_fusion_rejects_invalid_accel_without_poisoning_state()
+{
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          1000);
+
+  Model model;
+
+  model.state.loopTimer.setRate(
+      500);
+
+  model.state.accel.timer.setRate(
+      500);
+
+  model.state.gyro.present =
+      true;
+
+  model.state.accel.present =
+      true;
+
+  model.config.fusion.mode =
+      FUSION_MAHONY;
+
+  model.state.attitude.rate =
+      VectorFloat{
+          0.0f,
+          0.0f,
+          0.0f};
+
+  model.state.accel.adc.store(
+      VectorFloat{
+          0.0f,
+          0.0f,
+          ACCEL_G});
+
+  Espfc::Control::Fusion fusion(
+      model);
+
+  fusion.begin();
+
+  // Establish one known-good AHRS state.
+  TEST_ASSERT_EQUAL_INT(
+      1,
+      fusion.update());
+
+  TEST_ASSERT_TRUE(
+      model.state.attitude.healthy);
+
+  const Quaternion goodQ =
+      model.state.attitude.quaternion;
+
+  const float nanValue =
+      std::numeric_limits<float>
+          ::quiet_NaN();
+
+  // Inject corrupt sensor data.
+  model.state.accel.adc.store(
+      VectorFloat{
+          nanValue,
+          0.0f,
+          ACCEL_G});
+
+  TEST_ASSERT_EQUAL_INT(
+      0,
+      fusion.update());
+
+  // Last valid quaternion must remain intact.
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          model.state.attitude
+              .quaternion.w));
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      goodQ.w,
+      model.state.attitude
+          .quaternion.w);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      goodQ.x,
+      model.state.attitude
+          .quaternion.x);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      goodQ.y,
+      model.state.attitude
+          .quaternion.y);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      goodQ.z,
+      model.state.attitude
+          .quaternion.z);
+
+  // Restore a valid measurement.
+  model.state.accel.adc.store(
+      VectorFloat{
+          0.0f,
+          0.0f,
+          ACCEL_G});
+
+  // AHRS must continue normally. This proves the bad
+  // sample never entered the recursive AHRS state.
+  TEST_ASSERT_EQUAL_INT(
+      1,
+      fusion.update());
+
+  TEST_ASSERT_TRUE(
+      model.state.attitude.healthy);
+}
 void test_rates_betaflight()
 {
   InputConfig config;
@@ -1397,6 +1645,15 @@ RUN_TEST(test_controller_shadow_althold_vertical_accel_limit);
 RUN_TEST(test_controller_shadow_althold_full_climb_rate_scaling);
 RUN_TEST(test_actuator_althold_fault_requires_switch_cycle);
 RUN_TEST(test_actuator_angle_fault_requires_switch_cycle);
+  // Final assisted-mode architecture regression tests
+RUN_TEST(
+    test_controller_althold_v2_shadow_does_not_drive_thrust);
+
+RUN_TEST(
+    test_baro_bias_seeds_first_absolute_altitude_sample);
+
+RUN_TEST(
+    test_fusion_rejects_invalid_accel_without_poisoning_state);
 
 RUN_TEST(test_rates_betaflight);
   RUN_TEST(test_rates_betaflight_expo);
