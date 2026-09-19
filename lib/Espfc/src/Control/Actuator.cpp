@@ -124,18 +124,55 @@ void Actuator::updateArmingDisabled()
         _model.state.mode.rescueConfigMode == RESCUE_CONFIG_ACTIVE);
 
   // Check small angle - prevent arming if tilted beyond configured angle
-  if (_model.config.arming.smallAngle < 180.0f && _model.accelActive())
+if (_model.config.arming.smallAngle < 180.0f &&
+    _model.accelActive())
+{
+  bool angleUnsafe =
+      !attitudeEstimateHealthy();
+
+  if (!angleUnsafe)
   {
-    const float maxTiltRad = Utils::toRad(_model.config.arming.smallAngle);
-    const float roll = _model.state.attitude.euler[AXIS_ROLL];
-    const float pitch = _model.state.attitude.euler[AXIS_PITCH];
-    const float currentTilt = std::max(std::fabs(roll), std::fabs(pitch));
-    _model.setArmingDisabled(ARMING_DISABLED_ANGLE, currentTilt > maxTiltRad);
+    const float maxTiltRad =
+        Utils::toRad(
+            _model.config.arming.smallAngle);
+
+    const float roll =
+        _model.state.attitude.euler[
+            AXIS_ROLL];
+
+    const float pitch =
+        _model.state.attitude.euler[
+            AXIS_PITCH];
+
+    if (!std::isfinite(roll) ||
+        !std::isfinite(pitch))
+    {
+      angleUnsafe =
+          true;
+    }
+    else
+    {
+      const float currentTilt =
+          std::max(
+              std::fabs(roll),
+              std::fabs(pitch));
+
+      angleUnsafe =
+          currentTilt >
+          maxTiltRad;
+    }
   }
-  else
-  {
-    _model.setArmingDisabled(ARMING_DISABLED_ANGLE, false);
-  }
+
+  _model.setArmingDisabled(
+      ARMING_DISABLED_ANGLE,
+      angleUnsafe);
+}
+else
+{
+  _model.setArmingDisabled(
+      ARMING_DISABLED_ANGLE,
+      false);
+}
   if (_model.isFeatureActive(FEATURE_GPS))
   {
     _model.setArmingDisabled(ARMING_DISABLED_GPS,
