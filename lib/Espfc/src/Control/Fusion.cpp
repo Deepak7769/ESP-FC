@@ -1,5 +1,8 @@
 #include "Control/Fusion.h"
 #include "Utils/MemoryHelper.h"
+#include "Hal/Time.hpp"
+
+#include <cmath>
 
 namespace Espfc::Control {
 
