@@ -802,22 +802,39 @@ void test_controller_shadow_althold_vertical_accel_limit()
   TEST_ASSERT_TRUE(
       change < 0.1f);
 }
-void test_controller_shadow_althold_full_climb_rate_scaling()
+void test_actuator_althold_fault_requires_switch_cycle()
 {
-  When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          50000);
 
   Model model;
 
-  model.state.gyro.clock = 1000;
-  model.config.gyro.dlpf = GYRO_DLPF_256;
-  model.config.loopSync = 1;
-  model.config.mixerSync = 1;
-  model.config.mixer.type = FC_MIXER_QUADX;
+  // --------------------------------------------------
+  // Required barometer state
+  // --------------------------------------------------
 
-  model.begin();
+  model.config.baro.dev =
+      BARO_BMP280;
 
-  Controller controller(model);
-  controller.begin();
+  model.state.baro.present =
+      true;
+
+  model.state.baro.sampleValid =
+      true;
+
+  model.state.baro.lastUpdateUs =
+      50000;
+
+  // --------------------------------------------------
+  // Required altitude-estimator state
+  // --------------------------------------------------
+
+  model.state.altitude.healthy =
+      true;
 
   model.state.altitude.height =
       2.0f;
@@ -825,25 +842,130 @@ void test_controller_shadow_althold_full_climb_rate_scaling()
   model.state.altitude.vario =
       0.0f;
 
+  // --------------------------------------------------
+  // Required attitude-estimator state
+  // AltHold depends on a valid world-frame vertical
+  // acceleration projection, so attitude health is part
+  // of the AltHold health contract.
+  // --------------------------------------------------
+
+  model.state.gyro.present =
+      true;
+
+  model.state.accel.present =
+      true;
+
+  model.state.attitude.healthy =
+      true;
+
+  model.state.attitude.lastUpdateUs =
+      50000;
+
+  model.state.attitude.quaternion =
+      Quaternion(
+          1.0f,
+          0.0f,
+          0.0f,
+          0.0f);
+
+  model.state.attitude.euler =
+      VectorFloat(
+          0.0f,
+          0.0f,
+          0.0f);
+
+  // --------------------------------------------------
+  // AltHold AUX condition
+  // --------------------------------------------------
+
+  auto& condition =
+      model.config.conditions[0];
+
+  condition.id =
+      MODE_ALTHOLD;
+
+  condition.ch =
+      AXIS_AUX_1;
+
+  condition.min =
+      1200;
+
+  condition.max =
+      1800;
+
+  model.state.input.us[AXIS_AUX_1] =
+      1500;
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+
+  // --------------------------------------------------
+  // 1. Healthy estimator + switch ON
+  // --------------------------------------------------
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  // --------------------------------------------------
+  // 2. Estimator failure
+  // --------------------------------------------------
+
+  model.state.altitude.healthy =
+      false;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  // --------------------------------------------------
+  // 3. Estimator recovers while switch stays ON
+  //
+  // Fault latch must prevent automatic re-entry.
+  // --------------------------------------------------
+
   model.state.altitude.healthy =
       true;
 
-  model.state.input.ch[AXIS_THRUST] =
-      1.0f;
+  actuator.updateModeMask();
 
-  model.updateModes(
-      uint32_t{1} << MODE_ALTHOLD);
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ALTHOLD));
 
-  controller.update();
+  // --------------------------------------------------
+  // 4. Pilot deliberately switches AltHold OFF
+  //
+  // This clears the fault latch.
+  // --------------------------------------------------
 
-  // At 1000 Hz:
-  // 1.5 m/s * 0.001 s = 0.0015 m.
-  TEST_ASSERT_FLOAT_WITHIN(
-      0.00002f,
-      2.0015f,
-      model.state
-          .assistedShadow
-          .altitudeTarget);
+  model.state.input.us[AXIS_AUX_1] =
+      1000;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  // --------------------------------------------------
+  // 5. Pilot deliberately switches AltHold ON again
+  // --------------------------------------------------
+
+  model.state.input.us[AXIS_AUX_1] =
+      1500;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ALTHOLD));
 }
 
 
