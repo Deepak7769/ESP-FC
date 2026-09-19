@@ -1,6 +1,7 @@
 #include "Sensor/BaroSensor.hpp"
 #include "Hal/Time.hpp"
 #include <cmath>
+#include <algorithm>
 
 namespace Espfc::Sensor {
 
@@ -61,23 +62,35 @@ int BaroSensor::begin()
   _baro =
       baro.dev;
 
-  const int delay =
-      _baro->getDelay(BARO_MODE_TEMP) +
-      _baro->getDelay(BARO_MODE_PRESS);
+const int gyroInterval =
+    std::max<int>(
+        _model.state.gyro.timer.interval,
+        1);
 
-  const int toGyroRate =
-      (delay /
-       _model.state.gyro.timer.interval) +
-      1;
+const int delay =
+    std::max<int>(
+        _baro->getDelay(
+            BARO_MODE_TEMP) +
+        _baro->getDelay(
+            BARO_MODE_PRESS),
+        1);
 
-  const int interval =
-      _model.state.gyro.timer.interval *
-      toGyroRate;
+const int toGyroRate =
+    (delay /
+     gyroInterval) +
+    1;
 
-  const int rate =
-      std::max(
-          1000000 / interval,
-          1);
+const int interval =
+    std::max(
+        gyroInterval *
+            toGyroRate,
+        1);
+
+const int rate =
+    std::max(
+        1000000 /
+            interval,
+        1);
 
   baro.rate =
       rate;
@@ -116,7 +129,10 @@ int BaroSensor::reload(ModelChangeEvent event)
   switch (event)
   {
     case MODEL_CHANGE_FILTER: {
-      const int rate = _model.state.baro.rate;
+      const int rate =
+    std::max<int>(
+        _model.state.baro.rate,
+        1);
       const auto internalFilter = FILTER_PT1;
       const auto internalCutoff = std::max((rate + 2) / 4, 1);
       _temperatureFilter.begin(FilterConfig(internalFilter, internalCutoff), rate);
@@ -225,27 +241,50 @@ void BaroSensor::readTemperature()
 
 bool BaroSensor::readPressure()
 {
+  constexpr float
+      MIN_PRESSURE_PA =
+          1000.0f;
+
+  constexpr float
+      MAX_PRESSURE_PA =
+          120000.0f;
+
   const float press =
       _baro->readPressure();
 
-if (!std::isfinite(press) ||
-    press <= 0.f)
-{
-  // Do not destroy validity because of one dropped sample.
-  // lastUpdateUs is intentionally not updated, so the
-  // freshness timeout will detect a persistent failure.
-  return false;
-}
+  if (!std::isfinite(press) ||
+      press < MIN_PRESSURE_PA ||
+      press > MAX_PRESSURE_PA)
+  {
+    // Keep the previous valid state.
+    // Freshness timeout handles persistent failure.
+    return false;
+  }
+
+  const float filteredPressure =
+      _pressureFilter.update(
+          press);
+
+  if (!std::isfinite(
+          filteredPressure) ||
+      filteredPressure <
+          MIN_PRESSURE_PA ||
+      filteredPressure >
+          MAX_PRESSURE_PA)
+  {
+    return false;
+  }
 
   _model.state.baro.pressureRaw =
       press;
 
-_model.state.baro.pressure =
-    _pressureFilter.update(press);
+  _model.state.baro.pressure =
+      filteredPressure;
 
-_model.state.baro.sampleValid = true;
+  _model.state.baro.sampleValid =
+      true;
 
-return true;
+  return true;
 }
 void BaroSensor::updateAltitude()
 {
