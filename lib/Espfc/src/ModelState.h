@@ -244,9 +244,13 @@ struct BaroState
   float altitudeBias;
   float altitudePrev;
   float vario;
+
+  // Professional AltHold estimator support
+  uint32_t lastUpdateUs;
+  bool sampleValid;
+
   int32_t altitudeBiasSamples;
 };
-
 struct GyroState
 {
   Device::GyroDevice* dev;
@@ -331,10 +335,34 @@ struct ModeState
 
 struct AltitudeState
 {
+  // Estimated vertical state
   float height;
   float vario;
+
+  // Barometer estimator diagnostics
+  float baroInnovation;
+  bool healthy;
+  bool baroAccepted;
 };
 
+struct AssistedModeShadowState
+{
+  // ANGLE mode V2
+  float rollAngleTarget;
+  float pitchAngleTarget;
+  float rollRateTarget;
+  float pitchRateTarget;
+
+  // ALT HOLD V2
+  float altitudeTarget;
+  float verticalRatePilot;
+  float verticalRateCorrection;
+  float verticalRateTarget;
+
+  bool angleActive;
+  bool altitudeActive;
+  bool altitudeTargetValid;
+};
 struct VtxState
 {
   uint8_t active = false;
@@ -487,6 +515,7 @@ struct ModelState
   RotationMatrixFloat trimRotation;
 
   AltitudeState altitude;
+  AssistedModeShadowState assistedShadow;
 
   SetpointState setpoint;
   Control::Pid innerPid[AXIS_COUNT_RPYT];
