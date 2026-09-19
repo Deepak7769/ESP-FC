@@ -74,11 +74,32 @@ int FAST_CODE_ATTR Fusion::update()
       _model.state.stats,
       COUNTER_IMU_FUSION);
 
-  auto& attitude =
-      _model.state.attitude;
+ auto& attitude =
+    _model.state.attitude;
 
+const uint32_t now =
+    micros();
+
+constexpr uint32_t
+    ATTITUDE_STALE_US =
+        100000;
+
+// A single rejected AHRS sample should not instantly
+// destroy the previous valid attitude solution.
+// It becomes unhealthy only if no valid solution has
+// arrived within the freshness window.
+const bool previousSolutionFresh =
+    attitude.lastUpdateUs != 0 &&
+    static_cast<uint32_t>(
+        now -
+        attitude.lastUpdateUs) <
+        ATTITUDE_STALE_US;
+
+if (!previousSolutionFresh)
+{
   attitude.healthy =
       false;
+}
 
   if (!_model.accelActive() ||
       !_model.gyroActive())
@@ -236,7 +257,7 @@ int FAST_CODE_ATTR Fusion::update()
       true;
 
   attitude.lastUpdateUs =
-      micros();
+      now;
 
   if (_model.config.debug.mode ==
       DEBUG_AC_ERROR)
