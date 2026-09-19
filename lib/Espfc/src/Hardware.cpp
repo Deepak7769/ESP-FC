@@ -142,8 +142,12 @@ void Hardware::detectGyro()
   const int8_t configuredDev =
       _model.config.gyro.dev;
 
-  const int8_t configuredBus =
-      _model.config.gyro.bus;
+const int8_t configuredBus =
+    _model.config.gyro.bus;
+
+// Some native builds compile without SPI/I2C detection
+// blocks, so configuredBus is intentionally unused there.
+(void)configuredBus;
 
   if (configuredDev == GYRO_NONE)
   {
