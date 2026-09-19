@@ -107,14 +107,78 @@ if (!previousSolutionFresh)
     return 0;
   }
 
-  const auto& g =
-      attitude.rate;
+const auto g =
+    attitude.rate;
 
-  const auto a =
-      _model.state.accel.adc.fetch();
+const auto a =
+    _model.state.accel.adc.fetch();
 
-  const auto& m =
-      _model.state.mag.adc;
+auto m =
+    _model.state.mag.adc;
+
+
+// -----------------------------------------------------
+// INPUT VALIDATION
+//
+// Validate sensor values BEFORE they enter the AHRS.
+// Once NaN/Inf reaches a recursive AHRS state, checking
+// the quaternion afterward can be too late.
+// -----------------------------------------------------
+
+const bool gyroFinite =
+    std::isfinite(g.x) &&
+    std::isfinite(g.y) &&
+    std::isfinite(g.z);
+
+const bool accelFinite =
+    std::isfinite(a.x) &&
+    std::isfinite(a.y) &&
+    std::isfinite(a.z);
+
+const float accelNormSq =
+    a.x * a.x +
+    a.y * a.y +
+    a.z * a.z;
+
+// Reject corrupt or effectively zero accelerometer
+// vectors. The zero-vector case is especially important
+// for RTQF attitude construction.
+if (!gyroFinite ||
+    !accelFinite ||
+    !std::isfinite(accelNormSq) ||
+    accelNormSq <= 1.0e-6f)
+{
+  return 0;
+}
+
+
+// -----------------------------------------------------
+// MAGNETOMETER FALLBACK
+// -----------------------------------------------------
+
+const bool magFinite =
+    std::isfinite(m.x) &&
+    std::isfinite(m.y) &&
+    std::isfinite(m.z);
+
+const float magNormSq =
+    m.x * m.x +
+    m.y * m.y +
+    m.z * m.z;
+
+if (!magFinite ||
+    !std::isfinite(magNormSq) ||
+    magNormSq <= 1.0e-12f)
+{
+  // A bad magnetometer must degrade gracefully to
+  // six-axis gyro+accelerometer fusion rather than
+  // poisoning the AHRS state.
+  m =
+      VectorFloat{
+          0.0f,
+          0.0f,
+          0.0f};
+}
 
   Quaternion q;
 
