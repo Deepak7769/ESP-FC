@@ -53,7 +53,17 @@ Altitude(Model& model):
 
     _filteredBaroValid =
         false;
+    _estimatorTimeValid =
+    false;
 
+_baroTimeValid =
+    false;
+
+_acceptedBaroTimeValid =
+    false;
+
+_lastEstimatorUpdateUs =
+    0;
     _lastBaroUpdateUs =
         0;
 
@@ -130,13 +140,44 @@ Altitude(Model& model):
             _model.state.accel.timer.rate,
             1);
 
-    const float dt =
-        1.0f /
-        static_cast<float>(
-            accelRate);
+const float nominalDt =
+    1.0f /
+    static_cast<float>(
+        accelRate);
 
-    const uint32_t now =
-        micros();
+const uint32_t now =
+    micros();
+
+float dt =
+    nominalDt;
+
+if (_estimatorTimeValid)
+{
+  const uint32_t elapsedUs =
+      static_cast<uint32_t>(
+          now -
+          _lastEstimatorUpdateUs);
+
+  if (elapsedUs > 0)
+  {
+    const float measuredDt =
+        static_cast<float>(
+            elapsedUs) *
+        0.000001f;
+
+    dt =
+        std::clamp(
+            measuredDt,
+            nominalDt * 0.25f,
+            nominalDt * 4.0f);
+  }
+}
+
+_lastEstimatorUpdateUs =
+    now;
+
+_estimatorTimeValid =
+    true;
 
     // --------------------------------------------------
     // BAROMETER FRESHNESS
@@ -145,23 +186,23 @@ Altitude(Model& model):
     constexpr uint32_t BARO_STALE_US =
         350000;
 
-    const bool baroFresh =
-        baro.sampleValid &&
-        baro.lastUpdateUs != 0 &&
-        static_cast<uint32_t>(
-            now -
-            baro.lastUpdateUs) <
-            BARO_STALE_US;
+const bool baroFresh =
+    baro.sampleValid &&
+    static_cast<uint32_t>(
+        now -
+        baro.lastUpdateUs) <
+        BARO_STALE_US;
 
     // Do not allow altitude hold during startup
     // pressure-zero calibration.
     const bool baroBiasReady =
         baro.altitudeBiasSamples < 0;
 
-    const bool newBaroSample =
-        baro.lastUpdateUs != 0 &&
-        baro.lastUpdateUs !=
-            _lastBaroUpdateUs;
+const bool newBaroSample =
+    baro.sampleValid &&
+    (!_baroTimeValid ||
+     baro.lastUpdateUs !=
+         _lastBaroUpdateUs);
 
     float baroDt =
         1.0f /
@@ -176,7 +217,7 @@ Altitude(Model& model):
 
     if (newBaroSample)
     {
-      if (_lastBaroUpdateUs != 0)
+    if (_baroTimeValid)
       {
         baroDt =
             static_cast<float>(
@@ -194,6 +235,8 @@ Altitude(Model& model):
 
       _lastBaroUpdateUs =
           baro.lastUpdateUs;
+        _baroTimeValid =
+    true;
 
       if (std::isfinite(
               baro.altitudeGround) &&
@@ -215,18 +258,39 @@ Altitude(Model& model):
                 _filteredBaroVario);
       }
     }
-
+const auto& attitude =
+    _model.state.attitude;
     // --------------------------------------------------
     // FAST VERTICAL VELOCITY ESTIMATION
     // --------------------------------------------------
-  const float accZ =
+const float accZ =
     _model.state.accel.world.z;
 
 const bool accelFinite =
     std::isfinite(accZ);
 
+// accel.world is only updated after a successful AHRS
+// solution. Do not repeatedly integrate an old value.
+const uint32_t nominalPeriodUs =
+    static_cast<uint32_t>(
+        nominalDt *
+        1000000.0f);
+
+const uint32_t projectionMaxAgeUs =
+    std::max<uint32_t>(
+        nominalPeriodUs * 3u,
+        5000u);
+
+const bool accelProjectionFresh =
+    attitude.healthy &&
+    static_cast<uint32_t>(
+        now -
+        attitude.lastUpdateUs) <=
+        projectionMaxAgeUs;
+
 const float safeAccZ =
-    accelFinite
+    (accelFinite &&
+     accelProjectionFresh)
         ? accZ
         : 0.0f;
 
@@ -388,12 +452,12 @@ altitude.baroInnovation =
         ACCEPTED_BARO_STALE_US =
             500000;
 
-    bool acceptedBaroFresh =
-        _lastAcceptedBaroUs != 0 &&
-        static_cast<uint32_t>(
-            now -
-            _lastAcceptedBaroUs) <
-            ACCEPTED_BARO_STALE_US;
+bool acceptedBaroFresh =
+    _acceptedBaroTimeValid &&
+    static_cast<uint32_t>(
+        now -
+        _lastAcceptedBaroUs) <
+        ACCEPTED_BARO_STALE_US;
 
     // --------------------------------------------------
     // SAFE RE-ACQUISITION
@@ -444,12 +508,10 @@ altitude.baroInnovation =
     ATTITUDE_STALE_US =
         100000;
 
-const auto& attitude =
-    _model.state.attitude;
+
 
 const bool attitudeFresh =
     attitude.healthy &&
-    attitude.lastUpdateUs != 0 &&
     static_cast<uint32_t>(
         now -
         attitude.lastUpdateUs) <
