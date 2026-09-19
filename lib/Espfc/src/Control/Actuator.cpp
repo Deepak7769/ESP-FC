@@ -341,65 +341,6 @@ bool Actuator::attitudeEstimateHealthy() const
       normSq > 0.5f &&
       normSq < 1.5f;
 }
-bool Actuator::attitudeEstimateHealthy() const
-{
-  const auto& attitude =
-      _model.state.attitude;
-
-  // Angle mode requires both IMU sources and a valid
-  // attitude solution.
-  if (!_model.gyroActive() ||
-      !_model.accelActive() ||
-      !attitude.healthy)
-  {
-    return false;
-  }
-
-  // The attitude estimate must also be recent.
-  constexpr uint32_t ATTITUDE_STALE_US =
-      100000;
-
-  const uint32_t age =
-      static_cast<uint32_t>(
-          micros() -
-          attitude.lastUpdateUs);
-
-  if (age >= ATTITUDE_STALE_US)
-  {
-    return false;
-  }
-
-  const auto& q =
-      attitude.quaternion;
-
-  // Never allow NaN/Inf to enter an assisted mode.
-  const bool finite =
-      std::isfinite(
-          attitude.euler[AXIS_ROLL]) &&
-      std::isfinite(
-          attitude.euler[AXIS_PITCH]) &&
-      std::isfinite(q.w) &&
-      std::isfinite(q.x) &&
-      std::isfinite(q.y) &&
-      std::isfinite(q.z);
-
-  if (!finite)
-  {
-    return false;
-  }
-
-  const float normSq =
-      q.w * q.w +
-      q.x * q.x +
-      q.y * q.y +
-      q.z * q.z;
-
-  return
-      std::isfinite(normSq) &&
-      normSq > 0.5f &&
-      normSq < 1.5f;
-}
-
 
 bool Actuator::canActivateMode(
     FlightMode mode)
