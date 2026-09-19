@@ -123,16 +123,40 @@ public:
             now - baro.lastUpdateUs) <
             BARO_STALE_US;
 
-    const bool newBaroSample =
-        baro.lastUpdateUs != 0 &&
-        baro.lastUpdateUs !=
-            _lastBaroUpdateUs;
+float baroDt =
+    1.0f /
+    static_cast<float>(
+        std::max<int>(
+            baro.rate,
+            1));
 
-    if (newBaroSample)
-    {
-      _lastBaroUpdateUs =
-          baro.lastUpdateUs;
-    }
+const bool newBaroSample =
+    baro.lastUpdateUs != 0 &&
+    baro.lastUpdateUs !=
+        _lastBaroUpdateUs;
+
+if (newBaroSample)
+{
+  if (_lastBaroUpdateUs != 0)
+  {
+    baroDt =
+        static_cast<float>(
+            static_cast<uint32_t>(
+                baro.lastUpdateUs -
+                _lastBaroUpdateUs)) *
+        0.000001f;
+
+    // Guard against corrupted or unexpectedly long timing.
+    baroDt =
+        std::clamp(
+            baroDt,
+            0.001f,
+            0.250f);
+  }
+
+  _lastBaroUpdateUs =
+      baro.lastUpdateUs;
+}
 
     if (!_heightInitialized &&
         baroFresh &&
@@ -185,12 +209,12 @@ public:
         constexpr float HEIGHT_CORRECTION_TAU_S =
             1.0f;
 
-        const float alpha =
-            std::clamp(
-                dt /
-                (HEIGHT_CORRECTION_TAU_S + dt),
-                0.0f,
-                1.0f);
+const float alpha =
+    std::clamp(
+        baroDt /
+        (HEIGHT_CORRECTION_TAU_S + baroDt),
+        0.0f,
+        1.0f);
 
         altitude.height =
             predictedHeight +
