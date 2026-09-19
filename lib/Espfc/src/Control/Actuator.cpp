@@ -39,6 +39,11 @@ _model.state.mode.maskPresent |=
   }
   _model.state.mode.airmodeAllowed = false;
   _model.state.mode.rescueConfigMode = RESCUE_CONFIG_PENDING;
+  _angleFaultLatched =
+    false;
+
+_altHoldFaultLatched =
+    false;
   return 1;
 }
 
@@ -184,28 +189,81 @@ if (val > min &&
 
   _model.updateSwitchActive(newMask);
   // -----------------------------------------------------
-// Continuous assisted-mode health validation
-// -----------------------------------------------------
+  // ASSISTED-MODE SUPERVISOR
+  // -----------------------------------------------------
 
-// ANGLE mode requires a continuously valid accelerometer/
-// attitude source, not only a valid sensor at mode entry.
-if ((newMask & (uint32_t{1} << MODE_ANGLE)) &&
-    !_model.accelActive())
-{
-  newMask &=
-      ~(uint32_t{1} << MODE_ANGLE);
-}
+  constexpr uint32_t ANGLE_BIT =
+      uint32_t{1} <<
+      MODE_ANGLE;
 
-// ALT HOLD requires a continuously healthy vertical
-// estimator. A mode that was valid when enabled must not
-// remain active after its altitude source becomes invalid.
-if ((newMask & (uint32_t{1} << MODE_ALTHOLD)) &&
-    (!_model.baroActive() ||
-     !_model.state.altitude.healthy))
-{
-  newMask &=
-      ~(uint32_t{1} << MODE_ALTHOLD);
-}
+  constexpr uint32_t ALTHOLD_BIT =
+      uint32_t{1} <<
+      MODE_ALTHOLD;
+
+  const bool angleRequested =
+      (newMask & ANGLE_BIT) != 0;
+
+  const bool altHoldRequested =
+      (newMask & ALTHOLD_BIT) != 0;
+
+  const bool angleHealthy =
+      attitudeEstimateHealthy();
+
+  const bool altHoldHealthy =
+      _model.baroActive() &&
+      _model.state.altitude.healthy;
+
+
+  // -----------------------------------------------------
+  // ANGLE fault latch
+  // -----------------------------------------------------
+
+  if (!angleRequested)
+  {
+    // Switch OFF clears the previous fault.
+    _angleFaultLatched =
+        false;
+  }
+  else if (!angleHealthy)
+  {
+    // Once the estimator fails, do not automatically
+    // re-enter Angle mode while the switch remains ON.
+    _angleFaultLatched =
+        true;
+  }
+
+  if (_angleFaultLatched ||
+      !angleHealthy)
+  {
+    newMask &=
+        ~ANGLE_BIT;
+  }
+
+
+  // -----------------------------------------------------
+  // ALT HOLD fault latch
+  // -----------------------------------------------------
+
+  if (!altHoldRequested)
+  {
+    // Switch OFF clears the previous fault.
+    _altHoldFaultLatched =
+        false;
+  }
+  else if (!altHoldHealthy)
+  {
+    // Sensor/estimator failure requires a deliberate
+    // OFF -> ON switch cycle before re-entry.
+    _altHoldFaultLatched =
+        true;
+  }
+
+  if (_altHoldFaultLatched ||
+      !altHoldHealthy)
+  {
+    newMask &=
+        ~ALTHOLD_BIT;
+  }
   _model.setArmingDisabled(ARMING_DISABLED_FAILSAFE, _model.state.failsafe.phase != FC_FAILSAFE_IDLE);
   _model.setArmingDisabled(ARMING_DISABLED_BOXFAILSAFE, _model.isSwitchActive(MODE_FAILSAFE));
   _model.setArmingDisabled(ARMING_DISABLED_ARM_SWITCH, _model.armingDisabled() && _model.isSwitchActive(MODE_ARMED));
@@ -228,20 +286,146 @@ if ((newMask & (uint32_t{1} << MODE_ALTHOLD)) &&
 
   _model.updateModes(newMask);
 }
+bool Actuator::attitudeEstimateHealthy() const
+{
+  const auto& attitude =
+      _model.state.attitude;
 
-bool Actuator::canActivateMode(FlightMode mode)
+  if (!_model.gyroActive() ||
+      !_model.accelActive() ||
+      !attitude.healthy)
+  {
+    return false;
+  }
+
+  constexpr uint32_t
+      ATTITUDE_STALE_US =
+          100000;
+
+  const uint32_t age =
+      static_cast<uint32_t>(
+          micros() -
+          attitude.lastUpdateUs);
+
+  if (age >= ATTITUDE_STALE_US)
+  {
+    return false;
+  }
+
+  const auto& q =
+      attitude.quaternion;
+
+  const bool finite =
+      std::isfinite(
+          attitude.euler[AXIS_ROLL]) &&
+      std::isfinite(
+          attitude.euler[AXIS_PITCH]) &&
+      std::isfinite(q.w) &&
+      std::isfinite(q.x) &&
+      std::isfinite(q.y) &&
+      std::isfinite(q.z);
+
+  if (!finite)
+  {
+    return false;
+  }
+
+  const float normSq =
+      q.w * q.w +
+      q.x * q.x +
+      q.y * q.y +
+      q.z * q.z;
+
+  return
+      std::isfinite(normSq) &&
+      normSq > 0.5f &&
+      normSq < 1.5f;
+}
+bool Actuator::attitudeEstimateHealthy() const
+{
+  const auto& attitude =
+      _model.state.attitude;
+
+  // Angle mode requires both IMU sources and a valid
+  // attitude solution.
+  if (!_model.gyroActive() ||
+      !_model.accelActive() ||
+      !attitude.healthy)
+  {
+    return false;
+  }
+
+  // The attitude estimate must also be recent.
+  constexpr uint32_t ATTITUDE_STALE_US =
+      100000;
+
+  const uint32_t age =
+      static_cast<uint32_t>(
+          micros() -
+          attitude.lastUpdateUs);
+
+  if (age >= ATTITUDE_STALE_US)
+  {
+    return false;
+  }
+
+  const auto& q =
+      attitude.quaternion;
+
+  // Never allow NaN/Inf to enter an assisted mode.
+  const bool finite =
+      std::isfinite(
+          attitude.euler[AXIS_ROLL]) &&
+      std::isfinite(
+          attitude.euler[AXIS_PITCH]) &&
+      std::isfinite(q.w) &&
+      std::isfinite(q.x) &&
+      std::isfinite(q.y) &&
+      std::isfinite(q.z);
+
+  if (!finite)
+  {
+    return false;
+  }
+
+  const float normSq =
+      q.w * q.w +
+      q.x * q.x +
+      q.y * q.y +
+      q.z * q.z;
+
+  return
+      std::isfinite(normSq) &&
+      normSq > 0.5f &&
+      normSq < 1.5f;
+}
+
+
+bool Actuator::canActivateMode(
+    FlightMode mode)
 {
   switch (mode)
   {
     case MODE_ARMED:
-      return !_model.armingDisabled() && _model.isThrottleLow();
+      return
+          !_model.armingDisabled() &&
+          _model.isThrottleLow();
+
     case MODE_ANGLE:
-      return _model.accelActive();
+      return
+          attitudeEstimateHealthy() &&
+          !_angleFaultLatched;
+
     case MODE_AIRMODE:
-      return _model.state.mode.airmodeAllowed;
+      return
+          _model.state.mode.airmodeAllowed;
+
     case MODE_ALTHOLD:
-  return _model.baroActive() &&
-         _model.state.altitude.healthy;
+      return
+          _model.baroActive() &&
+          _model.state.altitude.healthy &&
+          !_altHoldFaultLatched;
+
     default:
       return true;
   }
