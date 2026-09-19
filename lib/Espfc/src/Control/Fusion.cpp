@@ -7,6 +7,11 @@ Fusion::Fusion(Model& model): _model(model), _madgwick(), _mahony(), _rtqf(), _u
 
 int Fusion::begin()
 {
+  _model.state.attitude.healthy =
+    false;
+
+_model.state.attitude.lastUpdateUs =
+    0;
   _useMag = _model.config.fusion.useMag;
 
   _madgwick.begin(_model.state.accel.timer.rate);
@@ -61,58 +66,223 @@ void Fusion::restoreGain()
 
 int FAST_CODE_ATTR Fusion::update()
 {
-  Utils::Stats::Measure measure(_model.state.stats, COUNTER_IMU_FUSION);
+  Utils::Stats::Measure measure(
+      _model.state.stats,
+      COUNTER_IMU_FUSION);
 
-  if (_model.accelActive())
+  auto& attitude =
+      _model.state.attitude;
+
+  attitude.healthy =
+      false;
+
+  if (!_model.accelActive() ||
+      !_model.gyroActive())
   {
-    const auto& g = _model.state.attitude.rate;
-    const auto a = _model.state.accel.adc.fetch();
-    const auto& m = _model.state.mag.adc;
-    Quaternion q;
-
-    switch (_model.config.fusion.mode)
-    {
-      case FUSION_MADGWICK:
-        q = madgwickFusion(g, a, m);
-        break;
-      case FUSION_MAHONY:
-        q = mahonyFusion(g, a, m);
-        break;
-      case FUSION_RTQF:
-        q = rtqfFusion(g, a, m);
-        break;
-      case FUSION_NONE:
-      default:
-        break;
-    }
-
-    _model.state.attitude.quaternion = Quaternion::ensureSign(q, _model.state.attitude.quaternion);
-    _model.state.attitude.euler.eulerFromQuaternion(_model.state.attitude.quaternion);
-
-    // filter quaternion to align delay with accelerometer filtering
-    const auto fq = filterQuaternion(_model.state.attitude.quaternion).getNormalized();
-
-    auto world = a.getRotated(fq);
-    world.z -= ACCEL_G; // remove gravity
-
-    _model.state.accel.world = world;
-    _model.state.attitude.cosTheta = 1.0f - 2.0f * (fq.x * fq.x + fq.y * fq.y);
+    return 0;
   }
 
-  if (_model.config.debug.mode == DEBUG_AC_ERROR)
+  const auto& g =
+      attitude.rate;
+
+  const auto a =
+      _model.state.accel.adc.fetch();
+
+  const auto& m =
+      _model.state.mag.adc;
+
+  Quaternion q;
+
+  bool fusionProduced =
+      true;
+
+  switch (_model.config.fusion.mode)
   {
-    _model.state.debug[0] = lrintf(_model.state.accel.world[0] * ACCEL_G_INV * 1000);
-    _model.state.debug[1] = lrintf(_model.state.accel.world[1] * ACCEL_G_INV * 1000);
-    _model.state.debug[2] = lrintf(_model.state.accel.world[2] * ACCEL_G_INV * 1000);
-    _model.state.debug[3] = lrintf(_model.state.attitude.cosTheta * 1000.f);
+    case FUSION_MADGWICK:
+      q =
+          madgwickFusion(
+              g,
+              a,
+              m);
+      break;
+
+    case FUSION_MAHONY:
+      q =
+          mahonyFusion(
+              g,
+              a,
+              m);
+      break;
+
+    case FUSION_RTQF:
+      q =
+          rtqfFusion(
+              g,
+              a,
+              m);
+      break;
+
+    case FUSION_NONE:
+    default:
+      fusionProduced =
+          false;
+      break;
   }
 
-  if (_model.config.debug.mode == DEBUG_AC_CORRECTION)
+  if (!fusionProduced)
   {
-    _model.state.debug[0] = lrintf(Utils::toDeg(_model.state.attitude.euler[0]) * 10);
-    _model.state.debug[1] = lrintf(Utils::toDeg(_model.state.attitude.euler[1]) * 10);
-    _model.state.debug[2] = lrintf(Utils::toDeg(_model.state.attitude.euler[2]) * 10);
+    return 0;
   }
+
+  const bool quaternionFinite =
+      std::isfinite(q.w) &&
+      std::isfinite(q.x) &&
+      std::isfinite(q.y) &&
+      std::isfinite(q.z);
+
+  if (!quaternionFinite)
+  {
+    return 0;
+  }
+
+  const float qNormSq =
+      q.w * q.w +
+      q.x * q.x +
+      q.y * q.y +
+      q.z * q.z;
+
+  if (!std::isfinite(qNormSq) ||
+      qNormSq < 0.25f ||
+      qNormSq > 2.25f)
+  {
+    return 0;
+  }
+
+  q.normalize();
+
+  const Quaternion signedQ =
+      Quaternion::ensureSign(
+          q,
+          attitude.quaternion);
+
+  VectorFloat euler;
+
+  euler.eulerFromQuaternion(
+      signedQ);
+
+  if (!std::isfinite(euler.x) ||
+      !std::isfinite(euler.y) ||
+      !std::isfinite(euler.z))
+  {
+    return 0;
+  }
+
+  const auto fq =
+      filterQuaternion(
+          signedQ)
+          .getNormalized();
+
+  if (!std::isfinite(fq.w) ||
+      !std::isfinite(fq.x) ||
+      !std::isfinite(fq.y) ||
+      !std::isfinite(fq.z))
+  {
+    return 0;
+  }
+
+  auto world =
+      a.getRotated(fq);
+
+  world.z -=
+      ACCEL_G;
+
+  if (!std::isfinite(world.x) ||
+      !std::isfinite(world.y) ||
+      !std::isfinite(world.z))
+  {
+    return 0;
+  }
+
+  const float cosTheta =
+      1.0f -
+      2.0f *
+          (fq.x * fq.x +
+           fq.y * fq.y);
+
+  if (!std::isfinite(cosTheta))
+  {
+    return 0;
+  }
+
+  // Commit the complete state only after every check
+  // has succeeded.
+  attitude.quaternion =
+      signedQ;
+
+  attitude.euler =
+      euler;
+
+  attitude.cosTheta =
+      cosTheta;
+
+  _model.state.accel.world =
+      world;
+
+  attitude.healthy =
+      true;
+
+  attitude.lastUpdateUs =
+      micros();
+
+  if (_model.config.debug.mode ==
+      DEBUG_AC_ERROR)
+  {
+    _model.state.debug[0] =
+        lrintf(
+            world[0] *
+            ACCEL_G_INV *
+            1000);
+
+    _model.state.debug[1] =
+        lrintf(
+            world[1] *
+            ACCEL_G_INV *
+            1000);
+
+    _model.state.debug[2] =
+        lrintf(
+            world[2] *
+            ACCEL_G_INV *
+            1000);
+
+    _model.state.debug[3] =
+        lrintf(
+            attitude.cosTheta *
+            1000.f);
+  }
+
+  if (_model.config.debug.mode ==
+      DEBUG_AC_CORRECTION)
+  {
+    _model.state.debug[0] =
+        lrintf(
+            Utils::toDeg(
+                attitude.euler[0]) *
+            10);
+
+    _model.state.debug[1] =
+        lrintf(
+            Utils::toDeg(
+                attitude.euler[1]) *
+            10);
+
+    _model.state.debug[2] =
+        lrintf(
+            Utils::toDeg(
+                attitude.euler[2]) *
+            10);
+  }
+
   return 1;
 }
 
