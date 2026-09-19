@@ -246,9 +246,8 @@ if (val > min &&
   const bool angleHealthy =
       attitudeEstimateHealthy();
 
-  const bool altHoldHealthy =
-      _model.baroActive() &&
-      _model.state.altitude.healthy;
+const bool altHoldHealthy =
+    altitudeEstimateHealthy();
 
 
   // -----------------------------------------------------
@@ -378,6 +377,47 @@ bool Actuator::attitudeEstimateHealthy() const
       normSq > 0.5f &&
       normSq < 1.5f;
 }
+bool Actuator::altitudeEstimateHealthy() const
+{
+  const auto& altitude =
+      _model.state.altitude;
+
+  const auto& baro =
+      _model.state.baro;
+
+  if (!_model.baroActive() ||
+      !altitude.healthy ||
+      !baro.sampleValid)
+  {
+    return false;
+  }
+
+  if (!attitudeEstimateHealthy())
+  {
+    return false;
+  }
+
+  constexpr uint32_t
+      BARO_STALE_US =
+          350000;
+
+  const uint32_t baroAge =
+      static_cast<uint32_t>(
+          micros() -
+          baro.lastUpdateUs);
+
+  if (baroAge >=
+      BARO_STALE_US)
+  {
+    return false;
+  }
+
+  return
+      std::isfinite(
+          altitude.height) &&
+      std::isfinite(
+          altitude.vario);
+}
 
 bool Actuator::canActivateMode(
     FlightMode mode)
@@ -398,11 +438,10 @@ bool Actuator::canActivateMode(
       return
           _model.state.mode.airmodeAllowed;
 
-    case MODE_ALTHOLD:
-      return
-          _model.baroActive() &&
-          _model.state.altitude.healthy &&
-          !_altHoldFaultLatched;
+case MODE_ALTHOLD:
+  return
+      altitudeEstimateHealthy() &&
+      !_altHoldFaultLatched;
 
     default:
       return true;
