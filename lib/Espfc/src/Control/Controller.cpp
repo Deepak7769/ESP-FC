@@ -13,6 +13,8 @@ int Controller::begin()
   reload(MODEL_CHANGE_RATES);
   reload(MODEL_CHANGE_FILTER);
   reload(MODEL_CHANGE_PID);
+  _shadowLastUpdateUs =
+    0;
   return 1;
 }
 
@@ -331,12 +333,45 @@ void Controller::updateAssistedModesShadow()
   const auto& input =
       _model.state.input;
 
-  const float dt =
-      1.0f /
-      static_cast<float>(
-          std::max<int>(
-              _model.state.loopTimer.rate,
-              1));
+const float nominalDt =
+    1.0f /
+    static_cast<float>(
+        std::max<int>(
+            _model.state.loopTimer.rate,
+            1));
+
+const uint32_t now =
+    micros();
+
+float dt =
+    nominalDt;
+
+if (_shadowLastUpdateUs != 0)
+{
+  const uint32_t elapsedUs =
+      static_cast<uint32_t>(
+          now -
+          _shadowLastUpdateUs);
+
+  if (elapsedUs > 0)
+  {
+    const float measuredDt =
+        static_cast<float>(
+            elapsedUs) *
+        0.000001f;
+
+    // Prevent an interrupted/debug-stalled loop from
+    // creating a huge one-cycle target jump.
+    dt =
+        std::clamp(
+            measuredDt,
+            0.00025f,
+            0.050f);
+  }
+}
+
+_shadowLastUpdateUs =
+    now;
 
   // =====================================================
   // ANGLE MODE V2
