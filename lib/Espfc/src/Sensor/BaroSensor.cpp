@@ -149,10 +149,12 @@ bool BaroSensor::readPressure()
   const float press =
       _baro->readPressure();
 
- if (!std::isfinite(press) ||
+if (!std::isfinite(press) ||
     press <= 0.f)
 {
-  _model.state.baro.sampleValid = false;
+  // Do not destroy validity because of one dropped sample.
+  // lastUpdateUs is intentionally not updated, so the
+  // freshness timeout will detect a persistent failure.
   return false;
 }
 
