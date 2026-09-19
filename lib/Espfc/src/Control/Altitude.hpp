@@ -216,27 +216,44 @@ public:
     // --------------------------------------------------
     // FAST VERTICAL VELOCITY ESTIMATION
     // --------------------------------------------------
+  const float accZ =
+    _model.state.accel.world.z;
 
-    const float accZ =
-        _model.state.accel.world.z;
+const bool accelFinite =
+    std::isfinite(accZ);
 
-    const bool accelFinite =
-        std::isfinite(accZ);
+const float safeAccZ =
+    accelFinite
+        ? accZ
+        : 0.0f;
 
-    const float safeAccZ =
-        accelFinite
-            ? accZ
-            : 0.0f;
+// Previous externally visible state must match the
+// complementary filter's previous state.
+const float previousVario =
+    std::isfinite(altitude.vario)
+        ? altitude.vario
+        : 0.0f;
 
-    const float baroVarioMeasurement =
-        _filteredBaroValid
-            ? _filteredBaroVario
-            : 0.0f;
+// IMU-only prediction for this cycle.
+const float predictedVario =
+    previousVario +
+    safeAccZ * dt;
 
-    altitude.vario =
-        _varioFusion.update(
-            safeAccZ,
-            baroVarioMeasurement);
+// A stale barometer must NOT continuously pull Vz
+// toward its last value.
+const bool baroVarioUsable =
+    baroFresh &&
+    _filteredBaroValid;
+
+const float varioMeasurement =
+    baroVarioUsable
+        ? _filteredBaroVario
+        : predictedVario;
+
+altitude.vario =
+    _varioFusion.update(
+        safeAccZ,
+        varioMeasurement);
 
     // --------------------------------------------------
     // INITIALIZE ABSOLUTE HEIGHT
@@ -248,14 +265,30 @@ public:
         baroBiasReady &&
         _filteredBaroValid)
     {
-      altitude.height =
-          _filteredBaroAlt;
+altitude.height =
+    _filteredBaroAlt;
 
-      altitude.vario =
-          0.0f;
+// Do NOT set altitude.vario to zero here.
+//
+// _varioFusion has already been running during the
+// barometer-bias phase. Resetting only altitude.vario
+// would make the public estimator state disagree with
+// the complementary filter's internal state.
 
-      altitude.baroInnovation =
-          0.0f;
+if (!std::isfinite(altitude.vario))
+{
+  altitude.vario =
+      0.0f;
+
+  _varioFusion.begin(
+      accelRate,
+      _model.config.altHold.baroTau *
+          0.1f,
+      0.0f);
+}
+
+altitude.baroInnovation =
+    0.0f;
 
       altitude.baroAccepted =
           true;
@@ -400,23 +433,37 @@ public:
               0.1f,
           0.0f);
     }
-
+ 
     // --------------------------------------------------
     // FINAL ESTIMATOR HEALTH
     // --------------------------------------------------
+ constexpr uint32_t
+    ATTITUDE_STALE_US =
+        100000;
 
-    altitude.healthy =
-        _heightInitialized &&
-        _filteredBaroValid &&
-        baroBiasReady &&
-        baroFresh &&
-        acceptedBaroFresh &&
-        accelFinite &&
-        std::isfinite(
-            altitude.height) &&
-        std::isfinite(
-            altitude.vario);
+const auto& attitude =
+    _model.state.attitude;
 
+const bool attitudeFresh =
+    attitude.healthy &&
+    attitude.lastUpdateUs != 0 &&
+    static_cast<uint32_t>(
+        now -
+        attitude.lastUpdateUs) <
+        ATTITUDE_STALE_US;
+    
+altitude.healthy =
+    _heightInitialized &&
+    _filteredBaroValid &&
+    baroBiasReady &&
+    baroFresh &&
+    acceptedBaroFresh &&
+    attitudeFresh &&
+    accelFinite &&
+    std::isfinite(
+        altitude.height) &&
+    std::isfinite(
+        altitude.vario);
     // --------------------------------------------------
     // DEBUG
     // --------------------------------------------------
