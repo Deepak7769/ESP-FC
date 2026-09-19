@@ -246,8 +246,8 @@ struct BaroState
   float vario;
 
   // Professional AltHold estimator support
-  uint32_t lastUpdateUs;
-  bool sampleValid;
+uint32_t lastUpdateUs{0};
+bool sampleValid{false};
 
   int32_t altitudeBiasSamples;
 };
@@ -313,12 +313,12 @@ struct AttitudeState
 
   Quaternion quaternion;
 
-  float cosTheta;
+  float cosTheta{1.0f};
 
   // Assisted-mode estimator health.
-  bool healthy;
+  bool healthy{false};
 
-  uint32_t lastUpdateUs;
+  uint32_t lastUpdateUs{0};
 };
 
 struct SetpointState
@@ -346,32 +346,35 @@ struct ModeState
 struct AltitudeState
 {
   // Estimated vertical state
-  float height;
-  float vario;
+  float height{0.0f};
+  float vario{0.0f};
 
   // Barometer estimator diagnostics
-  float baroInnovation;
-  bool healthy;
-  bool baroAccepted;
+  float baroInnovation{0.0f};
+
+  bool healthy{false};
+  bool baroAccepted{false};
 };
 
 struct AssistedModeShadowState
 {
   // ANGLE mode V2
-  float rollAngleTarget;
-  float pitchAngleTarget;
-  float rollRateTarget;
-  float pitchRateTarget;
+  float rollAngleTarget{0.0f};
+  float pitchAngleTarget{0.0f};
+
+  float rollRateTarget{0.0f};
+  float pitchRateTarget{0.0f};
 
   // ALT HOLD V2
-  float altitudeTarget;
-  float verticalRatePilot;
-  float verticalRateCorrection;
-  float verticalRateTarget;
+  float altitudeTarget{0.0f};
 
-  bool angleActive;
-  bool altitudeActive;
-  bool altitudeTargetValid;
+  float verticalRatePilot{0.0f};
+  float verticalRateCorrection{0.0f};
+  float verticalRateTarget{0.0f};
+
+  bool angleActive{false};
+  bool altitudeActive{false};
+  bool altitudeTargetValid{false};
 };
 struct VtxState
 {
