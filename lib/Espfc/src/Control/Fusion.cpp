@@ -1,6 +1,7 @@
 #include "Control/Fusion.h"
 #include "Utils/MemoryHelper.h"
 #include "Hal/Time.hpp"
+#include <algorithm>
 
 #include <cmath>
 
@@ -8,7 +9,89 @@ namespace Espfc::Control {
 
 Fusion::Fusion(Model& model): _model(model), _madgwick(), _mahony(), _rtqf(), _useMag(false) {}
 
+void Fusion::resetAlgorithms(
+    bool startupGain)
+{
+  const float rate =
+      static_cast<float>(
+          std::max<int>(
+              _model.state.accel.timer.rate,
+              1));
 
+  _madgwick =
+      Madgwick{};
+
+  _mahony =
+      Mahony{};
+
+  _rtqf =
+      Rtqf{};
+
+  _madgwick.begin(
+      rate);
+
+  _mahony.begin(
+      rate);
+
+  _rtqf.begin(
+      rate);
+
+  if (startupGain)
+  {
+    _madgwick.setKp(
+        _model.config.fusion.gain *
+        0.05f);
+
+    _mahony.setKp(
+        _model.config.fusion.gain *
+        0.1f);
+
+    _mahony.setKi(
+        _model.config.fusion.gainI *
+        0.1f);
+
+    _rtqf.setKp(
+        _model.config.fusion.gain *
+        0.0002f);
+  }
+  else
+  {
+    restoreGain();
+  }
+
+  _invalidOutputCount =
+      0;
+
+  reload(
+      MODEL_CHANGE_FILTER);
+}
+
+
+void Fusion::noteInvalidOutput()
+{
+  if (_invalidOutputCount < 255u)
+  {
+    ++_invalidOutputCount;
+  }
+
+  constexpr uint8_t
+      INVALID_OUTPUT_LIMIT =
+          3;
+
+  // Never re-seed the recursive attitude estimator while
+  // armed; that could create an attitude discontinuity.
+  if (_invalidOutputCount >=
+          INVALID_OUTPUT_LIMIT &&
+      !_model.isModeActive(
+          MODE_ARMED))
+  {
+    resetAlgorithms(
+        false);
+
+    _model.state.attitude.healthy =
+        false;
+  }
+}
 int Fusion::begin()
 {
   _model.state.attitude.healthy =
@@ -16,19 +99,11 @@ int Fusion::begin()
 
 _model.state.attitude.lastUpdateUs =
     0;
-  _useMag = _model.config.fusion.useMag;
+  _useMag =
+      _model.config.fusion.useMag;
 
-  _madgwick.begin(_model.state.accel.timer.rate);
-  _madgwick.setKp(_model.config.fusion.gain * 0.05f);
-
-  _mahony.begin(_model.state.accel.timer.rate);
-  _mahony.setKp(_model.config.fusion.gain * 0.1f);
-  _mahony.setKi(_model.config.fusion.gainI * 0.1f);
-
-  _rtqf.begin(_model.state.accel.timer.rate);
-  _rtqf.setKp(_model.config.fusion.gain * 0.0002f);
-
-  reload(MODEL_CHANGE_FILTER);
+  resetAlgorithms(
+      true);
 
   _model.logger.info()
       .log("FUSION")
@@ -229,10 +304,11 @@ if (!magFinite ||
       std::isfinite(q.y) &&
       std::isfinite(q.z);
 
-  if (!quaternionFinite)
-  {
-    return 0;
-  }
+if (!quaternionFinite)
+{
+  noteInvalidOutput();
+  return 0;
+}
 
   const float qNormSq =
       q.w * q.w +
@@ -240,12 +316,13 @@ if (!magFinite ||
       q.y * q.y +
       q.z * q.z;
 
-  if (!std::isfinite(qNormSq) ||
-      qNormSq < 0.25f ||
-      qNormSq > 2.25f)
-  {
-    return 0;
-  }
+if (!std::isfinite(qNormSq) ||
+    qNormSq < 0.25f ||
+    qNormSq > 2.25f)
+{
+  noteInvalidOutput();
+  return 0;
+}
 
   q.normalize();
 
@@ -259,25 +336,27 @@ if (!magFinite ||
   euler.eulerFromQuaternion(
       signedQ);
 
-  if (!std::isfinite(euler.x) ||
-      !std::isfinite(euler.y) ||
-      !std::isfinite(euler.z))
-  {
-    return 0;
-  }
+if (!std::isfinite(euler.x) ||
+    !std::isfinite(euler.y) ||
+    !std::isfinite(euler.z))
+{
+  noteInvalidOutput();
+  return 0;
+}
 
   const auto fq =
       filterQuaternion(
           signedQ)
           .getNormalized();
 
-  if (!std::isfinite(fq.w) ||
-      !std::isfinite(fq.x) ||
-      !std::isfinite(fq.y) ||
-      !std::isfinite(fq.z))
-  {
-    return 0;
-  }
+if (!std::isfinite(fq.w) ||
+    !std::isfinite(fq.x) ||
+    !std::isfinite(fq.y) ||
+    !std::isfinite(fq.z))
+{
+  noteInvalidOutput();
+  return 0;
+}
 
   auto world =
       a.getRotated(fq);
@@ -285,12 +364,13 @@ if (!magFinite ||
   world.z -=
       ACCEL_G;
 
-  if (!std::isfinite(world.x) ||
-      !std::isfinite(world.y) ||
-      !std::isfinite(world.z))
-  {
-    return 0;
-  }
+if (!std::isfinite(world.x) ||
+    !std::isfinite(world.y) ||
+    !std::isfinite(world.z))
+{
+  noteInvalidOutput();
+  return 0;
+}
 
   const float cosTheta =
       1.0f -
@@ -298,10 +378,11 @@ if (!magFinite ||
           (fq.x * fq.x +
            fq.y * fq.y);
 
-  if (!std::isfinite(cosTheta))
-  {
-    return 0;
-  }
+if (!std::isfinite(cosTheta))
+{
+  noteInvalidOutput();
+  return 0;
+}
 
   // Commit the complete state only after every check
   // has succeeded.
@@ -322,7 +403,9 @@ if (!magFinite ||
 
   attitude.lastUpdateUs =
       now;
-
+_invalidOutputCount =
+    0;
+    
   if (_model.config.debug.mode ==
       DEBUG_AC_ERROR)
   {
