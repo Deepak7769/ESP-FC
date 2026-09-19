@@ -356,8 +356,13 @@ void test_controller_shadow_angle_activates_and_slews()
   controller.begin();
 
   // Drone starts level.
-  model.state.attitude.euler[AXIS_ROLL] = 0.0f;
-  model.state.attitude.euler[AXIS_PITCH] = 0.0f;
+model.state.attitude.euler.set(
+    AXIS_ROLL,
+    0.0f);
+
+model.state.attitude.euler.set(
+    AXIS_PITCH,
+    0.0f);
 
   // Pilot requests positive roll and pitch.
   model.state.input.ch[AXIS_ROLL] = 1.0f;
@@ -423,12 +428,13 @@ void test_controller_shadow_angle_bumpless_entry()
 
   // Imagine Angle mode is enabled while the aircraft
   // already has some roll attitude.
-  model.state.attitude.euler[AXIS_ROLL] =
-      0.30f;
+model.state.attitude.euler.set(
+    AXIS_ROLL,
+    0.30f);
 
-  model.state.attitude.euler[AXIS_PITCH] =
-      0.0f;
-
+model.state.attitude.euler.set(
+    AXIS_PITCH,
+    0.0f);
   // Stick centered.
   model.state.input.ch[AXIS_ROLL] =
       0.0f;
