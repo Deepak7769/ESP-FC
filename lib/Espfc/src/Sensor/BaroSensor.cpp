@@ -149,19 +149,22 @@ bool BaroSensor::readPressure()
   const float press =
       _baro->readPressure();
 
-  if (!std::isfinite(press) ||
-      press <= 0.f)
-  {
-    return false;
-  }
+ if (!std::isfinite(press) ||
+    press <= 0.f)
+{
+  _model.state.baro.sampleValid = false;
+  return false;
+}
 
   _model.state.baro.pressureRaw =
       press;
 
-  _model.state.baro.pressure =
-      _pressureFilter.update(press);
+_model.state.baro.pressure =
+    _pressureFilter.update(press);
 
-  return true;
+_model.state.baro.sampleValid = true;
+
+return true;
 }
 void BaroSensor::updateAltitude()
 {
@@ -185,6 +188,8 @@ void BaroSensor::updateAltitude()
   baro.altitude = altitude;
 const uint32_t altitudeNow =
     micros();
+  
+  baro.lastUpdateUs = altitudeNow;
 
 if (_first)
 {
