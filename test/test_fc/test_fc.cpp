@@ -328,6 +328,462 @@ void test_controller_angle_mode_does_not_latch_fterm_scale()
   TEST_ASSERT_FLOAT_WITHIN(0.001f, 1.0f, model.state.innerPid[AXIS_ROLL].fScale);
   TEST_ASSERT_TRUE(model.state.innerPid[AXIS_ROLL].fTerm < -0.001f || model.state.innerPid[AXIS_ROLL].fTerm > 0.001f);
 }
+// =========================================================
+// V2 ASSISTED MODE SHADOW TESTS
+// =========================================================
+
+void test_controller_shadow_angle_activates_and_slews()
+{
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
+
+  Model model;
+
+  model.state.gyro.clock = 1000;
+  model.config.gyro.dlpf = GYRO_DLPF_256;
+  model.config.loopSync = 1;
+  model.config.mixerSync = 1;
+  model.config.mixer.type = FC_MIXER_QUADX;
+
+  model.config.level.angleLimit = 45;
+  model.config.level.rateLimit = 300;
+
+  model.config.pid[FC_PID_LEVEL] =
+      {.P = 45u, .I = 0u, .D = 0u, .F = 0};
+
+  model.begin();
+
+  Controller controller(model);
+  controller.begin();
+
+  // Drone starts level.
+  model.state.attitude.euler[AXIS_ROLL] = 0.0f;
+  model.state.attitude.euler[AXIS_PITCH] = 0.0f;
+
+  // Pilot requests positive roll and pitch.
+  model.state.input.ch[AXIS_ROLL] = 1.0f;
+  model.state.input.ch[AXIS_PITCH] = 0.5f;
+
+  model.updateModes(
+      uint32_t{1} << MODE_ANGLE);
+
+  controller.update();
+
+  const auto& shadow =
+      model.state.assistedShadow;
+
+  TEST_ASSERT_TRUE(
+      shadow.angleActive);
+
+  // Target must start moving toward the requested angle.
+  TEST_ASSERT_TRUE(
+      shadow.rollAngleTarget > 0.0f);
+
+  TEST_ASSERT_TRUE(
+      shadow.pitchAngleTarget > 0.0f);
+
+  // But slew limiting must prevent an instantaneous jump
+  // to the full 45 degree command.
+  TEST_ASSERT_TRUE(
+      shadow.rollAngleTarget < 0.7854f);
+
+  TEST_ASSERT_TRUE(
+      shadow.pitchAngleTarget < 0.7854f);
+
+  // Positive angle error should create positive rate targets.
+  TEST_ASSERT_TRUE(
+      shadow.rollRateTarget > 0.0f);
+
+  TEST_ASSERT_TRUE(
+      shadow.pitchRateTarget > 0.0f);
+}
+
+
+void test_controller_shadow_angle_bumpless_entry()
+{
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
+
+  Model model;
+
+  model.state.gyro.clock = 1000;
+  model.config.gyro.dlpf = GYRO_DLPF_256;
+  model.config.loopSync = 1;
+  model.config.mixerSync = 1;
+  model.config.mixer.type = FC_MIXER_QUADX;
+
+  model.config.level.angleLimit = 45;
+  model.config.level.rateLimit = 300;
+
+  model.config.pid[FC_PID_LEVEL] =
+      {.P = 45u, .I = 0u, .D = 0u, .F = 0};
+
+  model.begin();
+
+  Controller controller(model);
+  controller.begin();
+
+  // Imagine Angle mode is enabled while the aircraft
+  // already has some roll attitude.
+  model.state.attitude.euler[AXIS_ROLL] =
+      0.30f;
+
+  model.state.attitude.euler[AXIS_PITCH] =
+      0.0f;
+
+  // Stick centered.
+  model.state.input.ch[AXIS_ROLL] =
+      0.0f;
+
+  model.state.input.ch[AXIS_PITCH] =
+      0.0f;
+
+  model.updateModes(
+      uint32_t{1} << MODE_ANGLE);
+
+  controller.update();
+
+  const auto& shadow =
+      model.state.assistedShadow;
+
+  TEST_ASSERT_TRUE(
+      shadow.angleActive);
+
+  // Bumpless entry means the target should begin close
+  // to the current attitude instead of immediately
+  // jumping to zero.
+  TEST_ASSERT_TRUE(
+      shadow.rollAngleTarget > 0.20f);
+
+  TEST_ASSERT_TRUE(
+      shadow.rollAngleTarget <= 0.30f);
+}
+
+
+void test_controller_shadow_althold_captures_current_altitude()
+{
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
+
+  Model model;
+
+  model.state.gyro.clock = 1000;
+  model.config.gyro.dlpf = GYRO_DLPF_256;
+  model.config.loopSync = 1;
+  model.config.mixerSync = 1;
+  model.config.mixer.type = FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(model);
+  controller.begin();
+
+  // Simulated estimator state.
+  model.state.altitude.height =
+      2.50f;
+
+  model.state.altitude.vario =
+      0.0f;
+
+  model.state.altitude.healthy =
+      true;
+
+  // Centered throttle = zero climb request.
+  model.state.input.ch[AXIS_THRUST] =
+      0.0f;
+
+  model.updateModes(
+      uint32_t{1} << MODE_ALTHOLD);
+
+  controller.update();
+
+  const auto& shadow =
+      model.state.assistedShadow;
+
+  TEST_ASSERT_TRUE(
+      shadow.altitudeActive);
+
+  TEST_ASSERT_TRUE(
+      shadow.altitudeTargetValid);
+
+  // AltHold should capture current altitude on entry.
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.001f,
+      2.50f,
+      shadow.altitudeTarget);
+
+  // Centered stick means no pilot climb/descent request.
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.001f,
+      0.0f,
+      shadow.verticalRatePilot);
+}
+
+
+void test_controller_shadow_althold_center_stick_holds_target()
+{
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
+
+  Model model;
+
+  model.state.gyro.clock = 1000;
+  model.config.gyro.dlpf = GYRO_DLPF_256;
+  model.config.loopSync = 1;
+  model.config.mixerSync = 1;
+  model.config.mixer.type = FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(model);
+  controller.begin();
+
+  model.state.altitude.height =
+      3.0f;
+
+  model.state.altitude.vario =
+      0.0f;
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.input.ch[AXIS_THRUST] =
+      0.0f;
+
+  model.updateModes(
+      uint32_t{1} << MODE_ALTHOLD);
+
+  controller.update();
+
+  const float initialTarget =
+      model.state.assistedShadow.altitudeTarget;
+
+  // Simulate many controller iterations with
+  // centered throttle.
+  for (int i = 0; i < 100; ++i)
+  {
+    controller.update();
+  }
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.001f,
+      initialTarget,
+      model.state.assistedShadow.altitudeTarget);
+}
+
+
+void test_controller_shadow_althold_climb_command_moves_target_up()
+{
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
+
+  Model model;
+
+  model.state.gyro.clock = 1000;
+  model.config.gyro.dlpf = GYRO_DLPF_256;
+  model.config.loopSync = 1;
+  model.config.mixerSync = 1;
+  model.config.mixer.type = FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(model);
+  controller.begin();
+
+  model.state.altitude.height =
+      2.0f;
+
+  model.state.altitude.vario =
+      0.0f;
+
+  model.state.altitude.healthy =
+      true;
+
+  // Positive centered-stick displacement.
+  model.state.input.ch[AXIS_THRUST] =
+      0.50f;
+
+  model.updateModes(
+      uint32_t{1} << MODE_ALTHOLD);
+
+  controller.update();
+
+  const auto& shadow =
+      model.state.assistedShadow;
+
+  TEST_ASSERT_TRUE(
+      shadow.altitudeActive);
+
+  TEST_ASSERT_TRUE(
+      shadow.verticalRatePilot > 0.0f);
+
+  // Positive climb command must move the altitude
+  // target upward.
+  TEST_ASSERT_TRUE(
+      shadow.altitudeTarget > 2.0f);
+
+  TEST_ASSERT_TRUE(
+      shadow.verticalRateTarget > 0.0f);
+}
+
+
+void test_controller_shadow_althold_descent_command_moves_target_down()
+{
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
+
+  Model model;
+
+  model.state.gyro.clock = 1000;
+  model.config.gyro.dlpf = GYRO_DLPF_256;
+  model.config.loopSync = 1;
+  model.config.mixerSync = 1;
+  model.config.mixer.type = FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(model);
+  controller.begin();
+
+  model.state.altitude.height =
+      2.0f;
+
+  model.state.altitude.vario =
+      0.0f;
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.input.ch[AXIS_THRUST] =
+      -0.50f;
+
+  model.updateModes(
+      uint32_t{1} << MODE_ALTHOLD);
+
+  controller.update();
+
+  const auto& shadow =
+      model.state.assistedShadow;
+
+  TEST_ASSERT_TRUE(
+      shadow.altitudeActive);
+
+  TEST_ASSERT_TRUE(
+      shadow.verticalRatePilot < 0.0f);
+
+  TEST_ASSERT_TRUE(
+      shadow.altitudeTarget < 2.0f);
+
+  TEST_ASSERT_TRUE(
+      shadow.verticalRateTarget < 0.0f);
+}
+
+
+void test_controller_shadow_althold_stops_when_estimator_unhealthy()
+{
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
+
+  Model model;
+
+  model.state.gyro.clock = 1000;
+  model.config.gyro.dlpf = GYRO_DLPF_256;
+  model.config.loopSync = 1;
+  model.config.mixerSync = 1;
+  model.config.mixer.type = FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(model);
+  controller.begin();
+
+  model.state.altitude.height =
+      1.5f;
+
+  model.state.altitude.vario =
+      0.0f;
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.input.ch[AXIS_THRUST] =
+      0.0f;
+
+  model.updateModes(
+      uint32_t{1} << MODE_ALTHOLD);
+
+  controller.update();
+
+  TEST_ASSERT_TRUE(
+      model.state.assistedShadow.altitudeActive);
+
+  TEST_ASSERT_TRUE(
+      model.state.assistedShadow.altitudeTargetValid);
+
+  // Simulate loss of reliable vertical estimate.
+  model.state.altitude.healthy =
+      false;
+
+  controller.update();
+
+  TEST_ASSERT_FALSE(
+      model.state.assistedShadow.altitudeActive);
+
+  TEST_ASSERT_FALSE(
+      model.state.assistedShadow.altitudeTargetValid);
+}
+
+
+void test_controller_shadow_althold_vertical_accel_limit()
+{
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
+
+  Model model;
+
+  model.state.gyro.clock = 1000;
+  model.config.gyro.dlpf = GYRO_DLPF_256;
+  model.config.loopSync = 1;
+  model.config.mixerSync = 1;
+  model.config.mixer.type = FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(model);
+  controller.begin();
+
+  model.state.altitude.height =
+      2.0f;
+
+  model.state.altitude.vario =
+      0.0f;
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.input.ch[AXIS_THRUST] =
+      1.0f;
+
+  model.updateModes(
+      uint32_t{1} << MODE_ALTHOLD);
+
+  controller.update();
+
+  const float firstVzTarget =
+      model.state.assistedShadow.verticalRateTarget;
+
+  controller.update();
+
+  const float secondVzTarget =
+      model.state.assistedShadow.verticalRateTarget;
+
+  const float change =
+      secondVzTarget -
+      firstVzTarget;
+
+  TEST_ASSERT_TRUE(
+      change >= 0.0f);
+
+  // Vz target must increase gradually rather than
+  // instantly jumping to maximum climb rate.
+  TEST_ASSERT_TRUE(
+      secondVzTarget < 1.5f);
+
+  TEST_ASSERT_TRUE(
+      change < 0.1f);
+}
 
 void test_rates_betaflight()
 {
@@ -676,9 +1132,21 @@ int main(int argc, char** argv)
   RUN_TEST(test_model_inner_pid_init);
   RUN_TEST(test_model_outer_pid_init);
   RUN_TEST(test_controller_rates);
-  RUN_TEST(test_controller_rates_limit);
-  RUN_TEST(test_controller_angle_mode_does_not_latch_fterm_scale);
-  RUN_TEST(test_rates_betaflight);
+RUN_TEST(test_controller_rates_limit);
+RUN_TEST(test_controller_angle_mode_does_not_latch_fterm_scale);
+
+// V2 assisted-mode shadow tests
+RUN_TEST(test_controller_shadow_angle_activates_and_slews);
+RUN_TEST(test_controller_shadow_angle_bumpless_entry);
+
+RUN_TEST(test_controller_shadow_althold_captures_current_altitude);
+RUN_TEST(test_controller_shadow_althold_center_stick_holds_target);
+RUN_TEST(test_controller_shadow_althold_climb_command_moves_target_up);
+RUN_TEST(test_controller_shadow_althold_descent_command_moves_target_down);
+RUN_TEST(test_controller_shadow_althold_stops_when_estimator_unhealthy);
+RUN_TEST(test_controller_shadow_althold_vertical_accel_limit);
+
+RUN_TEST(test_rates_betaflight);
   RUN_TEST(test_rates_betaflight_expo);
   RUN_TEST(test_rates_raceflight);
   RUN_TEST(test_rates_raceflight_expo);
