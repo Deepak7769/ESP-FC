@@ -218,7 +218,8 @@ bool Actuator::canActivateMode(FlightMode mode)
     case MODE_AIRMODE:
       return _model.state.mode.airmodeAllowed;
     case MODE_ALTHOLD:
-      return _model.state.baro.dev;
+  return _model.baroActive() &&
+         _model.state.altitude.healthy;
     default:
       return true;
   }
