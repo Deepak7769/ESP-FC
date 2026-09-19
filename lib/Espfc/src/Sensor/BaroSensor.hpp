@@ -24,7 +24,9 @@ public:
   int read();
   int reload(ModelChangeEvent event);
 
+#ifndef UNIT_TEST
 private:
+#endif
   void readTemperature();
   bool readPressure();
   void updateAltitude();
