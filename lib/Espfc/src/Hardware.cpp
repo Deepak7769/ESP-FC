@@ -24,6 +24,7 @@
 #include <WiFi.h>
 #endif
 
+
 namespace {
 #if defined(ESPFC_SPI_0)
 #if defined(ESP32C3) || defined(ESP32S3) || defined(ESP32S2)
