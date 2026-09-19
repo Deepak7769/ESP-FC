@@ -22,6 +22,7 @@ private:
   void updateModeMask();
   bool canActivateMode(FlightMode mode);
   bool attitudeEstimateHealthy() const;
+  bool altitudeEstimateHealthy() const;
   void updateArmed();
   void updateAirMode();
   void updateBuzzer();
