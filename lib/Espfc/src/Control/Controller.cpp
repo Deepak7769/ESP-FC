@@ -265,7 +265,380 @@ void FAST_CODE_ATTR Controller::innerLoop()
     _model.state.debug[3] = lrintf(innerPid[AXIS_ROLL].iTerm * 1000.0f);
   }
 }
+float Controller::calculatePilotClimbRateShadow() const
+{
+  float stick =
+      _model.state.input.ch[AXIS_THRUST];
 
+  stick =
+      Utils::deadband(
+          stick,
+          0.10f);
+
+  constexpr float MAX_DESCENT_MS =
+      1.0f;
+
+  constexpr float MAX_CLIMB_MS =
+      1.5f;
+
+  if (stick > 0.0f)
+  {
+    return stick *
+           MAX_CLIMB_MS;
+  }
+
+  return stick *
+         MAX_DESCENT_MS;
+}
+
+
+void Controller::updateAssistedModesShadow()
+{
+  auto& shadow =
+      _model.state.assistedShadow;
+
+  const auto& attitude =
+      _model.state.attitude;
+
+  const auto& altitude =
+      _model.state.altitude;
+
+  const auto& input =
+      _model.state.input;
+
+  const float dt =
+      1.0f /
+      static_cast<float>(
+          std::max<int>(
+              _model.state.loopTimer.rate,
+              1));
+
+  // =====================================================
+  // ANGLE MODE V2
+  // =====================================================
+
+  const bool angleActive =
+      _model.isModeActive(MODE_ANGLE);
+
+  if (angleActive &&
+      !_shadowAngleWasActive)
+  {
+    // Bumpless entry: start from current attitude.
+    _shadowAngleTarget[AXIS_ROLL] =
+        attitude.euler[AXIS_ROLL];
+
+    _shadowAngleTarget[AXIS_PITCH] =
+        attitude.euler[AXIS_PITCH];
+  }
+
+  if (angleActive)
+  {
+    constexpr float ANGLE_SLEW_DPS =
+        120.0f;
+
+    const float maxAngleStep =
+        Utils::toRad(ANGLE_SLEW_DPS) *
+        dt;
+
+    const float maxRate =
+        Utils::toRad(
+            _model.config.level.rateLimit);
+
+    const float levelKp =
+        static_cast<float>(
+            _model.config.pid[FC_PID_LEVEL].P) *
+        LEVEL_PTERM_SCALE;
+
+    for (size_t axis = 0;
+         axis < AXIS_COUNT_RP;
+         ++axis)
+    {
+      const float requestedAngle =
+          Utils::toRad(
+              _model.config.level.angleLimit) *
+          input.ch[axis];
+
+      const float change =
+          std::clamp(
+              requestedAngle -
+                  _shadowAngleTarget[axis],
+              -maxAngleStep,
+              maxAngleStep);
+
+      _shadowAngleTarget[axis] +=
+          change;
+
+      const float angleError =
+          _shadowAngleTarget[axis] -
+          attitude.euler[axis];
+
+      const float rateTarget =
+          std::clamp(
+              levelKp *
+                  angleError,
+              -maxRate,
+              maxRate);
+
+      if (axis == AXIS_ROLL)
+      {
+        shadow.rollAngleTarget =
+            _shadowAngleTarget[axis];
+
+        shadow.rollRateTarget =
+            rateTarget;
+      }
+      else
+      {
+        shadow.pitchAngleTarget =
+            _shadowAngleTarget[axis];
+
+        shadow.pitchRateTarget =
+            rateTarget;
+      }
+    }
+  }
+  else
+  {
+    _shadowAngleTarget[AXIS_ROLL] =
+        attitude.euler[AXIS_ROLL];
+
+    _shadowAngleTarget[AXIS_PITCH] =
+        attitude.euler[AXIS_PITCH];
+  }
+
+  shadow.angleActive =
+      angleActive;
+
+  _shadowAngleWasActive =
+      angleActive;
+
+
+  // =====================================================
+  // ALTITUDE HOLD V2
+  // =====================================================
+
+  const bool altActive =
+      _model.isModeActive(MODE_ALTHOLD) &&
+      altitude.healthy;
+
+  const float pilotVz =
+      calculatePilotClimbRateShadow();
+
+  if (altActive &&
+      !_shadowAltWasActive)
+  {
+    // Capture current estimated altitude.
+    _shadowAltitudeTarget =
+        altitude.height;
+
+    // Begin from current vertical velocity.
+    _shadowVzTarget =
+        altitude.vario;
+
+    shadow.altitudeTargetValid =
+        true;
+  }
+
+  if (altActive)
+  {
+    // Moving the throttle away from center moves
+    // the altitude target.
+    _shadowAltitudeTarget +=
+        pilotVz * dt;
+
+    const float altitudeError =
+        _shadowAltitudeTarget -
+        altitude.height;
+
+    constexpr float ALTITUDE_KP =
+        0.50f;
+
+    constexpr float MAX_POSITION_CORRECTION_MS =
+        1.0f;
+
+    const float velocityCorrection =
+        std::clamp(
+            ALTITUDE_KP *
+                altitudeError,
+            -MAX_POSITION_CORRECTION_MS,
+            MAX_POSITION_CORRECTION_MS);
+
+    constexpr float MAX_DESCENT_MS =
+        1.0f;
+
+    constexpr float MAX_CLIMB_MS =
+        1.5f;
+
+    const float requestedVz =
+        std::clamp(
+            pilotVz +
+                velocityCorrection,
+            -MAX_DESCENT_MS,
+            MAX_CLIMB_MS);
+
+    // Smooth vertical acceleration.
+    constexpr float VERTICAL_ACCEL_LIMIT_MSS =
+        1.0f;
+
+    const float maxVzStep =
+        VERTICAL_ACCEL_LIMIT_MSS *
+        dt;
+
+    _shadowVzTarget +=
+        std::clamp(
+            requestedVz -
+                _shadowVzTarget,
+            -maxVzStep,
+            maxVzStep);
+
+    shadow.altitudeTarget =
+        _shadowAltitudeTarget;
+
+    shadow.verticalRatePilot =
+        pilotVz;
+
+    shadow.verticalRateCorrection =
+        velocityCorrection;
+
+    shadow.verticalRateTarget =
+        _shadowVzTarget;
+  }
+  else
+  {
+    shadow.altitudeTarget =
+        altitude.height;
+
+    shadow.verticalRatePilot =
+        0.0f;
+
+    shadow.verticalRateCorrection =
+        0.0f;
+
+    shadow.verticalRateTarget =
+        altitude.vario;
+
+    shadow.altitudeTargetValid =
+        false;
+
+    _shadowAltitudeTarget =
+        altitude.height;
+
+    _shadowVzTarget =
+        altitude.vario;
+  }
+
+  shadow.altitudeActive =
+      altActive;
+
+  _shadowAltWasActive =
+      altActive;
+
+
+  // =====================================================
+  // ALTITUDE DEBUG
+  // =====================================================
+
+  if (_model.config.debug.mode ==
+      DEBUG_AUTOPILOT_ALTITUDE)
+  {
+    _model.state.debug[0] =
+        std::clamp(
+            lrintf(
+                altitude.height *
+                100.0f),
+            -32000l,
+            32000l);
+
+    _model.state.debug[1] =
+        std::clamp(
+            lrintf(
+                shadow.altitudeTarget *
+                100.0f),
+            -32000l,
+            32000l);
+
+    _model.state.debug[2] =
+        std::clamp(
+            lrintf(
+                altitude.vario *
+                100.0f),
+            -32000l,
+            32000l);
+
+    _model.state.debug[3] =
+        std::clamp(
+            lrintf(
+                shadow.verticalRateTarget *
+                100.0f),
+            -32000l,
+            32000l);
+
+    _model.state.debug[4] =
+        std::clamp(
+            lrintf(
+                shadow.verticalRatePilot *
+                100.0f),
+            -32000l,
+            32000l);
+
+    _model.state.debug[5] =
+        std::clamp(
+            lrintf(
+                altitude.baroInnovation *
+                100.0f),
+            -32000l,
+            32000l);
+
+    _model.state.debug[6] =
+        altitude.healthy ? 1 : 0;
+
+    _model.state.debug[7] =
+        altitude.baroAccepted ? 1 : 0;
+  }
+
+
+  // =====================================================
+  // ANGLE DEBUG
+  // =====================================================
+
+  if (_model.config.debug.mode ==
+      DEBUG_ANGLE_TARGET)
+  {
+    _model.state.debug[0] =
+        lrintf(
+            Utils::toDeg(
+                shadow.rollAngleTarget) *
+            10.0f);
+
+    _model.state.debug[1] =
+        lrintf(
+            Utils::toDeg(
+                attitude.euler[AXIS_ROLL]) *
+            10.0f);
+
+    _model.state.debug[2] =
+        lrintf(
+            Utils::toDeg(
+                shadow.rollRateTarget));
+
+    _model.state.debug[3] =
+        lrintf(
+            Utils::toDeg(
+                shadow.pitchAngleTarget) *
+            10.0f);
+
+    _model.state.debug[4] =
+        lrintf(
+            Utils::toDeg(
+                attitude.euler[AXIS_PITCH]) *
+            10.0f);
+
+    _model.state.debug[5] =
+        lrintf(
+            Utils::toDeg(
+                shadow.pitchRateTarget));
+  }
+}
 float Controller::calcualteAltHoldSetpoint() const
 {
   float thrust = _model.state.input.ch[AXIS_THRUST];
