@@ -20,6 +20,7 @@ private:
   void updateArmingDisabled();
   void updateModeMask();
   bool canActivateMode(FlightMode mode);
+  bool attitudeEstimateHealthy() const;
   void updateArmed();
   void updateAirMode();
   void updateBuzzer();
@@ -28,6 +29,8 @@ private:
   void updateLed();
 
   Model& _model;
+bool _angleFaultLatched{false};
+bool _altHoldFaultLatched{false};
 };
 
 } // namespace Espfc::Control
