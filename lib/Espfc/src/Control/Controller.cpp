@@ -267,13 +267,8 @@ void FAST_CODE_ATTR Controller::innerLoop()
 }
 float Controller::calculatePilotClimbRateShadow() const
 {
-  float stick =
-      _model.state.input.ch[AXIS_THRUST];
-
-  stick =
-      Utils::deadband(
-          stick,
-          0.10f);
+  constexpr float DEADBAND =
+      0.10f;
 
   constexpr float MAX_DESCENT_MS =
       1.0f;
@@ -281,14 +276,43 @@ float Controller::calculatePilotClimbRateShadow() const
   constexpr float MAX_CLIMB_MS =
       1.5f;
 
-  if (stick > 0.0f)
+  float stick =
+      std::clamp(
+          _model.state.input.ch[
+              AXIS_THRUST],
+          -1.0f,
+          1.0f);
+
+  stick =
+      Utils::deadband(
+          stick,
+          DEADBAND);
+
+  // Utils::deadband() removes 0.10 from the magnitude.
+  // Renormalize so full stick is still +/-1.0.
+  if (stick != 0.0f)
   {
-    return stick *
-           MAX_CLIMB_MS;
+    stick /=
+        (1.0f -
+         DEADBAND);
   }
 
-  return stick *
-         MAX_DESCENT_MS;
+  stick =
+      std::clamp(
+          stick,
+          -1.0f,
+          1.0f);
+
+  if (stick > 0.0f)
+  {
+    return
+        stick *
+        MAX_CLIMB_MS;
+  }
+
+  return
+      stick *
+      MAX_DESCENT_MS;
 }
 
 
@@ -317,8 +341,9 @@ void Controller::updateAssistedModesShadow()
   // ANGLE MODE V2
   // =====================================================
 
-  const bool angleActive =
-      _model.isModeActive(MODE_ANGLE);
+const bool angleActive =
+    _model.isModeActive(MODE_ANGLE) &&
+    _model.state.attitude.healthy;
 
   if (angleActive &&
       !_shadowAngleWasActive)
