@@ -351,6 +351,11 @@ void test_controller_shadow_angle_activates_and_slews()
       {.P = 45u, .I = 0u, .D = 0u, .F = 0};
 
   model.begin();
+      // V2 Angle shadow requires a valid attitude estimate.
+  model.state.attitude.healthy =
+      true;
+
+
 
   Controller controller(model);
   controller.begin();
@@ -422,6 +427,7 @@ void test_controller_shadow_angle_bumpless_entry()
       {.P = 45u, .I = 0u, .D = 0u, .F = 0};
 
   model.begin();
+  model.state.attitude.healthy = true;
 
   Controller controller(model);
   controller.begin();
@@ -790,7 +796,242 @@ void test_controller_shadow_althold_vertical_accel_limit()
   TEST_ASSERT_TRUE(
       change < 0.1f);
 }
+void test_controller_shadow_althold_full_climb_rate_scaling()
+{
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
 
+  Model model;
+
+  model.state.gyro.clock = 1000;
+  model.config.gyro.dlpf = GYRO_DLPF_256;
+  model.config.loopSync = 1;
+  model.config.mixerSync = 1;
+  model.config.mixer.type = FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(model);
+  controller.begin();
+
+  model.state.altitude.height =
+      2.0f;
+
+  model.state.altitude.vario =
+      0.0f;
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.input.ch[AXIS_THRUST] =
+      1.0f;
+
+  model.updateModes(
+      uint32_t{1} << MODE_ALTHOLD);
+
+  controller.update();
+
+  // At 1000 Hz:
+  // 1.5 m/s * 0.001 s = 0.0015 m.
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.00002f,
+      2.0015f,
+      model.state
+          .assistedShadow
+          .altitudeTarget);
+}
+
+
+void test_actuator_althold_fault_requires_switch_cycle()
+{
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(50000);
+
+  Model model;
+
+  model.config.baro.dev =
+      BARO_BMP280;
+
+  model.state.baro.present =
+      true;
+
+  model.state.altitude.healthy =
+      true;
+
+  auto& condition =
+      model.config.conditions[0];
+
+  condition.id =
+      MODE_ALTHOLD;
+
+  condition.ch =
+      AXIS_AUX_1;
+
+  condition.min =
+      1200;
+
+  condition.max =
+      1800;
+
+  model.state.input.us[AXIS_AUX_1] =
+      1500;
+
+  Actuator actuator(model);
+
+  actuator.begin();
+
+  // Healthy estimator + switch ON:
+  // AltHold should activate.
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  // Simulate estimator failure.
+  model.state.altitude.healthy =
+      false;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  // Estimator recovers while switch is still ON.
+  model.state.altitude.healthy =
+      true;
+
+  actuator.updateModeMask();
+
+  // Fault latch must prevent automatic re-entry.
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  // Pilot deliberately moves switch OFF.
+  model.state.input.us[AXIS_AUX_1] =
+      1000;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  // Pilot deliberately enables AltHold again.
+  model.state.input.us[AXIS_AUX_1] =
+      1500;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+}
+
+
+void test_actuator_angle_fault_requires_switch_cycle()
+{
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(50000);
+
+  Model model;
+
+  // Required sensor configuration/state.
+  model.state.gyro.present =
+      true;
+
+  model.state.accel.present =
+      true;
+
+  model.state.attitude.healthy =
+      true;
+
+  model.state.attitude.lastUpdateUs =
+      50000;
+
+  model.state.attitude.quaternion =
+      Quaternion(
+          1.0f,
+          0.0f,
+          0.0f,
+          0.0f);
+
+  model.state.attitude.euler =
+      VectorFloat(
+          0.0f,
+          0.0f,
+          0.0f);
+
+  auto& condition =
+      model.config.conditions[0];
+
+  condition.id =
+      MODE_ANGLE;
+
+  condition.ch =
+      AXIS_AUX_1;
+
+  condition.min =
+      1200;
+
+  condition.max =
+      1800;
+
+  model.state.input.us[AXIS_AUX_1] =
+      1500;
+
+  Actuator actuator(model);
+
+  actuator.begin();
+
+  // Healthy attitude estimator + switch ON.
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ANGLE));
+
+  // Simulate attitude-estimator failure.
+  model.state.attitude.healthy =
+      false;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ANGLE));
+
+  // Estimator recovers while switch remains ON.
+  model.state.attitude.healthy =
+      true;
+
+  actuator.updateModeMask();
+
+  // It must remain disabled until the pilot cycles
+  // the mode switch.
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ANGLE));
+
+  // Pilot moves switch OFF.
+  model.state.input.us[AXIS_AUX_1] =
+      1000;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ANGLE));
+
+  // Pilot enables Angle mode deliberately again.
+  model.state.input.us[AXIS_AUX_1] =
+      1500;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ANGLE));
+}
 void test_rates_betaflight()
 {
   InputConfig config;
@@ -1151,6 +1392,11 @@ RUN_TEST(test_controller_shadow_althold_climb_command_moves_target_up);
 RUN_TEST(test_controller_shadow_althold_descent_command_moves_target_down);
 RUN_TEST(test_controller_shadow_althold_stops_when_estimator_unhealthy);
 RUN_TEST(test_controller_shadow_althold_vertical_accel_limit);
+
+// Additional V2 regression tests
+RUN_TEST(test_controller_shadow_althold_full_climb_rate_scaling);
+RUN_TEST(test_actuator_althold_fault_requires_switch_cycle);
+RUN_TEST(test_actuator_angle_fault_requires_switch_cycle);
 
 RUN_TEST(test_rates_betaflight);
   RUN_TEST(test_rates_betaflight_expo);
