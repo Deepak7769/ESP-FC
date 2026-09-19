@@ -305,10 +305,20 @@ struct AccelState
 struct AttitudeState
 {
   VectorFloat rate;
-  Utils::Filter filter[AXIS_COUNT_RPY];
+
+  Utils::Filter filter[
+      AXIS_COUNT_RPY];
+
   VectorFloat euler;
+
   Quaternion quaternion;
+
   float cosTheta;
+
+  // Assisted-mode estimator health.
+  bool healthy;
+
+  uint32_t lastUpdateUs;
 };
 
 struct SetpointState
