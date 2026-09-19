@@ -4,30 +4,109 @@
 
 namespace Espfc::Sensor {
 
-BaroSensor::BaroSensor(Model& model): _model(model), _state(BARO_STATE_INIT), _counter(0) {}
-
+BaroSensor::BaroSensor(Model& model):
+    _model(model)
+{
+}
 int BaroSensor::begin()
 {
-  if (!_model.baroActive() || !_model.state.baro.dev) return 0;
+  auto& baro =
+      _model.state.baro;
 
-  _baro = _model.state.baro.dev;
+  // Deterministic runtime reset.
+  _baro = nullptr;
 
-  const int delay = _baro->getDelay(BARO_MODE_TEMP) + _baro->getDelay(BARO_MODE_PRESS);
-  const int toGyroRate = (delay / _model.state.gyro.timer.interval) + 1; // number of gyro readings per cycle
-  const int interval = _model.state.gyro.timer.interval * toGyroRate;
-  const int rate = 1000000 / interval;
-  _model.state.baro.rate = rate;
+  _state =
+      BARO_STATE_INIT;
 
-  const float dt = 1.0f / rate;
-  const float tau = 0.8f;
-  _biasAlpha = 1.0f - expf(-dt / tau);
-  _model.state.baro.altitudeBiasSamples = 3 * rate;
+  _wait =
+      0;
+
+  _counter =
+      0;
+
+  _biasAlpha =
+      0.0f;
+
+  _first =
+      true;
+
+  _lastAltitudeUs =
+      0;
+
+  baro.sampleValid =
+      false;
+
+  baro.lastUpdateUs =
+      0;
+
+  baro.vario =
+      0.0f;
+
+  baro.altitudePrev =
+      0.0f;
+
+  baro.altitudeBias =
+      0.0f;
+
+  baro.altitudeBiasSamples =
+      0;
+
+  if (!_model.baroActive() ||
+      !baro.dev)
+  {
+    return 0;
+  }
+
+  _baro =
+      baro.dev;
+
+  const int delay =
+      _baro->getDelay(BARO_MODE_TEMP) +
+      _baro->getDelay(BARO_MODE_PRESS);
+
+  const int toGyroRate =
+      (delay /
+       _model.state.gyro.timer.interval) +
+      1;
+
+  const int interval =
+      _model.state.gyro.timer.interval *
+      toGyroRate;
+
+  const int rate =
+      std::max(
+          1000000 / interval,
+          1);
+
+  baro.rate =
+      rate;
+
+  const float dt =
+      1.0f /
+      static_cast<float>(rate);
+
+  const float tau =
+      0.8f;
+
+  _biasAlpha =
+      1.0f -
+      expf(-dt / tau);
+
+  baro.altitudeBiasSamples =
+      3 * rate;
 
   reload(MODEL_CHANGE_FILTER);
 
-  _model.logger.info().log("BARO INIT").log(Device::BaroDevice::getName(_baro->getType())).logln(rate);
+  _model.logger.info()
+      .log("BARO INIT")
+      .log(
+          Device::BaroDevice::getName(
+              _baro->getType()))
+      .logln(rate);
 
-  _baro->setMode(BARO_MODE_TEMP);
+  _baro->setMode(
+      BARO_MODE_TEMP);
 
   return 1;
 }
