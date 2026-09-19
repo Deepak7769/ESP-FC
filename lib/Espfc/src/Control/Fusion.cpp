@@ -115,20 +115,56 @@ _model.state.attitude.lastUpdateUs =
 
 int Fusion::reload(ModelChangeEvent event)
 {
+    _useMag =
+    _model.config.fusion.useMag;
   switch (event)
   {
-    case MODEL_CHANGE_FILTER: {
-      const auto cutoff = _model.state.accel.timer.rate / GYRO_FUSION_LPF_DIV;
-      for (size_t i = 0; i < AXIS_COUNT_RPY; i++)
-      {
-        _model.state.attitude.filter[i].begin(FilterConfig(FILTER_PT1, cutoff), _model.state.loopTimer.rate);
-      }
-      for (size_t i = 0; i < 4; i++)
-      {
-        _qFilter[i].begin(FilterConfig(FILTER_BIQUAD, 20), _model.state.accel.timer.rate);
-      }
-      break;
-    }
+case MODEL_CHANGE_FILTER: {
+  _useMag =
+      _model.config.fusion.useMag;
+
+  const int accelRate =
+      std::max<int>(
+          _model.state.accel.timer.rate,
+          1);
+
+  const int loopRate =
+      std::max<int>(
+          _model.state.loopTimer.rate,
+          1);
+
+  const int cutoff =
+      std::max<int>(
+          accelRate /
+              GYRO_FUSION_LPF_DIV,
+          1);
+
+  for (size_t i = 0;
+       i < AXIS_COUNT_RPY;
+       ++i)
+  {
+    _model.state.attitude
+        .filter[i]
+        .begin(
+            FilterConfig(
+                FILTER_PT1,
+                cutoff),
+            loopRate);
+  }
+
+  for (size_t i = 0;
+       i < 4;
+       ++i)
+  {
+    _qFilter[i].begin(
+        FilterConfig(
+            FILTER_BIQUAD,
+            20),
+        accelRate);
+  }
+
+  break;
+}
     default:
       break;
   }
