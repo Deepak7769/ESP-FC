@@ -106,9 +106,18 @@ int SensorManager::postLoop()
 
 int FAST_CODE_ATTR SensorManager::fusion()
 {
-  _fusion.update();
-  _altitude.update();
-  return 1;
+  const bool fusionValid =
+      _fusion.update() != 0;
+
+  // Altitude estimation may still consume a new
+  // barometer observation after a rejected AHRS cycle,
+  // but it must not integrate stale world-frame
+  // acceleration from that rejected cycle.
+  _altitude.update(
+      fusionValid);
+
+  return
+      fusionValid ? 1 : 0;
 }
 
 // main task
