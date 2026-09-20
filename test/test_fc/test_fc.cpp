@@ -19,7 +19,55 @@ using Espfc::Control::Actuator;
 using Espfc::Control::Controller;
 using Espfc::Control::Rates;
 using Espfc::Utils::Timer;
+static void setHealthyAssistedEstimatorState(
+    Model& model,
+    uint32_t nowUs)
+{
+  // --------------------------------------------------
+  // Fresh attitude estimator
+  // --------------------------------------------------
 
+  model.state.gyro.present =
+      true;
+
+  model.state.accel.present =
+      true;
+
+  model.state.attitude.healthy =
+      true;
+
+  model.state.attitude.lastUpdateUs =
+      nowUs;
+
+  model.state.attitude.quaternion =
+      Quaternion(
+          1.0f,
+          0.0f,
+          0.0f,
+          0.0f);
+
+  model.state.attitude.euler =
+      VectorFloat(
+          0.0f,
+          0.0f,
+          0.0f);
+
+  // --------------------------------------------------
+  // Fresh barometer
+  // --------------------------------------------------
+
+  model.config.baro.dev =
+      BARO_BMP280;
+
+  model.state.baro.present =
+      true;
+
+  model.state.baro.sampleValid =
+      true;
+
+  model.state.baro.lastUpdateUs =
+      nowUs;
+}
 /*void setUp(void)
 {
   ArduinoFakeReset();
@@ -438,6 +486,7 @@ void test_controller_shadow_angle_bumpless_entry()
   Controller controller(model);
   controller.begin();
 
+
   // Imagine Angle mode is enabled while the aircraft
   // already has some roll attitude.
 model.state.attitude.euler.set(
@@ -492,6 +541,9 @@ void test_controller_shadow_althold_captures_current_altitude()
 
   Controller controller(model);
   controller.begin();
+    setHealthyAssistedEstimatorState(
+      model,
+      0);
 
   // Simulated estimator state.
   model.state.altitude.height =
@@ -551,6 +603,9 @@ void test_controller_shadow_althold_center_stick_holds_target()
 
   Controller controller(model);
   controller.begin();
+    setHealthyAssistedEstimatorState(
+      model,
+      0);
 
   model.state.altitude.height =
       3.0f;
@@ -602,6 +657,9 @@ void test_controller_shadow_althold_climb_command_moves_target_up()
 
   Controller controller(model);
   controller.begin();
+    setHealthyAssistedEstimatorState(
+      model,
+      0);
 
   model.state.altitude.height =
       2.0f;
@@ -656,6 +714,9 @@ void test_controller_shadow_althold_descent_command_moves_target_down()
 
   Controller controller(model);
   controller.begin();
+    setHealthyAssistedEstimatorState(
+      model,
+      0);
 
   model.state.altitude.height =
       2.0f;
@@ -707,6 +768,9 @@ void test_controller_shadow_althold_stops_when_estimator_unhealthy()
 
   Controller controller(model);
   controller.begin();
+    setHealthyAssistedEstimatorState(
+      model,
+      0);
 
   model.state.altitude.height =
       1.5f;
@@ -761,6 +825,9 @@ void test_controller_shadow_althold_vertical_accel_limit()
 
   Controller controller(model);
   controller.begin();
+    setHealthyAssistedEstimatorState(
+      model,
+      0);
 
   model.state.altitude.height =
       2.0f;
@@ -1214,6 +1281,9 @@ void test_controller_althold_v2_shadow_does_not_drive_thrust()
       model);
 
   controller.begin();
+    setHealthyAssistedEstimatorState(
+      model,
+      1000);
 
   model.state.altitude.height =
       2.0f;
