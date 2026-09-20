@@ -235,8 +235,28 @@ case BARO_STATE_PRESS_GET:
 
 void BaroSensor::readTemperature()
 {
-  float temp = _model.state.baro.temperatureRaw = _baro->readTemperature();
-  _model.state.baro.temperature = _temperatureFilter.update(temp);
+  const float temp =
+      _baro->readTemperature();
+
+  if (!std::isfinite(temp))
+  {
+    return;
+  }
+
+  const float filtered =
+      _temperatureFilter.update(
+          temp);
+
+  if (!std::isfinite(filtered))
+  {
+    return;
+  }
+
+  _model.state.baro.temperatureRaw =
+      temp;
+
+  _model.state.baro.temperature =
+      filtered;
 }
 
 bool BaroSensor::readPressure()
