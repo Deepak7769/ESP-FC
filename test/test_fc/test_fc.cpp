@@ -1,5 +1,7 @@
 #include "Control/Actuator.h"
 #include "Control/Controller.h"
+#include "Control/Altitude.hpp"
+#include <Complementary.hpp>
 #include "Control/Fusion.h"
 #include "Sensor/BaroSensor.hpp"
 #include "Model.h"
@@ -1838,7 +1840,234 @@ void test_mixer_output_limit_servo()
   TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.5f, mixer.limitOutput(0.5f, servo, 80));
   TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.8f, mixer.limitOutput(1.0f, servo, 80));
 }
+void test_altitude_baro_vario_used_only_once_per_sample()
+{
+  // Two altitude-estimator updates:
+  //
+  // update #1 = new barometer sample
+  // update #2 = same barometer timestamp, therefore
+  //             NOT a new barometer sample.
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .Return(
+          1000,
+          2000);
 
+  Model model;
+
+  // --------------------------------------------------
+  // Estimator rates
+  // --------------------------------------------------
+
+  model.state.accel.timer.rate =
+      1000;
+
+  model.state.baro.rate =
+      50;
+
+  // Altitude.cpp multiplies this by 0.1,
+  // therefore effective complementary tau = 1 second.
+  model.config.altHold.baroTau =
+      10;
+
+  // --------------------------------------------------
+  // Valid/fresh attitude projection
+  // --------------------------------------------------
+
+  model.state.attitude.healthy =
+      true;
+
+  model.state.attitude.lastUpdateUs =
+      1000;
+
+  // No vertical acceleration.
+  model.state.accel.world.z =
+      0.0f;
+
+  // --------------------------------------------------
+  // Valid barometer state
+  // --------------------------------------------------
+
+  model.state.baro.sampleValid =
+      true;
+
+  model.state.baro.lastUpdateUs =
+      1000;
+
+  // Startup bias already completed.
+  model.state.baro.altitudeBiasSamples =
+      -1;
+
+  model.state.baro.altitudeGround =
+      0.0f;
+
+  // Give the estimator a clearly non-zero
+  // vertical-speed measurement.
+  model.state.baro.vario =
+      2.0f;
+
+  Control::Altitude altitude(
+      model);
+
+  altitude.begin();
+
+  // --------------------------------------------------
+  // First update:
+  // barometer timestamp is new, therefore Vz may
+  // influence the complementary filter.
+  // --------------------------------------------------
+
+  altitude.update();
+
+  const float firstVario =
+      model.state.altitude.vario;
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          firstVario));
+
+  TEST_ASSERT_TRUE(
+      std::fabs(
+          firstVario) >
+      1.0e-7f);
+
+  // --------------------------------------------------
+  // Second update:
+  //
+  // baro.lastUpdateUs has NOT changed.
+  //
+  // Correct behaviour:
+  //   newBaroSample == false
+  //
+  // Therefore the old barometer Vz must NOT be injected
+  // into the complementary filter a second time.
+  //
+  // With zero acceleration, predicted Vz equals the
+  // previous filter state, so Vz should remain unchanged.
+  // --------------------------------------------------
+
+  altitude.update();
+
+  const float secondVario =
+      model.state.altitude.vario;
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          secondVario));
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      1.0e-7f,
+      firstVario,
+      secondVario);
+}
+void test_complementary_variable_dt()
+{
+  Complementary nominalFilter;
+  Complementary delayedFilter;
+  Complementary legacyFilter;
+
+  constexpr float SAMPLE_RATE =
+      1000.0f;
+
+  constexpr float TAU =
+      1.0f;
+
+  constexpr float RATE =
+      1.0f;
+
+  constexpr float POSITION =
+      0.0f;
+
+  // --------------------------------------------------
+  // Nominal 1 ms update
+  // --------------------------------------------------
+
+  nominalFilter.begin(
+      SAMPLE_RATE,
+      TAU,
+      0.0f);
+
+  const float nominal =
+      nominalFilter.update(
+          RATE,
+          POSITION,
+          0.001f);
+
+  // Expected:
+  //
+  // alpha =
+  //   1 / (1 + 0.001)
+  //
+  // state =
+  //   alpha * (0 + 1 * 0.001)
+  //
+  // ~= 0.000999001
+  TEST_ASSERT_FLOAT_WITHIN(
+      1.0e-6f,
+      0.000999001f,
+      nominal);
+
+  // --------------------------------------------------
+  // Simulated delayed estimator cycle: 10 ms
+  // --------------------------------------------------
+
+  delayedFilter.begin(
+      SAMPLE_RATE,
+      TAU,
+      0.0f);
+
+  const float delayed =
+      delayedFilter.update(
+          RATE,
+          POSITION,
+          0.010f);
+
+  // Expected:
+  //
+  // alpha =
+  //   1 / (1 + 0.010)
+  //
+  // state =
+  //   alpha * (0 + 1 * 0.010)
+  //
+  // ~= 0.00990099
+  TEST_ASSERT_FLOAT_WITHIN(
+      1.0e-6f,
+      0.00990099f,
+      delayed);
+
+  // Most important assertion:
+  //
+  // A 10 ms integration interval must produce a
+  // substantially larger integrated rate contribution
+  // than a 1 ms interval.
+  TEST_ASSERT_TRUE(
+      delayed >
+      nominal * 9.0f);
+
+  // --------------------------------------------------
+  // Backward-compatible two-argument update()
+  //
+  // It should still use the nominal sample period.
+  // --------------------------------------------------
+
+  legacyFilter.begin(
+      SAMPLE_RATE,
+      TAU,
+      0.0f);
+
+  const float legacy =
+      legacyFilter.update(
+          RATE,
+          POSITION);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      1.0e-6f,
+      nominal,
+      legacy);
+}
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -1879,7 +2108,11 @@ RUN_TEST(
 
 RUN_TEST(
     test_fusion_rejects_invalid_accel_without_poisoning_state);
+  RUN_TEST(
+    test_altitude_baro_vario_used_only_once_per_sample);
 
+RUN_TEST(
+    test_complementary_variable_dt);
 RUN_TEST(test_rates_betaflight);
   RUN_TEST(test_rates_betaflight_expo);
   RUN_TEST(test_rates_raceflight);
@@ -1894,6 +2127,7 @@ RUN_TEST(test_rates_betaflight);
   RUN_TEST(test_mixer_throttle_limit_clip);
   RUN_TEST(test_mixer_output_limit_motor);
   RUN_TEST(test_mixer_output_limit_servo);
+  
 
   return UNITY_END();
 }
