@@ -802,6 +802,114 @@ void test_controller_shadow_althold_vertical_accel_limit()
   TEST_ASSERT_TRUE(
       change < 0.1f);
 }
+void test_controller_shadow_althold_full_climb_rate_scaling()
+{
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          50000);
+
+  Model model;
+
+  model.state.gyro.clock =
+      1000;
+
+  model.config.gyro.dlpf =
+      GYRO_DLPF_256;
+
+  model.config.loopSync =
+      1;
+
+  model.config.mixerSync =
+      1;
+
+  model.config.mixer.type =
+      FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(
+      model);
+
+  controller.begin();
+
+  // Fresh attitude estimator state.
+  model.state.gyro.present =
+      true;
+
+  model.state.accel.present =
+      true;
+
+  model.state.attitude.healthy =
+      true;
+
+  model.state.attitude.lastUpdateUs =
+      50000;
+
+  model.state.attitude.quaternion =
+      Quaternion(
+          1.0f,
+          0.0f,
+          0.0f,
+          0.0f);
+
+  model.state.attitude.euler =
+      VectorFloat(
+          0.0f,
+          0.0f,
+          0.0f);
+
+  // Fresh barometer state.
+  model.config.baro.dev =
+      BARO_BMP280;
+
+  model.state.baro.present =
+      true;
+
+  model.state.baro.sampleValid =
+      true;
+
+  model.state.baro.lastUpdateUs =
+      50000;
+
+  // Healthy altitude estimator.
+  model.state.altitude.height =
+      2.0f;
+
+  model.state.altitude.vario =
+      0.0f;
+
+  model.state.altitude.healthy =
+      true;
+
+  // Full climb command.
+  model.state.input.ch[
+      AXIS_THRUST] =
+      1.0f;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ALTHOLD);
+
+  controller.update();
+
+  TEST_ASSERT_TRUE(
+      model.state.assistedShadow
+          .altitudeActive);
+
+  TEST_ASSERT_TRUE(
+      model.state.assistedShadow
+          .altitudeTargetValid);
+
+  // 1.5 m/s * 0.001 s = 0.0015 m.
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.00002f,
+      2.0015f,
+      model.state.assistedShadow
+          .altitudeTarget);
+}
 void test_actuator_althold_fault_requires_switch_cycle()
 {
   When(
@@ -969,92 +1077,6 @@ void test_actuator_althold_fault_requires_switch_cycle()
 }
 
 
-void test_actuator_althold_fault_requires_switch_cycle()
-{
-  When(Method(ArduinoFake(), micros)).AlwaysReturn(50000);
-
-  Model model;
-
-  model.config.baro.dev =
-      BARO_BMP280;
-
-  model.state.baro.present =
-      true;
-
-  model.state.altitude.healthy =
-      true;
-
-  auto& condition =
-      model.config.conditions[0];
-
-  condition.id =
-      MODE_ALTHOLD;
-
-  condition.ch =
-      AXIS_AUX_1;
-
-  condition.min =
-      1200;
-
-  condition.max =
-      1800;
-
-  model.state.input.us[AXIS_AUX_1] =
-      1500;
-
-  Actuator actuator(model);
-
-  actuator.begin();
-
-  // Healthy estimator + switch ON:
-  // AltHold should activate.
-  actuator.updateModeMask();
-
-  TEST_ASSERT_TRUE(
-      model.isModeActive(
-          MODE_ALTHOLD));
-
-  // Simulate estimator failure.
-  model.state.altitude.healthy =
-      false;
-
-  actuator.updateModeMask();
-
-  TEST_ASSERT_FALSE(
-      model.isModeActive(
-          MODE_ALTHOLD));
-
-  // Estimator recovers while switch is still ON.
-  model.state.altitude.healthy =
-      true;
-
-  actuator.updateModeMask();
-
-  // Fault latch must prevent automatic re-entry.
-  TEST_ASSERT_FALSE(
-      model.isModeActive(
-          MODE_ALTHOLD));
-
-  // Pilot deliberately moves switch OFF.
-  model.state.input.us[AXIS_AUX_1] =
-      1000;
-
-  actuator.updateModeMask();
-
-  TEST_ASSERT_FALSE(
-      model.isModeActive(
-          MODE_ALTHOLD));
-
-  // Pilot deliberately enables AltHold again.
-  model.state.input.us[AXIS_AUX_1] =
-      1500;
-
-  actuator.updateModeMask();
-
-  TEST_ASSERT_TRUE(
-      model.isModeActive(
-          MODE_ALTHOLD));
-}
 
 
 void test_actuator_angle_fault_requires_switch_cycle()
