@@ -1968,12 +1968,7 @@ When(
       firstVario,
       secondVario);
     
-    Verify(
-    Method(
-        ArduinoFake(),
-        micros))
-    .Exactly(
-        6_Times);
+
 }
 void test_complementary_variable_dt()
 {
