@@ -309,6 +309,7 @@ const float predictedVario =
 // A stale barometer must NOT continuously pull Vz
 // toward its last value.
 const bool baroVarioUsable =
+    newBaroSample &&
     baroFresh &&
     _filteredBaroValid;
 
@@ -320,7 +321,8 @@ const float varioMeasurement =
 altitude.vario =
     _varioFusion.update(
         safeAccZ,
-        varioMeasurement);
+        varioMeasurement,
+        dt);
 
     // --------------------------------------------------
     // INITIALIZE ABSOLUTE HEIGHT
