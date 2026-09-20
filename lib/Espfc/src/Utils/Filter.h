@@ -156,6 +156,8 @@ public:
   float update(float v);
   void reset();
 
+void prime(float value);
+
   void reconfigure(int16_t freq, int16_t cutoff = 0);
   void reconfigure(int16_t freq, int16_t cutoff, float q, float weight = 1.0f);
   void reconfigure(const FilterConfig& config, int rate);
