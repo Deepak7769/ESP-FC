@@ -32,6 +32,12 @@ int BaroSensor::begin()
   _first =
       true;
 
+    _filtersInitialized =
+    false;
+
+_pressurePrimed =
+    false;
+
   _lastAltitudeUs =
       0;
 
@@ -124,25 +130,65 @@ const int rate =
   return 1;
 }
 
-int BaroSensor::reload(ModelChangeEvent event)
+int BaroSensor::reload(
+    ModelChangeEvent event)
 {
-  switch (event)
+  if (event != MODEL_CHANGE_FILTER)
   {
-    case MODEL_CHANGE_FILTER: {
-      const int rate =
-    std::max<int>(
-        _model.state.baro.rate,
-        1);
-      const auto internalFilter = FILTER_PT1;
-      const auto internalCutoff = std::max((rate + 2) / 4, 1);
-      _temperatureFilter.begin(FilterConfig(internalFilter, internalCutoff), rate);
-      _pressureFilter.begin(FilterConfig(internalFilter, internalCutoff), rate);
-      _varioFilter.begin(FilterConfig(internalFilter, internalCutoff), rate);
-      break;
-    }
-    default:
-      break;
+    return 1;
   }
+
+  const int rate =
+      std::max<int>(
+          _model.state.baro.rate,
+          1);
+
+  const auto internalFilter =
+      FILTER_PT1;
+
+  const auto internalCutoff =
+      std::max(
+          (rate + 2) / 4,
+          1);
+
+  const FilterConfig config(
+      internalFilter,
+      internalCutoff);
+
+  if (!_filtersInitialized)
+  {
+    _temperatureFilter.begin(
+        config,
+        rate);
+
+    _pressureFilter.begin(
+        config,
+        rate);
+
+    _varioFilter.begin(
+        config,
+        rate);
+
+    _filtersInitialized =
+        true;
+  }
+  else
+  {
+    // Keep existing filter state while changing
+    // coefficients.
+    _temperatureFilter.reconfigure(
+        config,
+        rate);
+
+    _pressureFilter.reconfigure(
+        config,
+        rate);
+
+    _varioFilter.reconfigure(
+        config,
+        rate);
+  }
+
   return 1;
 }
 
@@ -281,9 +327,27 @@ bool BaroSensor::readPressure()
     return false;
   }
 
-  const float filteredPressure =
+float filteredPressure =
+    press;
+
+if (!_pressurePrimed)
+{
+  // Absolute pressure is around atmospheric pressure,
+  // not zero. Seed the filter directly from the first
+  // valid observation to prevent a synthetic altitude
+  // transient.
+  _pressureFilter.prime(
+      press);
+
+  _pressurePrimed =
+      true;
+}
+else
+{
+  filteredPressure =
       _pressureFilter.update(
           press);
+}
 
   if (!std::isfinite(
           filteredPressure) ||
