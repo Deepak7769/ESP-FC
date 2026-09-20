@@ -399,16 +399,30 @@ bool Actuator::altitudeEstimateHealthy() const
   }
 
   constexpr uint32_t
+      ALTITUDE_STALE_US =
+          100000;
+
+  constexpr uint32_t
       BARO_STALE_US =
           350000;
 
+  const uint32_t now =
+      micros();
+
+  const uint32_t altitudeAge =
+      static_cast<uint32_t>(
+          now -
+          altitude.lastUpdateUs);
+
   const uint32_t baroAge =
       static_cast<uint32_t>(
-          micros() -
+          now -
           baro.lastUpdateUs);
 
-  if (baroAge >=
-      BARO_STALE_US)
+  if (altitudeAge >=
+          ALTITUDE_STALE_US ||
+      baroAge >=
+          BARO_STALE_US)
   {
     return false;
   }
@@ -419,7 +433,6 @@ bool Actuator::altitudeEstimateHealthy() const
       std::isfinite(
           altitude.vario);
 }
-
 bool Actuator::canActivateMode(
     FlightMode mode)
 {
