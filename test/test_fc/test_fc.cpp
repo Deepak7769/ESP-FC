@@ -1847,13 +1847,18 @@ void test_altitude_baro_vario_used_only_once_per_sample()
   // update #1 = new barometer sample
   // update #2 = same barometer timestamp, therefore
   //             NOT a new barometer sample.
-  When(
-      Method(
-          ArduinoFake(),
-          micros))
-      .Return(
-          1000,
-          2000);
+When(
+    Method(
+        ArduinoFake(),
+        micros))
+    .Return(
+        900,   // Stats start - update 1
+        1000,  // Altitude estimator time - update 1
+        1100,  // Stats end - update 1
+
+        1900,  // Stats start - update 2
+        2000,  // Altitude estimator time - update 2
+        2100); // Stats end - update 2
 
   Model model;
 
@@ -1920,6 +1925,7 @@ void test_altitude_baro_vario_used_only_once_per_sample()
   // --------------------------------------------------
 
   altitude.update();
+    
 
   const float firstVario =
       model.state.altitude.vario;
@@ -1961,6 +1967,13 @@ void test_altitude_baro_vario_used_only_once_per_sample()
       1.0e-7f,
       firstVario,
       secondVario);
+    
+    Verify(
+    Method(
+        ArduinoFake(),
+        micros))
+    .Exactly(
+        6_Times);
 }
 void test_complementary_variable_dt()
 {
