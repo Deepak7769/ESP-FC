@@ -871,6 +871,137 @@ void test_controller_shadow_althold_vertical_accel_limit()
   TEST_ASSERT_TRUE(
       change < 0.1f);
 }
+
+void test_controller_shadow_althold_target_is_bounded()
+{
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          0);
+
+  Model model;
+
+  model.state.gyro.clock =
+      1000;
+
+  model.config.gyro.dlpf =
+      GYRO_DLPF_256;
+
+  model.config.loopSync =
+      1;
+
+  model.config.mixerSync =
+      1;
+
+  model.config.mixer.type =
+      FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(
+      model);
+
+  controller.begin();
+
+  setHealthyAssistedEstimatorState(
+      model,
+      0);
+
+  model.state.altitude.height =
+      2.0f;
+
+  model.state.altitude.vario =
+      0.0f;
+
+  model.state.altitude.healthy =
+      true;
+
+  // --------------------------------------------------
+  // DESCENT TARGET MUST NOT RUN AWAY
+  // --------------------------------------------------
+
+  model.state.input.ch[
+      AXIS_THRUST] =
+      -1.0f;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ALTHOLD);
+
+  // 10 seconds at nominal 1 kHz would previously
+  // integrate roughly -10 m of impossible target.
+  for (int i = 0;
+       i < 10000;
+       ++i)
+  {
+    controller.update();
+  }
+
+  const float descentTarget =
+      model.state.assistedShadow
+          .altitudeTarget;
+
+  // Current altitude = 2 m.
+  // Anti-windup window = +/-2 m.
+  // Therefore target must never go below 0 m.
+  TEST_ASSERT_TRUE(
+      descentTarget >=
+      -0.001f);
+
+  TEST_ASSERT_TRUE(
+      descentTarget <=
+      2.001f);
+
+
+  // --------------------------------------------------
+  // RESET ALTHOLD
+  // --------------------------------------------------
+
+  model.updateModes(
+      0);
+
+  controller.update();
+
+  TEST_ASSERT_FALSE(
+      model.state.assistedShadow
+          .altitudeActive);
+
+
+  // --------------------------------------------------
+  // CLIMB TARGET MUST NOT RUN AWAY
+  // --------------------------------------------------
+
+  model.state.input.ch[
+      AXIS_THRUST] =
+      1.0f;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ALTHOLD);
+
+  for (int i = 0;
+       i < 10000;
+       ++i)
+  {
+    controller.update();
+  }
+
+  const float climbTarget =
+      model.state.assistedShadow
+          .altitudeTarget;
+
+  // Current altitude = 2 m.
+  // Upper edge of the +/-2 m window = 4 m.
+  TEST_ASSERT_TRUE(
+      climbTarget <=
+      4.001f);
+
+  TEST_ASSERT_TRUE(
+      climbTarget >=
+      1.999f);
+}
 void test_controller_shadow_althold_full_climb_rate_scaling()
 {
   When(
@@ -2881,6 +3012,8 @@ RUN_TEST(test_controller_shadow_althold_climb_command_moves_target_up);
 RUN_TEST(test_controller_shadow_althold_descent_command_moves_target_down);
 RUN_TEST(test_controller_shadow_althold_stops_when_estimator_unhealthy);
 RUN_TEST(test_controller_shadow_althold_vertical_accel_limit);
+RUN_TEST(
+    test_controller_shadow_althold_target_is_bounded);
 
 // Additional V2 regression tests
 RUN_TEST(test_controller_shadow_althold_full_climb_rate_scaling);
