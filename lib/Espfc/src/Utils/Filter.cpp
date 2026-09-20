@@ -356,6 +356,69 @@ void Filter::reset()
   }
 }
 
+void Filter::prime(
+    float value)
+{
+  if (!std::isfinite(value))
+  {
+    return;
+  }
+
+  switch (_conf.type)
+  {
+    case FILTER_PT1:
+      _state.pt1.v =
+          value;
+      break;
+
+    case FILTER_PT2:
+      _state.pt2.v[0] =
+          value;
+
+      _state.pt2.v[1] =
+          value;
+      break;
+
+    case FILTER_PT3:
+      _state.pt3.v[0] =
+          value;
+
+      _state.pt3.v[1] =
+          value;
+
+      _state.pt3.v[2] =
+          value;
+      break;
+
+    case FILTER_FIR2:
+      _state.fir2.v[0] =
+          value;
+
+      _state.fir2.v[1] =
+          value;
+      break;
+
+    case FILTER_MEDIAN3:
+      _state.median.v[0] =
+          value;
+
+      _state.median.v[1] =
+          value;
+
+      _state.median.v[2] =
+          value;
+      break;
+
+    case FILTER_NONE:
+      break;
+
+    default:
+      // Not currently required by the barometer path.
+      reset();
+      break;
+  }
+}
+
 void FAST_CODE_ATTR Filter::reconfigure(int16_t freq, int16_t cutoff)
 {
   reconfigure(FilterConfig((FilterType)_conf.type, freq, cutoff), _rate);
