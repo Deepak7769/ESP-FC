@@ -7,6 +7,18 @@ void Complementary::begin(
     float tau,
     float state)
 {
+  if (!std::isfinite(sampleRate) ||
+      sampleRate <= 0.0f)
+  {
+    sampleRate = 1000.0f;
+  }
+
+  if (!std::isfinite(tau) ||
+      tau <= 0.0f)
+  {
+    tau = 0.5f;
+  }
+
   _dt =
       1.0f / sampleRate;
 
@@ -18,7 +30,9 @@ void Complementary::begin(
       (_tau + _dt);
 
   _state =
-      state;
+      std::isfinite(state)
+          ? state
+          : 0.0f;
 }
 
 float Complementary::update(
@@ -43,15 +57,33 @@ float Complementary::update(
         _dt;
   }
 
+  if (!std::isfinite(rate))
+  {
+    rate =
+        0.0f;
+  }
+
+  if (!std::isfinite(position))
+  {
+    position =
+        _state;
+  }
+
   const float alpha =
       _tau /
       (_tau + dt);
 
-  _state =
+  const float nextState =
       alpha *
           (_state + rate * dt) +
       (1.0f - alpha) *
           position;
+
+  if (std::isfinite(nextState))
+  {
+    _state =
+        nextState;
+  }
 
   return _state;
 }
