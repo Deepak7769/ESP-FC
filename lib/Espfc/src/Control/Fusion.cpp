@@ -200,7 +200,7 @@ constexpr uint32_t
 // It becomes unhealthy only if no valid solution has
 // arrived within the freshness window.
 const bool previousSolutionFresh =
-    attitude.lastUpdateUs != 0 &&
+    attitude.healthy &&
     static_cast<uint32_t>(
         now -
         attitude.lastUpdateUs) <
