@@ -271,6 +271,11 @@ const bool newBaroSample =
             std::isfinite(
                 _filteredBaroVario);
       }
+        else
+{
+  _filteredBaroValid =
+      false;
+}
     }
 const auto& attitude =
     _model.state.attitude;
@@ -303,169 +308,201 @@ const bool accelProjectionFresh =
         projectionMaxAgeUs;
 
 const float safeAccZ =
-    (accelFinite &&
+    (fusionValid &&
+     accelFinite &&
      accelProjectionFresh)
         ? accZ
         : 0.0f;
+// --------------------------------------------------
+// VERTICAL VELOCITY PREDICTION
+//
+// Prediction runs at IMU/estimator rate.
+// Barometer correction is performed separately and
+// only when an accepted barometer observation arrives.
+// --------------------------------------------------
 
-// Previous externally visible state must match the
-// complementary filter's previous state.
 const float previousVario =
-    std::isfinite(altitude.vario)
+    std::isfinite(
+        altitude.vario)
         ? altitude.vario
         : 0.0f;
 
-// IMU-only prediction for this cycle.
 const float predictedVario =
     previousVario +
     safeAccZ * dt;
 
-// A stale barometer must NOT continuously pull Vz
-// toward its last value.
-const bool baroVarioUsable =
+
+// --------------------------------------------------
+// BAROMETER ACCEPTANCE
+// --------------------------------------------------
+
+bool acceptedThisSample =
+    false;
+
+bool justInitialized =
+    false;
+
+
+// --------------------------------------------------
+// INITIALIZE ABSOLUTE HEIGHT
+// --------------------------------------------------
+
+if (!_heightInitialized &&
     newBaroSample &&
     baroFresh &&
-    _filteredBaroValid;
-
-const float varioMeasurement =
-    baroVarioUsable
-        ? _filteredBaroVario
-        : predictedVario;
-
-altitude.vario =
-    _varioFusion.update(
-        safeAccZ,
-        varioMeasurement,
-        dt);
-
-    // --------------------------------------------------
-    // INITIALIZE ABSOLUTE HEIGHT
-    // --------------------------------------------------
-
-    if (!_heightInitialized &&
-        newBaroSample &&
-        baroFresh &&
-        baroBiasReady &&
-        _filteredBaroValid)
-    {
-altitude.height =
-    _filteredBaroAlt;
-
-// Do NOT set altitude.vario to zero here.
-//
-// _varioFusion has already been running during the
-// barometer-bias phase. Resetting only altitude.vario
-// would make the public estimator state disagree with
-// the complementary filter's internal state.
-
-if (!std::isfinite(altitude.vario))
+    baroBiasReady &&
+    _filteredBaroValid)
 {
-  altitude.vario =
+  altitude.height =
+      _filteredBaroAlt;
+
+  altitude.baroInnovation =
       0.0f;
 
-  _varioFusion.begin(
-      accelRate,
-      _model.config.altHold.baroTau *
-          0.1f,
-      0.0f);
+  altitude.baroAccepted =
+      true;
+
+  _heightInitialized =
+      true;
+
+  _lastAcceptedBaroUs =
+      baro.lastUpdateUs;
+
+  _acceptedBaroTimeValid =
+      true;
+
+  acceptedThisSample =
+      true;
+
+  justInitialized =
+      true;
+}
+else
+{
+  altitude.baroAccepted =
+      false;
 }
 
-altitude.baroInnovation =
-    0.0f;
 
-      altitude.baroAccepted =
-          true;
+// --------------------------------------------------
+// HEIGHT PREDICTION + INNOVATION GATE
+// --------------------------------------------------
 
-      _heightInitialized =
-          true;
+if (_heightInitialized &&
+    !justInitialized)
+{
+  const float predictedHeight =
+      altitude.height +
+      predictedVario * dt;
 
-_lastAcceptedBaroUs =
-    baro.lastUpdateUs;
+  if (newBaroSample &&
+      baroFresh &&
+      baroBiasReady &&
+      _filteredBaroValid)
+  {
+    altitude.baroInnovation =
+        _filteredBaroAlt -
+        predictedHeight;
 
-_acceptedBaroTimeValid =
-    true;
-    }
-    else
-    {
-      altitude.baroAccepted =
-          false;
-    }
+    constexpr float
+        BARO_INNOVATION_GATE_M =
+            1.5f;
 
-    // --------------------------------------------------
-    // HEIGHT PREDICTION + BAROMETER CORRECTION
-    // --------------------------------------------------
+    acceptedThisSample =
+        std::isfinite(
+            altitude.baroInnovation) &&
+        std::fabs(
+            altitude.baroInnovation) <
+            BARO_INNOVATION_GATE_M;
+  }
 
-    if (_heightInitialized)
-    {
-      const float safeVario =
-          std::isfinite(
-              altitude.vario)
-              ? altitude.vario
-              : 0.0f;
+  if (acceptedThisSample)
+  {
+    constexpr float
+        HEIGHT_CORRECTION_TAU_S =
+            1.0f;
 
-      const float predictedHeight =
-          altitude.height +
-          safeVario * dt;
+    const float alpha =
+        std::clamp(
+            baroDt /
+                (HEIGHT_CORRECTION_TAU_S +
+                 baroDt),
+            0.0f,
+            1.0f);
 
-      bool acceptedThisSample =
-          false;
+    altitude.height =
+        predictedHeight +
+        alpha *
+            altitude.baroInnovation;
 
-      if (newBaroSample &&
-          baroFresh &&
-          baroBiasReady &&
-          _filteredBaroValid)
-      {
-        altitude.baroInnovation =
-            _filteredBaroAlt -
-            predictedHeight;
+    altitude.baroAccepted =
+        true;
 
-        constexpr float
-            BARO_INNOVATION_GATE_M =
-                1.5f;
+    _lastAcceptedBaroUs =
+        baro.lastUpdateUs;
 
-        acceptedThisSample =
-            std::isfinite(
-                altitude.baroInnovation) &&
-            std::fabs(
-                altitude.baroInnovation) <
-                BARO_INNOVATION_GATE_M;
-      }
+    _acceptedBaroTimeValid =
+        true;
+  }
+  else
+  {
+    altitude.height =
+        predictedHeight;
+  }
+}
 
-      if (acceptedThisSample)
-      {
-        constexpr float
-            HEIGHT_CORRECTION_TAU_S =
-                1.0f;
 
-        const float alpha =
-            std::clamp(
-                baroDt /
-                    (HEIGHT_CORRECTION_TAU_S +
-                     baroDt),
-                0.0f,
-                1.0f);
+// --------------------------------------------------
+// VERTICAL VELOCITY CORRECTION
+//
+// IMPORTANT:
+// Only an ACCEPTED barometer sample may correct Vz.
+//
+// baroDt controls measurement correction strength.
+// dt controls acceleration prediction.
+//
+// Therefore changing IMU rate does not change the
+// effective barometer correction response.
+// --------------------------------------------------
 
-        altitude.height =
-            predictedHeight +
-            alpha *
-                altitude.baroInnovation;
+altitude.vario =
+    predictedVario;
 
-altitude.baroAccepted =
-    true;
+if (acceptedThisSample &&
+    newBaroSample &&
+    baroFresh &&
+    _filteredBaroValid)
+{
+  const float configuredTau =
+      _model.config.altHold.baroTau *
+      0.1f;
 
-_lastAcceptedBaroUs =
-    baro.lastUpdateUs;
+  const float varioTau =
+      std::max(
+          configuredTau,
+          0.001f);
 
-_acceptedBaroTimeValid =
-    true;
-      }
-      else
-      {
-        altitude.height =
-            predictedHeight;
-      }
-    }
+  const float beta =
+      std::clamp(
+          baroDt /
+              (varioTau +
+               baroDt),
+          0.0f,
+          1.0f);
 
+  const float varioInnovation =
+      _filteredBaroVario -
+      predictedVario;
+
+  if (std::isfinite(
+          varioInnovation))
+  {
+    altitude.vario =
+        predictedVario +
+        beta *
+            varioInnovation;
+  }
+}
     // --------------------------------------------------
     // ACCEPTED-BARO HEALTH
     // --------------------------------------------------
@@ -519,11 +556,7 @@ _acceptedBaroTimeValid =
 acceptedBaroFresh =
     true;
 
-      _varioFusion.begin(
-          accelRate,
-          _model.config.altHold.baroTau *
-              0.1f,
-          0.0f);
+
     }
  
     // --------------------------------------------------
@@ -541,7 +574,8 @@ const bool attitudeFresh =
         now -
         attitude.lastUpdateUs) <
         ATTITUDE_STALE_US;
-    
+  altitude.lastUpdateUs =
+    now;  
 altitude.healthy =
     _heightInitialized &&
     _filteredBaroValid &&
