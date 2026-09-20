@@ -599,29 +599,61 @@ const bool altActive =
         true;
   }
 
-  if (altActive)
-  {
-    // Moving the throttle away from center moves
-    // the altitude target.
-    _shadowAltitudeTarget +=
-        pilotVz * dt;
+ if (altActive)
+{
+  // --------------------------------------------------
+  // ALTITUDE TARGET ANTI-WINDUP
+  //
+  // The altitude-position controller saturates at
+  // +/-1.0 m/s with Kp = 0.50, therefore an altitude
+  // error larger than 2.0 m cannot produce any more
+  // correction authority.
+  //
+  // Do not allow pilot target integration to build an
+  // unreachable -20 m / -60 m / +60 m backlog.
+  // --------------------------------------------------
 
-    const float altitudeError =
-        _shadowAltitudeTarget -
-        altitude.height;
+  constexpr float ALTITUDE_KP =
+      0.50f;
 
-    constexpr float ALTITUDE_KP =
-        0.50f;
+  constexpr float MAX_POSITION_CORRECTION_MS =
+      1.0f;
 
-    constexpr float MAX_POSITION_CORRECTION_MS =
-        1.0f;
+  constexpr float MAX_TARGET_ERROR_M =
+      MAX_POSITION_CORRECTION_MS /
+      ALTITUDE_KP; // 2.0 m
 
-    const float velocityCorrection =
-        std::clamp(
-            ALTITUDE_KP *
-                altitudeError,
-            -MAX_POSITION_CORRECTION_MS,
-            MAX_POSITION_CORRECTION_MS);
+  // Integrate pilot climb/descent command.
+  _shadowAltitudeTarget +=
+      pilotVz * dt;
+
+  // Keep the requested altitude inside the useful
+  // position-control window around the current
+  // estimated altitude.
+  const float minAltitudeTarget =
+      altitude.height -
+      MAX_TARGET_ERROR_M;
+
+  const float maxAltitudeTarget =
+      altitude.height +
+      MAX_TARGET_ERROR_M;
+
+  _shadowAltitudeTarget =
+      std::clamp(
+          _shadowAltitudeTarget,
+          minAltitudeTarget,
+          maxAltitudeTarget);
+
+  const float altitudeError =
+      _shadowAltitudeTarget -
+      altitude.height;
+
+  const float velocityCorrection =
+      std::clamp(
+          ALTITUDE_KP *
+              altitudeError,
+          -MAX_POSITION_CORRECTION_MS,
+          MAX_POSITION_CORRECTION_MS);
 
     constexpr float MAX_DESCENT_MS =
         1.0f;
