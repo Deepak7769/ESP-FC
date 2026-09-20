@@ -354,8 +354,11 @@ struct AltitudeState
 
   bool healthy{false};
   bool baroAccepted{false};
-};
 
+  // Timestamp of the most recent altitude-estimator cycle.
+  // Used independently from attitude/barometer freshness.
+  uint32_t lastUpdateUs{0};
+};
 struct AssistedModeShadowState
 {
   // ANGLE mode V2
