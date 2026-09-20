@@ -50,6 +50,9 @@ private:
 
   bool _first{true};
 
+bool _filtersInitialized{false};
+bool _pressurePrimed{false};
+
   uint32_t _lastAltitudeUs{0};
 };
 
