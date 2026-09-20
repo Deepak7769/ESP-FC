@@ -19,6 +19,7 @@ constexpr bool ENABLE_LEGACY_ALTHOLD_OUTPUT =
 Controller::Controller(Model& model): _model(model), _rates{} {}
 
 
+
 int Controller::begin()
 {
   reload(MODEL_CHANGE_RATES);
