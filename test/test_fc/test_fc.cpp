@@ -2076,6 +2076,785 @@ void test_complementary_variable_dt()
       nominal,
       legacy);
 }
+
+// =========================================================
+// FINAL ESTIMATOR / FAILSAFE REGRESSION TESTS
+// =========================================================
+
+static void prepareAltitudeRegressionModel(
+    Model& model,
+    int accelRate,
+    uint32_t nowUs)
+{
+  model.state.accel.timer.rate =
+      accelRate;
+
+  model.state.baro.rate =
+      50;
+
+  // Effective vertical-velocity correction tau = 1 second.
+  model.config.altHold.baroTau =
+      10;
+
+  // Valid attitude solution.
+  model.state.attitude.healthy =
+      true;
+
+  model.state.attitude.lastUpdateUs =
+      nowUs;
+
+  model.state.attitude.quaternion =
+      Quaternion(
+          1.0f,
+          0.0f,
+          0.0f,
+          0.0f);
+
+  model.state.attitude.euler =
+      VectorFloat(
+          0.0f,
+          0.0f,
+          0.0f);
+
+  // No vertical acceleration unless a test overrides it.
+  model.state.accel.world.z =
+      0.0f;
+
+  // Valid barometer state.
+  model.state.baro.sampleValid =
+      true;
+
+  model.state.baro.lastUpdateUs =
+      nowUs - 20000u;
+
+  model.state.baro.altitudeBiasSamples =
+      -1;
+
+  model.state.baro.altitudeGround =
+      0.0f;
+
+  model.state.baro.vario =
+      0.0f;
+}
+
+
+// =========================================================
+// 1. BAROMETER CORRECTION MUST NOT DEPEND ON IMU RATE
+// =========================================================
+
+void test_altitude_correction_independent_of_imu_rate()
+{
+  constexpr uint32_t NOW_US =
+      100000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model500;
+  Model model1000;
+
+  prepareAltitudeRegressionModel(
+      model500,
+      500,
+      NOW_US);
+
+  prepareAltitudeRegressionModel(
+      model1000,
+      1000,
+      NOW_US);
+
+  // Same barometer observation for both estimators.
+  model500.state.baro.vario =
+      1.0f;
+
+  model1000.state.baro.vario =
+      1.0f;
+
+  Control::Altitude altitude500(
+      model500);
+
+  Control::Altitude altitude1000(
+      model1000);
+
+  altitude500.begin();
+  altitude1000.begin();
+
+  altitude500.update(
+      true);
+
+  altitude1000.update(
+      true);
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          model500.state.altitude.vario));
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          model1000.state.altitude.vario));
+
+  // Same barometer rate + same observation + same tau
+  // must produce the same correction regardless of
+  // whether prediction is running at 500 or 1000 Hz.
+  TEST_ASSERT_FLOAT_WITHIN(
+      1.0e-6f,
+      model500.state.altitude.vario,
+      model1000.state.altitude.vario);
+}
+
+
+// =========================================================
+// 2. FAILED AHRS CYCLE MUST NOT RE-INTEGRATE OLD WORLD ACCEL
+// =========================================================
+
+void test_rejected_fusion_does_not_reintegrate_world_accel()
+{
+  constexpr uint32_t NOW_US =
+      100000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  model.state.accel.timer.rate =
+      1000;
+
+  model.state.baro.rate =
+      50;
+
+  model.state.attitude.healthy =
+      true;
+
+  model.state.attitude.lastUpdateUs =
+      NOW_US;
+
+  // Deliberately non-zero cached world acceleration.
+  model.state.accel.world.z =
+      4.0f;
+
+  // No barometer correction is needed for this test.
+  model.state.baro.sampleValid =
+      false;
+
+  Control::Altitude altitude(
+      model);
+
+  altitude.begin();
+
+  // fusionValid == false means accel.world belongs to
+  // the previous successful AHRS cycle and must not
+  // be integrated again.
+  altitude.update(
+      false);
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          model.state.altitude.vario));
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      1.0e-7f,
+      0.0f,
+      model.state.altitude.vario);
+}
+
+
+// =========================================================
+// 3. REJECTED HEIGHT SAMPLE MUST NOT CORRECT VERTICAL SPEED
+// =========================================================
+
+void test_rejected_height_sample_does_not_correct_vario()
+{
+  constexpr uint32_t NOW_US =
+      100000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  prepareAltitudeRegressionModel(
+      model,
+      1000,
+      NOW_US);
+
+  Control::Altitude altitude(
+      model);
+
+  altitude.begin();
+
+  // --------------------------------------------------
+  // First sample: establish valid estimator reference.
+  // --------------------------------------------------
+
+  model.state.baro.lastUpdateUs =
+      80000;
+
+  model.state.baro.altitudeGround =
+      0.0f;
+
+  model.state.baro.vario =
+      0.0f;
+
+  altitude.update(
+      true);
+
+  TEST_ASSERT_TRUE(
+      model.state.altitude.baroAccepted);
+
+  const float varioBeforeOutlier =
+      model.state.altitude.vario;
+
+  // --------------------------------------------------
+  // Second sample:
+  // gigantic height + velocity disturbance.
+  //
+  // Height innovation must reject this observation and
+  // the associated velocity observation must not alter Vz.
+  // --------------------------------------------------
+
+  model.state.baro.lastUpdateUs =
+      90000;
+
+  model.state.baro.altitudeGround =
+      1000.0f;
+
+  model.state.baro.vario =
+      100.0f;
+
+  altitude.update(
+      true);
+
+  TEST_ASSERT_FALSE(
+      model.state.altitude.baroAccepted);
+
+  TEST_ASSERT_TRUE(
+      std::fabs(
+          model.state.altitude
+              .baroInnovation) >
+      1.5f);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      1.0e-6f,
+      varioBeforeOutlier,
+      model.state.altitude.vario);
+}
+
+
+// =========================================================
+// 4. FILTER RELOAD MUST PRESERVE ALTITUDE ESTIMATOR HISTORY
+// =========================================================
+
+void test_altitude_reload_preserves_filter_history()
+{
+  constexpr uint32_t NOW_US =
+      100000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model referenceModel;
+  Model reloadModel;
+
+  prepareAltitudeRegressionModel(
+      referenceModel,
+      1000,
+      NOW_US);
+
+  prepareAltitudeRegressionModel(
+      reloadModel,
+      1000,
+      NOW_US);
+
+  referenceModel.state.baro.altitudeGround =
+      1.0f;
+
+  reloadModel.state.baro.altitudeGround =
+      1.0f;
+
+  referenceModel.state.baro.vario =
+      2.0f;
+
+  reloadModel.state.baro.vario =
+      2.0f;
+
+  referenceModel.state.baro.lastUpdateUs =
+      80000;
+
+  reloadModel.state.baro.lastUpdateUs =
+      80000;
+
+  Control::Altitude referenceAltitude(
+      referenceModel);
+
+  Control::Altitude reloadedAltitude(
+      reloadModel);
+
+  referenceAltitude.begin();
+  reloadedAltitude.begin();
+
+  referenceAltitude.update(
+      true);
+
+  reloadedAltitude.update(
+      true);
+
+  // Reconfigure only one estimator.
+  //
+  // Correct reload behavior preserves its filter history,
+  // therefore it should still match the untouched
+  // reference estimator afterward.
+  reloadedAltitude.reload(
+      MODEL_CHANGE_FILTER);
+
+  referenceModel.state.baro.lastUpdateUs =
+      90000;
+
+  reloadModel.state.baro.lastUpdateUs =
+      90000;
+
+  referenceAltitude.update(
+      true);
+
+  reloadedAltitude.update(
+      true);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      1.0e-6f,
+      referenceModel.state.altitude.height,
+      reloadModel.state.altitude.height);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      1.0e-6f,
+      referenceModel.state.altitude.vario,
+      reloadModel.state.altitude.vario);
+}
+
+
+// =========================================================
+// TEST BAROMETER DEVICE
+// =========================================================
+
+class RegressionTestBaroDevice final
+    : public Espfc::Device::BaroDevice
+{
+public:
+  explicit RegressionTestBaroDevice(
+      float pressure):
+      _pressure(pressure)
+  {
+  }
+
+  int begin(
+      Espfc::Device::BusDevice*) override
+  {
+    return 1;
+  }
+
+  int begin(
+      Espfc::Device::BusDevice*,
+      uint8_t) override
+  {
+    return 1;
+  }
+
+  Espfc::BaroDeviceType getType()
+      const override
+  {
+    return
+        BARO_BMP280;
+  }
+
+  float readTemperature() override
+  {
+    return
+        25.0f;
+  }
+
+  float readPressure() override
+  {
+    return
+        _pressure;
+  }
+
+  int getDelay(
+      Espfc::BaroDeviceMode)
+      const override
+  {
+    return
+        0;
+  }
+
+  void setMode(
+      Espfc::BaroDeviceMode) override
+  {
+  }
+
+  bool testConnection() override
+  {
+    return
+        true;
+  }
+
+private:
+  float _pressure;
+};
+
+
+// =========================================================
+// 5. FIRST PRESSURE SAMPLE MUST PRIME FILTER DIRECTLY
+// =========================================================
+
+void test_pressure_filter_first_sample_is_primed()
+{
+  constexpr float TEST_PRESSURE =
+      90000.0f;
+
+  Model model;
+
+  model.state.baro.rate =
+      50;
+
+  Espfc::Sensor::BaroSensor sensor(
+      model);
+
+  RegressionTestBaroDevice device(
+      TEST_PRESSURE);
+
+  // Configure the same filter path used by BaroSensor.
+  sensor.reload(
+      MODEL_CHANGE_FILTER);
+
+  sensor._baro =
+      &device;
+
+  sensor._pressurePrimed =
+      false;
+
+  TEST_ASSERT_TRUE(
+      sensor.readPressure());
+
+  TEST_ASSERT_TRUE(
+      sensor._pressurePrimed);
+
+  TEST_ASSERT_TRUE(
+      model.state.baro.sampleValid);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.001f,
+      TEST_PRESSURE,
+      model.state.baro.pressureRaw);
+
+  // Critical assertion:
+  //
+  // The first filtered pressure must equal the first
+  // physical pressure observation instead of ramping
+  // upward from zero.
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.001f,
+      TEST_PRESSURE,
+      model.state.baro.pressure);
+}
+
+
+// =========================================================
+// 6. ALTITUDE ESTIMATOR NEEDS ITS OWN FRESHNESS CHECK
+// =========================================================
+
+void test_altitude_estimator_has_independent_freshness()
+{
+  constexpr uint32_t NOW_US =
+      500000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.height =
+      2.0f;
+
+  model.state.altitude.vario =
+      0.0f;
+
+  // Barometer and attitude are fresh, but the altitude
+  // estimator itself has not run for 150 ms.
+  model.state.altitude.lastUpdateUs =
+      NOW_US -
+      150000u;
+
+  Actuator actuator(
+      model);
+
+  TEST_ASSERT_FALSE(
+      actuator.altitudeEstimateHealthy());
+
+  // Once the altitude estimator timestamp is fresh,
+  // the same otherwise-valid state should pass.
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  TEST_ASSERT_TRUE(
+      actuator.altitudeEstimateHealthy());
+}
+
+
+// =========================================================
+// 7. DISARMED OUTPUT MUST NOT REQUIRE A CONTROL/PID CYCLE
+// =========================================================
+
+void test_disarm_output_propagates_without_control_cycle()
+{
+  Model model;
+
+  Output::Mixer mixer(
+      model);
+
+  // Explicitly disarmed.
+  model.updateModes(
+      0);
+
+  for (size_t i = 0;
+       i < OUTPUT_CHANNELS;
+       ++i)
+  {
+    // Keep every test channel on the motor/disarmed path
+    // so servo-neutral special handling does not affect
+    // this regression.
+    model.config.output.channel[i].servo =
+        false;
+
+    model.state.output.disarmed[i] =
+        static_cast<int16_t>(
+            1000 +
+            static_cast<int>(i));
+
+    // Start from deliberately different values.
+    model.state.output.us[i] =
+        1800;
+  }
+
+  // No controller.update() and no normal mixer.update().
+  //
+  // This must still propagate configured disarmed values.
+  mixer.writeDisarmed();
+
+  for (size_t i = 0;
+       i < OUTPUT_CHANNELS;
+       ++i)
+  {
+    TEST_ASSERT_EQUAL_INT16(
+        model.state.output.disarmed[i],
+        model.state.output.us[i]);
+  }
+}
+
+
+// =========================================================
+// 8. ANGLE-FAULT TRANSITION MUST PRODUCE FINITE,
+//    RATE-LIMITED ACTIVE SETPOINTS
+// =========================================================
+
+void test_angle_fault_transition_rate_is_finite_and_bounded()
+{
+  constexpr uint32_t NOW_US =
+      50000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  model.state.gyro.clock =
+      1000;
+
+  model.config.gyro.dlpf =
+      GYRO_DLPF_256;
+
+  model.config.loopSync =
+      1;
+
+  model.config.mixerSync =
+      1;
+
+  model.config.mixer.type =
+      FC_MIXER_QUADX;
+
+  model.config.level.angleLimit =
+      45;
+
+  model.config.level.rateLimit =
+      300;
+
+  model.config.input.rateLimit[
+      AXIS_ROLL] =
+      300;
+
+  model.config.input.rateLimit[
+      AXIS_PITCH] =
+      300;
+
+  model.config.pid[
+      FC_PID_LEVEL] =
+      {
+          .P = 45u,
+          .I = 0u,
+          .D = 0u,
+          .F = 0
+      };
+
+  model.begin();
+
+  Controller controller(
+      model);
+
+  controller.begin();
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+
+  // Valid attitude estimator.
+  model.state.gyro.present =
+      true;
+
+  model.state.accel.present =
+      true;
+
+  model.state.attitude.healthy =
+      true;
+
+  model.state.attitude.lastUpdateUs =
+      NOW_US;
+
+  model.state.attitude.quaternion =
+      Quaternion(
+          1.0f,
+          0.0f,
+          0.0f,
+          0.0f);
+
+  model.state.attitude.euler =
+      VectorFloat(
+          0.10f,
+          0.0f,
+          0.0f);
+
+  // Configure Angle switch on AUX1.
+  auto& condition =
+      model.config.conditions[0];
+
+  condition.id =
+      MODE_ANGLE;
+
+  condition.ch =
+      AXIS_AUX_1;
+
+  condition.min =
+      1200;
+
+  condition.max =
+      1800;
+
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1500;
+
+  model.state.input.ch[
+      AXIS_ROLL] =
+      0.25f;
+
+  // Enter Angle mode.
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ANGLE));
+
+  controller.update();
+
+  const float rateBeforeFault =
+      model.state.setpoint.rate[
+          AXIS_ROLL];
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          rateBeforeFault));
+
+  // Simulate estimator failure while Angle switch
+  // remains enabled.
+  model.state.attitude.healthy =
+      false;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ANGLE));
+
+  // Active controller now falls back to rate mode.
+  controller.update();
+
+  const float rateAfterFault =
+      model.state.setpoint.rate[
+          AXIS_ROLL];
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          rateAfterFault));
+
+  const float maxRate =
+      Utils::toRad(
+          300.0f);
+
+  // The fallback command must remain inside the
+  // configured active rate limit.
+  TEST_ASSERT_TRUE(
+      std::fabs(
+          rateAfterFault) <=
+      maxRate +
+          0.001f);
+
+  // Also ensure the transition itself did not create
+  // a non-finite command.
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          rateAfterFault -
+          rateBeforeFault));
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -2121,7 +2900,32 @@ RUN_TEST(
 
 RUN_TEST(
     test_complementary_variable_dt);
-RUN_TEST(test_rates_betaflight);
+
+    RUN_TEST(
+    test_altitude_correction_independent_of_imu_rate);
+
+RUN_TEST(
+    test_rejected_fusion_does_not_reintegrate_world_accel);
+
+RUN_TEST(
+    test_rejected_height_sample_does_not_correct_vario);
+
+RUN_TEST(
+    test_altitude_reload_preserves_filter_history);
+
+RUN_TEST(
+    test_pressure_filter_first_sample_is_primed);
+
+RUN_TEST(
+    test_altitude_estimator_has_independent_freshness);
+
+RUN_TEST(
+    test_disarm_output_propagates_without_control_cycle);
+
+RUN_TEST(
+    test_angle_fault_transition_rate_is_finite_and_bounded);
+    
+  RUN_TEST(test_rates_betaflight);
   RUN_TEST(test_rates_betaflight_expo);
   RUN_TEST(test_rates_raceflight);
   RUN_TEST(test_rates_raceflight_expo);
