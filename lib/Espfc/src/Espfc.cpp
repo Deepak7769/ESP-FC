@@ -97,10 +97,24 @@ int FAST_CODE_ATTR Espfc::update(bool externalTrigger)
     _sensor.postLoop();
   }
 
-  if (_model.state.actuatorTimer.check())
+if (_model.state.actuatorTimer.check())
+{
+  const bool wasArmed =
+      _model.isModeActive(
+          MODE_ARMED);
+
+  _actuator.update();
+
+  const bool isArmed =
+      _model.isModeActive(
+          MODE_ARMED);
+
+  if (wasArmed &&
+      !isArmed)
   {
-    _actuator.update();
+    _mixer.writeDisarmed();
   }
+}
 
 #else
 
@@ -118,10 +132,24 @@ int FAST_CODE_ATTR Espfc::update(bool externalTrigger)
     {
       _input.update();
     }
-    if (_model.state.actuatorTimer.check())
-    {
-      _actuator.update();
-    }
+if (_model.state.actuatorTimer.check())
+{
+  const bool wasArmed =
+      _model.isModeActive(
+          MODE_ARMED);
+
+  _actuator.update();
+
+  const bool isArmed =
+      _model.isModeActive(
+          MODE_ARMED);
+
+  if (wasArmed &&
+      !isArmed)
+  {
+    _mixer.writeDisarmed();
+  }
+}
   }
   _sensor.updateDelayed();
 
