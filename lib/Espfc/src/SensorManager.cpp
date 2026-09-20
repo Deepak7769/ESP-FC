@@ -8,6 +8,7 @@ SensorManager::SensorManager(Model& model)
 {
 }
 
+
 int SensorManager::begin()
 {
   _gyro.begin();
