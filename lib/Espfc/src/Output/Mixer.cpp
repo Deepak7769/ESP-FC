@@ -160,6 +160,23 @@ int FAST_CODE_ATTR Mixer::update()
 
   return 1;
 }
+void Mixer::writeDisarmed()
+{
+  // This function is deliberately one-way:
+  // it may only write the configured DISARMED state.
+  if (_model.isModeActive(
+          MODE_ARMED))
+  {
+    return;
+  }
+
+  float outputs[
+      OUTPUT_CHANNELS] = {};
+
+  writeOutput(
+      _model.state.currentMixer,
+      outputs);
+}
 
 void FAST_CODE_ATTR Mixer::updateMixer(const MixerConfig& mixer, float* outputs)
 {
