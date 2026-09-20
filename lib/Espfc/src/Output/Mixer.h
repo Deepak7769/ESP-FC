@@ -11,6 +11,7 @@ public:
   Mixer(Model& model);
   int begin();
   int update();
+void writeDisarmed();
 
   void updateMixer(const MixerConfig& mixer, float* outputs);
   float limitThrust(float thrust, ThrottleLimitType type, int8_t limit);
