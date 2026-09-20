@@ -4,7 +4,7 @@
 #include "Utils/Filter.h"
 #include "Hal/Time.hpp"
 
-#include <Complementary.hpp>
+
 
 
 #include <algorithm>
@@ -19,6 +19,7 @@ Altitude(Model& model):
     _model(model),
     _heightInitialized(false),
     _filteredBaroValid(false),
+    _filtersInitialized(false),
     _estimatorTimeValid(false),
     _baroTimeValid(false),
     _acceptedBaroTimeValid(false),
@@ -46,6 +47,9 @@ Altitude(Model& model):
     altitude.healthy =
         false;
 
+    altitude.lastUpdateUs =
+    0;
+
     altitude.baroAccepted =
         false;
 
@@ -58,6 +62,8 @@ Altitude(Model& model):
     false;
 
 _baroTimeValid =
+    false;
+_filtersInitialized =
     false;
 
 _acceptedBaroTimeValid =
@@ -83,48 +89,55 @@ _lastEstimatorUpdateUs =
     return 1;
   }
 
-  int reload(ModelChangeEvent event)
+int reload(ModelChangeEvent event)
+{
+  if (event != MODEL_CHANGE_FILTER)
   {
-    if (event != MODEL_CHANGE_FILTER)
-    {
-      return 1;
-    }
-
-    const int accelRate =
-        std::max<int>(
-            _model.state.accel.timer.rate,
-            1);
-
-    const int baroRate =
-        std::max<int>(
-            _model.state.baro.rate,
-            1);
-
-    // IMPORTANT:
-    // These filters consume BAROMETER samples,
-    // therefore their rate must be the barometer rate,
-    // not the IMU rate.
-    _altitudeFilter.begin(
-        FilterConfig(
-            FILTER_PT3,
-            5),
-        baroRate);
-
-    _varioFilter.begin(
-        FilterConfig(
-            FILTER_PT3,
-            5),
-        baroRate);
-
-    _varioFusion.begin(
-        accelRate,
-        _model.config.altHold.baroTau *
-            0.1f);
-
     return 1;
   }
 
-  int update()
+  const int baroRate =
+      std::max<int>(
+          _model.state.baro.rate,
+          1);
+
+  const FilterConfig altitudeFilterConfig(
+      FILTER_PT3,
+      5);
+
+  // begin() clears filter history, so only use it
+  // for the first initialization.
+  if (!_filtersInitialized)
+  {
+    _altitudeFilter.begin(
+        altitudeFilterConfig,
+        baroRate);
+
+    _varioFilter.begin(
+        altitudeFilterConfig,
+        baroRate);
+
+    _filtersInitialized =
+        true;
+  }
+  else
+  {
+    // Reconfigure coefficients without destroying the
+    // existing estimator history.
+    _altitudeFilter.reconfigure(
+        altitudeFilterConfig,
+        baroRate);
+
+    _varioFilter.reconfigure(
+        altitudeFilterConfig,
+        baroRate);
+  }
+
+  return 1;
+}
+
+int update(
+    bool fusionValid = true)
   {
     Utils::Stats::Measure measure(
         _model.state.stats,
@@ -622,11 +635,12 @@ private:
   Utils::Filter _altitudeFilter;
   Utils::Filter _varioFilter;
 
-  Complementary _varioFusion;
+
 
   // Estimator state
-  bool _heightInitialized;
-  bool _filteredBaroValid;
+bool _heightInitialized;
+bool _filteredBaroValid;
+bool _filtersInitialized;
 
   // Timestamp validity flags.
   // These avoid treating micros()==0 as "invalid"
