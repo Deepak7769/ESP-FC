@@ -3120,6 +3120,209 @@ void test_failsafe_startup_requires_sustained_rx_recovery()
       model.state.failsafe.phase);
 }
 
+void test_failsafe_default_procedure_is_drop()
+{
+  ModelConfig config;
+
+  TEST_ASSERT_EQUAL_UINT8(
+      FAILSAFE_PROCEDURE_DROP,
+      config.failsafe.procedure);
+}
+
+void test_failsafe_auto_land_request_is_recorded_but_disarms()
+{
+  ArduinoFakeReset();
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          2000000);
+
+  Model model;
+
+  TelemetryManager telemetry(
+      model);
+
+  Input input(
+      model,
+      telemetry);
+
+  model.config.failsafe.procedure =
+      FAILSAFE_PROCEDURE_AUTO_LAND;
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.height =
+      3.25f;
+
+  model.state.altitude.vario =
+      -0.15f;
+
+  // Simulate an already armed aircraft.
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  input.failsafeStage2();
+
+  // AUTO-LAND was correctly recognized.
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingRequested);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowEstimatorHealthy);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowEligible);
+
+  TEST_ASSERT_EQUAL_UINT32(
+      2000000,
+      model.state.failsafe
+          .landingRequestedUs);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      3.25f,
+      model.state.failsafe
+          .landingEntryHeight);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      -0.15f,
+      model.state.failsafe
+          .landingEntryVario);
+
+  // Critical regression:
+  // the unfinished LAND controller must not leave the
+  // aircraft armed.
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_LANDED,
+      model.state.failsafe.phase);
+}
+
+void test_failsafe_auto_land_shadow_rejects_bad_estimator()
+{
+  ArduinoFakeReset();
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          3000000);
+
+  Model model;
+
+  TelemetryManager telemetry(
+      model);
+
+  Input input(
+      model,
+      telemetry);
+
+  model.config.failsafe.procedure =
+      FAILSAFE_PROCEDURE_AUTO_LAND;
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.altitude.healthy =
+      false;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  input.failsafeStage2();
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingRequested);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingShadowEstimatorHealthy);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingShadowEligible);
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ARMED));
+}
+
+void test_failsafe_drop_does_not_request_land()
+{
+  Model model;
+
+  TelemetryManager telemetry(
+      model);
+
+  Input input(
+      model,
+      telemetry);
+
+  model.config.failsafe.procedure =
+      FAILSAFE_PROCEDURE_DROP;
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  input.failsafeStage2();
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingRequested);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingShadowEligible);
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_LANDED,
+      model.state.failsafe.phase);
+}
+
+void test_failsafe_invalid_procedure_sanitizes_to_drop()
+{
+  Model model;
+
+  model.config.failsafe.procedure =
+      255;
+
+  model.sanitize();
+
+  TEST_ASSERT_EQUAL_UINT8(
+      FAILSAFE_PROCEDURE_DROP,
+      model.config.failsafe.procedure);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -3199,12 +3402,29 @@ RUN_TEST(
   RUN_TEST(test_rates_kiss);
   RUN_TEST(test_rates_kiss_expo);
   RUN_TEST(test_actuator_arming_gyro_motor_calbration);
-  RUN_TEST(
+RUN_TEST(
     test_failsafe_startup_without_rx_does_not_enter_stage2);
 
 RUN_TEST(
     test_failsafe_startup_requires_sustained_rx_recovery);
-  RUN_TEST(test_actuator_arming_failsafe);
+
+RUN_TEST(
+    test_failsafe_default_procedure_is_drop);
+
+RUN_TEST(
+    test_failsafe_auto_land_request_is_recorded_but_disarms);
+
+RUN_TEST(
+    test_failsafe_auto_land_shadow_rejects_bad_estimator);
+
+RUN_TEST(
+    test_failsafe_drop_does_not_request_land);
+
+RUN_TEST(
+    test_failsafe_invalid_procedure_sanitizes_to_drop);
+
+RUN_TEST(
+    test_actuator_arming_failsafe);
   RUN_TEST(test_actuator_arming_throttle);
   RUN_TEST(test_mixer_throttle_limit_none);
   RUN_TEST(test_mixer_throttle_limit_scale);
