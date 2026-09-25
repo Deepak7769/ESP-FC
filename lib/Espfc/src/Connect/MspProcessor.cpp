@@ -1090,14 +1090,14 @@ case MSP_SET_FAILSAFE_CONFIG:
 
   m.readU16(); // failsafe_throttle_low_delay
 
-// Read the standard MSP procedure field, but do not allow
-// Configurator to enable the unfinished operational LAND
-// path.
-m.readU8();
+const uint8_t procedure =
+    m.readU8();
 
 _model.config.failsafe.procedure =
-    FAILSAFE_PROCEDURE_DROP;
-
+    procedure <
+            FAILSAFE_PROCEDURE_COUNT
+        ? procedure
+        : FAILSAFE_PROCEDURE_DROP;
   break;
 }
 
