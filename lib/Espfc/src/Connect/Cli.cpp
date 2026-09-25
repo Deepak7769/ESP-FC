@@ -399,12 +399,12 @@ const Cli::Param* Cli::initialize(ModelConfig& c)
   static const char* ledTypeChoices[] = { "SIMPLE", "STRIP", nullptr };
   static const char* simplifiedTunigModeChoices[] = { "OFF", "RP", "RPY", nullptr };
   static const char* tpaModeChoices[] = { "PD", "D", nullptr };
-    static const char*
-      failsafeProcedureChoices[] = {
-          "AUTO-LAND",
-          "DROP",
-          nullptr
-      };
+ static const char*
+failsafeProcedureChoices[] = {
+    "AUTO-LAND-SHADOW",
+    "DROP",
+    nullptr
+};
 
   size_t i = 0;
   static const Param params[] = {
