@@ -1,6 +1,8 @@
 #include "Control/Actuator.h"
 #include "Control/Controller.h"
 #include "Control/Altitude.hpp"
+#include "Input.h"
+#include "TelemetryManager.h"
 #include <Complementary.hpp>
 #include "Control/Fusion.h"
 #include "Sensor/BaroSensor.hpp"
@@ -2986,6 +2988,125 @@ void test_angle_fault_transition_rate_is_finite_and_bounded()
           rateBeforeFault));
 }
 
+void test_failsafe_startup_without_rx_does_not_enter_stage2()
+{
+  ArduinoFakeReset();
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          5000000);
+
+  Model model;
+
+  TelemetryManager telemetry(
+      model);
+
+  Input input(
+      model,
+      telemetry);
+
+  model.state.failsafe.phase =
+      FC_FAILSAFE_IDLE;
+
+  model.state.failsafe.rxEverValid =
+      false;
+
+  model.state.input.rxLoss =
+      true;
+
+  model.state.input.channelsValid =
+      false;
+
+  const bool blocked =
+      input.failsafe(
+          INPUT_IDLE);
+
+  TEST_ASSERT_TRUE(
+      blocked);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe.rxEverValid);
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_IDLE,
+      model.state.failsafe.phase);
+
+  TEST_ASSERT_TRUE(
+      model.state.input.rxLoss);
+
+  TEST_ASSERT_FALSE(
+      model.state.input.rxFailSafe);
+}
+
+void test_failsafe_startup_requires_sustained_rx_recovery()
+{
+  ArduinoFakeReset();
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .Return(
+          1000000,
+          1200000,
+          1500001);
+
+  Model model;
+
+  TelemetryManager telemetry(
+      model);
+
+  Input input(
+      model,
+      telemetry);
+
+  model.state.failsafe.phase =
+      FC_FAILSAFE_IDLE;
+
+  model.state.failsafe.rxEverValid =
+      false;
+
+  model.state.input.channelsValid =
+      true;
+
+  model.state.input.rxLoss =
+      true;
+
+  // First good frame: qualification begins.
+  TEST_ASSERT_TRUE(
+      input.failsafe(
+          INPUT_RECEIVED));
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe.rxEverValid);
+
+  // Still only 200 ms healthy.
+  TEST_ASSERT_TRUE(
+      input.failsafe(
+          INPUT_RECEIVED));
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe.rxEverValid);
+
+  // More than 500 ms continuously healthy.
+  TEST_ASSERT_FALSE(
+      input.failsafe(
+          INPUT_RECEIVED));
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe.rxEverValid);
+
+  TEST_ASSERT_FALSE(
+      model.state.input.rxLoss);
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_IDLE,
+      model.state.failsafe.phase);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -3065,6 +3186,11 @@ RUN_TEST(
   RUN_TEST(test_rates_kiss);
   RUN_TEST(test_rates_kiss_expo);
   RUN_TEST(test_actuator_arming_gyro_motor_calbration);
+  RUN_TEST(
+    test_failsafe_startup_without_rx_does_not_enter_stage2);
+
+RUN_TEST(
+    test_failsafe_startup_requires_sustained_rx_recovery);
   RUN_TEST(test_actuator_arming_failsafe);
   RUN_TEST(test_actuator_arming_throttle);
   RUN_TEST(test_mixer_throttle_limit_none);
