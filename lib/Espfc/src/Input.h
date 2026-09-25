@@ -65,8 +65,22 @@ private:
   Device::InputEspNow _espnow;
 #endif
 
-  static constexpr uint32_t TENTH_TO_US = 100000UL;        // 1_000_000 / 10;
-  static constexpr uint32_t FRAME_TIME_DEFAULT_US = 23000; // 23 ms
+ static constexpr uint32_t TENTH_TO_US =
+    100000UL;
+
+// Require 500 ms of continuously healthy receiver data
+// before declaring the receiver recovered/ready.
+static constexpr uint32_t RX_RECOVERY_US =
+    500000UL;
+
+// A gap of 200 ms breaks receiver qualification.
+// This matches the beginning of the existing Stage-1
+// receiver-loss window.
+static constexpr uint32_t RX_RECOVERY_GAP_US =
+    2UL * TENTH_TO_US;
+
+static constexpr uint32_t FRAME_TIME_DEFAULT_US =
+    23000;
 };
 
 } // namespace Espfc
