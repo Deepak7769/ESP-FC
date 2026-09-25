@@ -503,8 +503,11 @@ void Actuator::updateFailsafeLandShadow()
     failsafe.landingShadowDescentRequested =
         failsafe.landingShadowActive;
 
-    failsafe.landingShadowFault =
-        !failsafe.landingShadowEligible;
+  if (!failsafe.landingShadowEligible)
+{
+  failsafe.landingShadowFault =
+      true;
+}
 
     failsafe.landingShadowLastUpdateUs =
         micros();
