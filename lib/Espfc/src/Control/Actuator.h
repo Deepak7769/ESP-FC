@@ -20,6 +20,7 @@ private:
   void updateScaler();
   void updateArmingDisabled();
   void updateModeMask();
+  void updateFailsafeLandShadow();
   bool canActivateMode(FlightMode mode);
   bool attitudeEstimateHealthy() const;
   bool altitudeEstimateHealthy() const;
