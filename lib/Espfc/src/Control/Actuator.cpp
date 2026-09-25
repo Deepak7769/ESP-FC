@@ -3,6 +3,7 @@
 #include "Utils/Math.hpp"
 
 #include <algorithm>
+
 #include <cmath>
 
 namespace Espfc::Control {
