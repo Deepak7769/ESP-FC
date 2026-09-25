@@ -8,6 +8,7 @@
 
 namespace Espfc {
 
+
 Input::Input(Model& model, TelemetryManager& telemetry): _model(model), _telemetry(telemetry) {}
 
 int Input::begin()
