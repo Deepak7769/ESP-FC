@@ -55,6 +55,9 @@ int Actuator::update()
   updateArmingDisabled();
   updateModeMask();
   updateArmed();
+
+  updateFailsafeLandShadow();
+
   updateAirMode();
   updateScaler();
   updateBuzzer();
@@ -433,6 +436,122 @@ bool Actuator::altitudeEstimateHealthy() const
       std::isfinite(
           altitude.vario);
 }
+
+void Actuator::updateFailsafeLandShadow()
+{
+  auto& failsafe =
+      _model.state.failsafe;
+
+  // LAND shadow never owns actuator output.
+  failsafe.landingShadowOutputBlocked =
+      true;
+
+  // -----------------------------------------------------
+  // NO LAND REQUEST
+  // -----------------------------------------------------
+
+  if (!failsafe.landingRequested)
+  {
+    failsafe.landingShadowEstimatorHealthy =
+        false;
+
+    failsafe.landingShadowEligible =
+        false;
+
+    failsafe.landingShadowActive =
+        false;
+
+    failsafe.landingShadowLevelRequested =
+        false;
+
+    failsafe.landingShadowDescentRequested =
+        false;
+
+    failsafe.landingShadowFault =
+        false;
+
+    failsafe.landingShadowLastUpdateUs =
+        0;
+  }
+  else
+  {
+    // ---------------------------------------------------
+    // CONTINUOUS ESTIMATOR VALIDATION
+    //
+    // Reuse exactly the same estimator-health function
+    // that guards normal AltHold activation.
+    // ---------------------------------------------------
+
+    const bool estimatorHealthy =
+        altitudeEstimateHealthy();
+
+    failsafe.landingShadowEstimatorHealthy =
+        estimatorHealthy;
+
+    failsafe.landingShadowEligible =
+        failsafe.rxEverValid &&
+        estimatorHealthy;
+
+    failsafe.landingShadowActive =
+        failsafe.landingShadowEligible;
+
+    // These remain requests only.
+    failsafe.landingShadowLevelRequested =
+        failsafe.landingShadowActive;
+
+    failsafe.landingShadowDescentRequested =
+        failsafe.landingShadowActive;
+
+    failsafe.landingShadowFault =
+        !failsafe.landingShadowEligible;
+
+    failsafe.landingShadowLastUpdateUs =
+        micros();
+  }
+
+  // -----------------------------------------------------
+  // FAILSAFE DEBUG
+  // -----------------------------------------------------
+
+  if (_model.config.debug.mode ==
+      DEBUG_FAILSAFE)
+  {
+    _model.state.debug[0] =
+        static_cast<int16_t>(
+            failsafe.phase);
+
+    _model.state.debug[1] =
+        static_cast<int16_t>(
+            _model.config.failsafe.procedure);
+
+    _model.state.debug[2] =
+        failsafe.rxEverValid ? 1 : 0;
+
+    _model.state.debug[3] =
+        failsafe.landingRequested ? 1 : 0;
+
+    _model.state.debug[4] =
+        failsafe.landingShadowEstimatorHealthy
+            ? 1
+            : 0;
+
+    _model.state.debug[5] =
+        failsafe.landingShadowEligible
+            ? 1
+            : 0;
+
+    _model.state.debug[6] =
+        failsafe.landingShadowActive
+            ? 1
+            : 0;
+
+    _model.state.debug[7] =
+        failsafe.landingShadowOutputBlocked
+            ? 1
+            : 0;
+  }
+}
+
 bool Actuator::canActivateMode(
     FlightMode mode)
 {
@@ -469,8 +588,55 @@ void Actuator::updateArmed()
     bool armed = _model.isModeActive(MODE_ARMED);
     if (armed)
     {
-      _model.state.mode.disarmReason = DISARM_REASON_SYSTEM;
-      _model.state.mode.rescueConfigMode = RESCUE_CONFIG_DISABLED;
+      _model.state.mode.disarmReason =
+          DISARM_REASON_SYSTEM;
+
+      _model.state.mode.rescueConfigMode =
+          RESCUE_CONFIG_DISABLED;
+
+      // -------------------------------------------------
+      // A deliberate new arm starts a completely new
+      // failsafe/LAND lifecycle.
+      // -------------------------------------------------
+
+      auto& failsafe =
+          _model.state.failsafe;
+
+      failsafe.landingRequested =
+          false;
+
+      failsafe.landingShadowEstimatorHealthy =
+          false;
+
+      failsafe.landingShadowEligible =
+          false;
+
+      failsafe.landingShadowActive =
+          false;
+
+      failsafe.landingShadowLevelRequested =
+          false;
+
+      failsafe.landingShadowDescentRequested =
+          false;
+
+      failsafe.landingShadowFault =
+          false;
+
+      failsafe.landingShadowOutputBlocked =
+          true;
+
+      failsafe.landingRequestedUs =
+          0;
+
+      failsafe.landingShadowLastUpdateUs =
+          0;
+
+      failsafe.landingEntryHeight =
+          0.0f;
+
+      failsafe.landingEntryVario =
+          0.0f;
     }
     else if (!armed && _model.state.mode.disarmReason == DISARM_REASON_SYSTEM)
     {
