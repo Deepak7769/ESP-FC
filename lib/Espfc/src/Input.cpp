@@ -22,7 +22,37 @@ int Input::begin()
   _model.state.input.frameDelta = FRAME_TIME_DEFAULT_US;
   _model.state.input.frameRate = 1000000ul / _model.state.input.frameDelta;
   _model.state.input.frameCount = 0;
+  // -----------------------------------------------------
+  // RECEIVER STARTUP STATE
+  //
+  // At boot the receiver has not yet been qualified.
+  // This blocks arming but must NOT start Stage-2
+  // failsafe or LAND.
+  // -----------------------------------------------------
 
+  _model.state.failsafe.phase =
+      FC_FAILSAFE_IDLE;
+
+  _model.state.failsafe.timeout =
+      0;
+
+  _model.state.failsafe.rxEverValid =
+      false;
+
+  _model.state.failsafe.recoveryActive =
+      false;
+
+  _model.state.failsafe.recoveryStartedUs =
+      0;
+
+  _model.state.input.rxLoss =
+      true;
+
+  _model.state.input.rxFailSafe =
+      false;
+
+  _model.state.input.lossTime =
+      0;
   reload(MODEL_CHANGE_INPUT);
 
   for (size_t c = 0; c < INPUT_CHANNELS; ++c)
@@ -312,66 +342,294 @@ else
   }
 }
 
-bool FAST_CODE_ATTR Input::failsafe(InputStatus status)
+bool FAST_CODE_ATTR Input::failsafe(
+    InputStatus status)
 {
-  Utils::Stats::Measure measure(_model.state.stats, COUNTER_FAILSAFE);
+  Utils::Stats::Measure measure(
+      _model.state.stats,
+      COUNTER_FAILSAFE);
 
-  if (_model.isSwitchActive(MODE_FAILSAFE))
+  auto& failsafe =
+      _model.state.failsafe;
+
+  auto& input =
+      _model.state.input;
+
+  const uint32_t now =
+      micros();
+
+  const bool validFrame =
+      status == INPUT_RECEIVED &&
+      input.channelsValid;
+
+  // =====================================================
+  // VALID RECEIVER FRAME
+  // =====================================================
+
+  if (validFrame)
   {
-    failsafeStage2();
-    return false; // not real failsafe, rx link is still valid
+    // Start/restart receiver qualification.
+    if (!failsafe.recoveryActive)
+    {
+      failsafe.recoveryActive =
+          true;
+
+      failsafe.recoveryStartedUs =
+          now;
+    }
+
+    const uint32_t healthyForUs =
+        static_cast<uint32_t>(
+            now -
+            failsafe.recoveryStartedUs);
+
+    // ---------------------------------------------------
+    // STARTUP:
+    // receiver has never previously been qualified.
+    // ---------------------------------------------------
+
+    if (!failsafe.rxEverValid)
+    {
+      // Keep arming blocked until RX has remained healthy
+      // for the complete qualification period.
+      input.rxLoss =
+          true;
+
+      input.rxFailSafe =
+          false;
+
+      input.lossTime =
+          0;
+
+      if (healthyForUs <
+          RX_RECOVERY_US)
+      {
+        return true;
+      }
+
+      // Receiver has now been continuously healthy long
+      // enough to become authoritative.
+      failsafe.rxEverValid =
+          true;
+
+      failsafe.recoveryActive =
+          false;
+
+      input.rxLoss =
+          false;
+
+      input.rxFailSafe =
+          false;
+
+      failsafeIdle();
+
+      return false;
+    }
+
+    // ---------------------------------------------------
+    // RECOVERY AFTER A REAL FAILSAFE
+    // ---------------------------------------------------
+
+    if (failsafe.phase !=
+            FC_FAILSAFE_IDLE ||
+        input.rxLoss ||
+        input.rxFailSafe)
+    {
+      failsafe.phase =
+          FC_FAILSAFE_RX_LOSS_MONITORING;
+
+      // Do not hand control back to the receiver yet.
+      input.rxLoss =
+          true;
+
+      input.rxFailSafe =
+          false;
+
+      if (healthyForUs <
+          RX_RECOVERY_US)
+      {
+        return true;
+      }
+
+      failsafe.recoveryActive =
+          false;
+
+      failsafe.phase =
+          FC_FAILSAFE_RX_LOSS_RECOVERED;
+
+      input.rxLoss =
+          false;
+
+      input.rxFailSafe =
+          false;
+
+      // For now recovery returns to the normal receiver
+      // state. Later LAND will add its own recovery policy.
+      failsafeIdle();
+
+      return false;
+    }
+
+    // Receiver was already healthy and remains healthy.
+    failsafe.recoveryActive =
+        false;
+
+    input.rxLoss =
+        false;
+
+    input.rxFailSafe =
+        false;
+
+    input.lossTime =
+        0;
+
+    return false;
   }
 
-if (status == INPUT_RECEIVED)
-{
-  if (!_model.state.input.channelsValid)
+  // =====================================================
+  // RECEIVER QUALIFICATION INTERRUPTION
+  // =====================================================
+
+  if (status == INPUT_RECEIVED &&
+      !input.channelsValid)
   {
-    _model.state.input.lossTime =
-        micros() -
-        _model.state.input.frameTime;
+    failsafe.recoveryActive =
+        false;
+  }
 
-    const uint32_t stage2Timeout =
-        std::clamp<uint32_t>(
-            _model.config.failsafe.delay,
-            2u,
-            200u) *
-        TENTH_TO_US;
+  if (status == INPUT_LOST ||
+      status == INPUT_FAILSAFE)
+  {
+    failsafe.recoveryActive =
+        false;
+  }
 
-    if (_model.state.input.lossTime >
-        stage2Timeout)
+  // =====================================================
+  // STARTUP WITH NO QUALIFIED RECEIVER
+  //
+  // This is the case:
+  //
+  //   drone ON
+  //   transmitter OFF
+  //
+  // Keep motors/arming blocked, but DO NOT call Stage 1
+  // or Stage 2. There has been no in-flight RX loss
+  // because RX was never acquired in the first place.
+  // =====================================================
+
+  if (!failsafe.rxEverValid)
+  {
+    input.rxLoss =
+        true;
+
+    input.rxFailSafe =
+        status == INPUT_FAILSAFE;
+
+    input.lossTime =
+        0;
+
+    failsafe.phase =
+        FC_FAILSAFE_IDLE;
+
+    // One isolated receiver frame must not count toward
+    // recovery forever. If no new valid frame has arrived
+    // within the Stage-1 window, restart qualification.
+    if (failsafe.recoveryActive)
     {
-      failsafeStage2();
-    }
-    else
-    {
-      failsafeStage1();
+      const uint32_t frameAgeUs =
+          static_cast<uint32_t>(
+              now -
+              input.frameTime);
+
+      if (frameAgeUs >=
+          RX_RECOVERY_GAP_US)
+      {
+        failsafe.recoveryActive =
+            false;
+      }
     }
 
     return true;
   }
 
-  failsafeIdle();
-  return false;
-}
+  // =====================================================
+  // MANUALLY REQUESTED FAILSAFE MODE
+  // =====================================================
+
+  if (_model.isSwitchActive(
+          MODE_FAILSAFE))
+  {
+    failsafe.recoveryActive =
+        false;
+
+    failsafeStage2();
+
+    // Preserve the original BOXFAILSAFE behavior:
+    // receiver itself is still present.
+    return false;
+  }
+
+  // =====================================================
+  // RECEIVER-REPORTED FAILSAFE
+  // =====================================================
 
   if (status == INPUT_FAILSAFE)
   {
+    failsafe.recoveryActive =
+        false;
+
     failsafeStage2();
+
     return true;
   }
 
-  // stage 2 timeout
-  _model.state.input.lossTime = micros() - _model.state.input.frameTime;
-  if (_model.state.input.lossTime > std::clamp<uint32_t>(_model.config.failsafe.delay, 2u, 200u) * TENTH_TO_US)
+  // =====================================================
+  // NORMAL RX LOSS TIMEOUTS
+  // =====================================================
+
+  input.lossTime =
+      static_cast<uint32_t>(
+          now -
+          input.frameTime);
+
+  const uint32_t stage2Timeout =
+      std::clamp<uint32_t>(
+          _model.config.failsafe.delay,
+          2u,
+          200u) *
+      TENTH_TO_US;
+
+  // Stage 2
+  if (input.lossTime >
+      stage2Timeout)
   {
+    failsafe.recoveryActive =
+        false;
+
     failsafeStage2();
+
     return true;
   }
 
-  // stage 1 timeout (100ms)
-  if (_model.state.input.lossTime >= 2 * TENTH_TO_US)
+  // Stage 1
+  if (input.lossTime >=
+      RX_RECOVERY_GAP_US)
   {
+    failsafe.recoveryActive =
+        false;
+
     failsafeStage1();
+
+    return true;
+  }
+
+  // If we are currently qualifying recovery after an
+  // actual failsafe, keep pilot input blocked between
+  // individual receiver frames.
+  if (failsafe.recoveryActive &&
+      failsafe.phase ==
+          FC_FAILSAFE_RX_LOSS_MONITORING)
+  {
     return true;
   }
 
@@ -386,8 +644,14 @@ void FAST_CODE_ATTR Input::failsafeIdle()
 
 void FAST_CODE_ATTR Input::failsafeStage1()
 {
-  _model.state.failsafe.phase = FC_FAILSAFE_RX_LOSS_DETECTED;
-  _model.state.input.rxLoss = true;
+  _model.state.failsafe.recoveryActive =
+      false;
+
+  _model.state.failsafe.phase =
+      FC_FAILSAFE_RX_LOSS_DETECTED;
+
+  _model.state.input.rxLoss =
+      true;
   for (size_t i = 0; i < _model.state.input.channelCount; i++)
   {
     setInput((Axis)i, getFailsafeValue(i), true, true);
@@ -396,7 +660,11 @@ void FAST_CODE_ATTR Input::failsafeStage1()
 
 void FAST_CODE_ATTR Input::failsafeStage2()
 {
-  _model.state.failsafe.phase = FC_FAILSAFE_RX_LOSS_DETECTED;
+  _model.state.failsafe.recoveryActive =
+      false;
+
+  _model.state.failsafe.phase =
+      FC_FAILSAFE_RX_LOSS_DETECTED;
   _model.state.input.rxLoss = true;
   _model.state.input.rxFailSafe = true;
   if (_model.isModeActive(MODE_ARMED))
