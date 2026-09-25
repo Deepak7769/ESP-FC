@@ -3180,13 +3180,17 @@ void test_failsafe_auto_land_request_is_recorded_but_disarms()
       model.state.failsafe
           .landingRequested);
 
-  TEST_ASSERT_TRUE(
-      model.state.failsafe
-          .landingShadowEstimatorHealthy);
+TEST_ASSERT_FALSE(
+    model.state.failsafe
+        .landingShadowEstimatorHealthy);
 
-  TEST_ASSERT_TRUE(
-      model.state.failsafe
-          .landingShadowEligible);
+TEST_ASSERT_FALSE(
+    model.state.failsafe
+        .landingShadowEligible);
+
+TEST_ASSERT_TRUE(
+    model.state.failsafe
+        .landingShadowOutputBlocked);
 
   TEST_ASSERT_EQUAL_UINT32(
       2000000,
@@ -3221,12 +3225,15 @@ void test_failsafe_auto_land_shadow_rejects_bad_estimator()
 {
   ArduinoFakeReset();
 
+  constexpr uint32_t NOW_US =
+      3000000;
+
   When(
       Method(
           ArduinoFake(),
           micros))
       .AlwaysReturn(
-          3000000);
+          NOW_US);
 
   Model model;
 
@@ -3237,14 +3244,27 @@ void test_failsafe_auto_land_shadow_rejects_bad_estimator()
       model,
       telemetry);
 
+  Actuator actuator(
+      model);
+
   model.config.failsafe.procedure =
       FAILSAFE_PROCEDURE_AUTO_LAND;
 
   model.state.failsafe.rxEverValid =
       true;
 
+  // Build an otherwise valid assisted-mode estimator
+  // environment first.
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  // Then deliberately invalidate only altitude.
   model.state.altitude.healthy =
       false;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
 
   model.updateModes(
       uint32_t{1} <<
@@ -3252,9 +3272,14 @@ void test_failsafe_auto_land_shadow_rejects_bad_estimator()
 
   input.failsafeStage2();
 
+  // Input only records the LAND request.
   TEST_ASSERT_TRUE(
       model.state.failsafe
           .landingRequested);
+
+  // Actuator performs the actual continuous
+  // estimator-health evaluation.
+  actuator.updateFailsafeLandShadow();
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
@@ -3264,6 +3289,27 @@ void test_failsafe_auto_land_shadow_rejects_bad_estimator()
       model.state.failsafe
           .landingShadowEligible);
 
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingShadowActive);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingShadowLevelRequested);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingShadowDescentRequested);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowFault);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowOutputBlocked);
+
+  // Current dry-run fallback still disarms.
   TEST_ASSERT_FALSE(
       model.isModeActive(
           MODE_ARMED));
@@ -3323,6 +3369,256 @@ void test_failsafe_invalid_procedure_sanitizes_to_drop()
       model.config.failsafe.procedure);
 }
 
+void test_failsafe_land_shadow_healthy_is_non_actuating()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      4000000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  model.state.altitude.height =
+      2.0f;
+
+  model.state.altitude.vario =
+      -0.1f;
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.failsafe.landingRequested =
+      true;
+
+  constexpr float OUTPUT_THRUST =
+      0.37f;
+
+  constexpr float SETPOINT_THRUST =
+      0.42f;
+
+  model.state.output.ch[
+      AXIS_THRUST] =
+      OUTPUT_THRUST;
+
+  model.state.setpoint.rate[
+      AXIS_THRUST] =
+      SETPOINT_THRUST;
+
+  Actuator actuator(
+      model);
+
+  actuator.updateFailsafeLandShadow();
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowEstimatorHealthy);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowEligible);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowActive);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowLevelRequested);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowDescentRequested);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingShadowFault);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowOutputBlocked);
+
+  // LAND shadow must not change actual thrust.
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      OUTPUT_THRUST,
+      model.state.output.ch[
+          AXIS_THRUST]);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      SETPOINT_THRUST,
+      model.state.setpoint.rate[
+          AXIS_THRUST]);
+}
+
+void test_box_failsafe_with_valid_rx_still_runs_stage2()
+{
+  ArduinoFakeReset();
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          5000000);
+
+  Model model;
+
+  TelemetryManager telemetry(
+      model);
+
+  Input input(
+      model,
+      telemetry);
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.input.channelsValid =
+      true;
+
+  model.updateSwitchActive(
+      uint32_t{1} <<
+      MODE_FAILSAFE);
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  const bool realRxFailure =
+      input.failsafe(
+          INPUT_RECEIVED);
+
+  // BOXFAILSAFE is manually requested;
+  // physical RX itself is still valid.
+  TEST_ASSERT_FALSE(
+      realRxFailure);
+
+  // But Stage 2 must still execute.
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_LANDED,
+      model.state.failsafe.phase);
+}
+
+void test_new_arm_clears_previous_land_latch()
+{
+  Model model;
+
+  Actuator actuator(
+      model);
+
+  model.state.failsafe.landingRequested =
+      true;
+
+  model.state.failsafe.landingShadowActive =
+      true;
+
+  model.state.failsafe.landingShadowEligible =
+      true;
+
+  model.state.failsafe.landingShadowFault =
+      true;
+
+  model.state.failsafe.landingRequestedUs =
+      123456;
+
+  model.state.failsafe.landingShadowLastUpdateUs =
+      123500;
+
+  model.state.failsafe.landingEntryHeight =
+      4.0f;
+
+  model.state.failsafe.landingEntryVario =
+      -0.4f;
+
+  // Initial state is disarmed.
+  // This creates a real DISARMED -> ARMED transition.
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  actuator.updateArmed();
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingRequested);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingShadowEstimatorHealthy);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingShadowEligible);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingShadowActive);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingShadowLevelRequested);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingShadowDescentRequested);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingShadowFault);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowOutputBlocked);
+
+  TEST_ASSERT_EQUAL_UINT32(
+      0,
+      model.state.failsafe
+          .landingRequestedUs);
+
+  TEST_ASSERT_EQUAL_UINT32(
+      0,
+      model.state.failsafe
+          .landingShadowLastUpdateUs);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      0.0f,
+      model.state.failsafe
+          .landingEntryHeight);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      0.0f,
+      model.state.failsafe
+          .landingEntryVario);
+}
+ 
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -3422,6 +3718,15 @@ RUN_TEST(
 
 RUN_TEST(
     test_failsafe_invalid_procedure_sanitizes_to_drop);
+
+RUN_TEST(
+    test_failsafe_land_shadow_healthy_is_non_actuating);
+
+RUN_TEST(
+    test_box_failsafe_with_valid_rx_still_runs_stage2);
+
+RUN_TEST(
+    test_new_arm_clears_previous_land_latch);
 
 RUN_TEST(
     test_actuator_arming_failsafe);
