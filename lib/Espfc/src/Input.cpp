@@ -45,6 +45,24 @@ int Input::begin()
   _model.state.failsafe.recoveryStartedUs =
       0;
 
+    _model.state.failsafe.landingRequested =
+      false;
+
+  _model.state.failsafe.landingShadowEligible =
+      false;
+
+  _model.state.failsafe.landingShadowEstimatorHealthy =
+      false;
+
+  _model.state.failsafe.landingRequestedUs =
+      0;
+
+  _model.state.failsafe.landingEntryHeight =
+      0.0f;
+
+  _model.state.failsafe.landingEntryVario =
+      0.0f;
+
   _model.state.input.rxLoss =
       true;
 
@@ -660,18 +678,101 @@ void FAST_CODE_ATTR Input::failsafeStage1()
 
 void FAST_CODE_ATTR Input::failsafeStage2()
 {
-  _model.state.failsafe.recoveryActive =
+  auto& failsafe =
+      _model.state.failsafe;
+
+  auto& input =
+      _model.state.input;
+
+  failsafe.recoveryActive =
       false;
 
-  _model.state.failsafe.phase =
+  failsafe.phase =
       FC_FAILSAFE_RX_LOSS_DETECTED;
-  _model.state.input.rxLoss = true;
-  _model.state.input.rxFailSafe = true;
-  if (_model.isModeActive(MODE_ARMED))
+
+  input.rxLoss =
+      true;
+
+  input.rxFailSafe =
+      true;
+
+  // Nothing further is required when already disarmed.
+  if (!_model.isModeActive(
+          MODE_ARMED))
   {
-    _model.state.failsafe.phase = FC_FAILSAFE_LANDED;
-    _model.disarm(DISARM_REASON_FAILSAFE);
+    return;
   }
+
+  // =====================================================
+  // AUTO-LAND REQUEST
+  // =====================================================
+
+  if (_model.config.failsafe.procedure ==
+      FAILSAFE_PROCEDURE_AUTO_LAND)
+  {
+    failsafe.landingRequested =
+        true;
+
+    failsafe.landingRequestedUs =
+        micros();
+
+    // Altitude.healthy already contains the important
+    // estimator freshness/validity requirements.
+    failsafe.landingShadowEstimatorHealthy =
+        _model.state.altitude.healthy;
+
+    failsafe.landingShadowEligible =
+        failsafe.rxEverValid &&
+        failsafe.landingShadowEstimatorHealthy;
+
+    failsafe.landingEntryHeight =
+        _model.state.altitude.height;
+
+    failsafe.landingEntryVario =
+        _model.state.altitude.vario;
+
+    // Record that the requested Stage-2 procedure was LAND.
+    //
+    // The current vertical controller is still shadow-only,
+    // therefore this state must NOT be connected to motors.
+    failsafe.phase =
+        FC_FAILSAFE_LANDING;
+  }
+  else
+  {
+    // DROP selected.
+    failsafe.landingRequested =
+        false;
+
+    failsafe.landingShadowEligible =
+        false;
+
+    failsafe.landingShadowEstimatorHealthy =
+        false;
+
+    failsafe.landingRequestedUs =
+        0;
+
+    failsafe.landingEntryHeight =
+        0.0f;
+
+    failsafe.landingEntryVario =
+        0.0f;
+  }
+
+  // =====================================================
+  // CURRENT OPERATIONAL SAFETY FALLBACK
+  //
+  // Until the V2 vertical controller becomes actuating
+  // and has its own regression coverage, Stage 2 keeps
+  // the existing disarm behavior.
+  // =====================================================
+
+  failsafe.phase =
+      FC_FAILSAFE_LANDED;
+
+  _model.disarm(
+      DISARM_REASON_FAILSAFE);
 }
 
 void FAST_CODE_ATTR Input::filterInputs(InputStatus status)
