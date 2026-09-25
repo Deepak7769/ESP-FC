@@ -720,21 +720,36 @@ void FAST_CODE_ATTR Input::failsafeStage2()
   failsafe.recoveryActive =
       false;
 
-  failsafe.phase =
-      FC_FAILSAFE_RX_LOSS_DETECTED;
-
   input.rxLoss =
       true;
 
   input.rxFailSafe =
       true;
 
-  // Already disarmed: never generate a new LAND request.
+  // -----------------------------------------------------
+  // ALREADY DISARMED
+  //
+  // Once Stage 2 has completed and entered LANDED,
+  // repeated timeout/failsafe processing must not move
+  // the state machine backwards.
+  // -----------------------------------------------------
+
   if (!_model.isModeActive(
           MODE_ARMED))
   {
+    if (failsafe.phase !=
+        FC_FAILSAFE_LANDED)
+    {
+      failsafe.phase =
+          FC_FAILSAFE_RX_LOSS_DETECTED;
+    }
+
     return;
   }
+
+  // Stage 2 is beginning from an armed state.
+  failsafe.phase =
+      FC_FAILSAFE_RX_LOSS_DETECTED;
 
   // =====================================================
   // AUTO-LAND REQUEST
