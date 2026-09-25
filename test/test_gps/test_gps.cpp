@@ -8,7 +8,10 @@
 
 static constexpr float toRad(float deg)
 {
-  return deg * (float)M_PI / 180.0f;
+  return
+      deg *
+      Gps::PI_F /
+      180.0f;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,7 +63,11 @@ void test_bearing_wraps_360()
 {
   // West is 270°, not -90°
   const auto [distance, bearing] = Gps::calculateDistanceAndBearing(0, 0, 0, -5000000);
-  TEST_ASSERT_TRUE(bearing >= 0.0f && bearing <= 2.0f * M_PI);
+TEST_ASSERT_TRUE(
+    bearing >= 0.0f &&
+    bearing <=
+        2.0f *
+        Gps::PI_F);
 }
 
 // Date line crossing tests
