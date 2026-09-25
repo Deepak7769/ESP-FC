@@ -124,9 +124,24 @@ enum FailsafePhase {
 
 class FailsafeState
 {
-  public:
-    FailsafePhase phase;
-    uint32_t timeout;
+public:
+  FailsafePhase phase{
+      FC_FAILSAFE_IDLE};
+
+  uint32_t timeout{0};
+
+  // True only after the FC has received a continuously
+  // healthy receiver signal for the qualification period.
+  //
+  // Important:
+  // "No RX since boot" is NOT the same thing as
+  // "RX was working and was then lost in flight".
+  bool rxEverValid{false};
+
+  // Receiver recovery qualification.
+  bool recoveryActive{false};
+
+  uint32_t recoveryStartedUs{0};
 };
 
 constexpr float ACCEL_G = 9.80665f;
