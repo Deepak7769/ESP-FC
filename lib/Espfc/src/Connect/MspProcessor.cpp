@@ -1073,17 +1073,34 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU16(1000);                             // failsafe_throttle
       r.writeU8(_model.config.failsafe.killSwitch); // failsafe_kill_switch
       r.writeU16(0);                                // failsafe_throttle_low_delay
-      r.writeU8(1);                                 // failsafe_procedure; default drop
+     r.writeU8(
+    _model.config.failsafe.procedure);
       break;
 
-    case MSP_SET_FAILSAFE_CONFIG:
-      _model.config.failsafe.delay = m.readU8();      // failsafe_delay
-      m.readU8();                                     // failsafe_off_delay
-      m.readU16();                                    // failsafe_throttle
-      _model.config.failsafe.killSwitch = m.readU8(); // failsafe_kill_switch
-      m.readU16();                                    // failsafe_throttle_low_delay
-      m.readU8();                                     // failsafe_procedure
-      break;
+case MSP_SET_FAILSAFE_CONFIG:
+{
+  _model.config.failsafe.delay =
+      m.readU8();
+
+  m.readU8();  // failsafe_off_delay
+  m.readU16(); // failsafe_throttle
+
+  _model.config.failsafe.killSwitch =
+      m.readU8();
+
+  m.readU16(); // failsafe_throttle_low_delay
+
+  const uint8_t procedure =
+      m.readU8();
+
+  _model.config.failsafe.procedure =
+      procedure <
+              FAILSAFE_PROCEDURE_COUNT
+          ? procedure
+          : FAILSAFE_PROCEDURE_DROP;
+
+  break;
+}
 
     case MSP_RXFAIL_CONFIG:
       for (size_t i = 0; i < _model.state.input.channelCount; i++)
