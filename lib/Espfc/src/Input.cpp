@@ -63,6 +63,24 @@ int Input::begin()
   _model.state.failsafe.landingEntryVario =
       0.0f;
 
+    _model.state.failsafe.landingShadowActive =
+      false;
+
+  _model.state.failsafe.landingShadowLevelRequested =
+      false;
+
+  _model.state.failsafe.landingShadowDescentRequested =
+      false;
+
+  _model.state.failsafe.landingShadowFault =
+      false;
+
+  _model.state.failsafe.landingShadowOutputBlocked =
+      true;
+
+  _model.state.failsafe.landingShadowLastUpdateUs =
+      0;
+
   _model.state.input.rxLoss =
       true;
 
@@ -376,6 +394,28 @@ bool FAST_CODE_ATTR Input::failsafe(
   const uint32_t now =
       micros();
 
+    // =====================================================
+  // MANUALLY REQUESTED FAILSAFE / BOXFAILSAFE
+  //
+  // This check MUST happen before the valid-frame path.
+  // Otherwise INPUT_RECEIVED returns before BOXFAILSAFE
+  // is ever processed.
+  // =====================================================
+
+  if (_model.isSwitchActive(
+          MODE_FAILSAFE) &&
+      failsafe.rxEverValid)
+  {
+    failsafe.recoveryActive =
+        false;
+
+    failsafeStage2();
+
+    // This is a manually requested failsafe while the
+    // physical receiver link itself may still be valid.
+    return false;
+  }
+
   const bool validFrame =
       status == INPUT_RECEIVED &&
       input.channelsValid;
@@ -570,22 +610,6 @@ bool FAST_CODE_ATTR Input::failsafe(
     return true;
   }
 
-  // =====================================================
-  // MANUALLY REQUESTED FAILSAFE MODE
-  // =====================================================
-
-  if (_model.isSwitchActive(
-          MODE_FAILSAFE))
-  {
-    failsafe.recoveryActive =
-        false;
-
-    failsafeStage2();
-
-    // Preserve the original BOXFAILSAFE behavior:
-    // receiver itself is still present.
-    return false;
-  }
 
   // =====================================================
   // RECEIVER-REPORTED FAILSAFE
@@ -696,7 +720,7 @@ void FAST_CODE_ATTR Input::failsafeStage2()
   input.rxFailSafe =
       true;
 
-  // Nothing further is required when already disarmed.
+  // Already disarmed: never generate a new LAND request.
   if (!_model.isModeActive(
           MODE_ARMED))
   {
@@ -710,47 +734,88 @@ void FAST_CODE_ATTR Input::failsafeStage2()
   if (_model.config.failsafe.procedure ==
       FAILSAFE_PROCEDURE_AUTO_LAND)
   {
-    failsafe.landingRequested =
-        true;
+    // Edge-trigger the LAND request.
+    // Do not keep replacing the entry timestamp/altitude.
+    if (!failsafe.landingRequested)
+    {
+      failsafe.landingRequested =
+          true;
 
-    failsafe.landingRequestedUs =
-        micros();
+      failsafe.landingRequestedUs =
+          micros();
 
-    // Altitude.healthy already contains the important
-    // estimator freshness/validity requirements.
+      failsafe.landingEntryHeight =
+          _model.state.altitude.height;
+
+      failsafe.landingEntryVario =
+          _model.state.altitude.vario;
+    }
+
+    // Estimator eligibility is evaluated continuously by
+    // Actuator::updateFailsafeLandShadow().
+    //
+    // Do not make a one-shot decision here.
     failsafe.landingShadowEstimatorHealthy =
-        _model.state.altitude.healthy;
+        false;
 
     failsafe.landingShadowEligible =
-        failsafe.rxEverValid &&
-        failsafe.landingShadowEstimatorHealthy;
+        false;
 
-    failsafe.landingEntryHeight =
-        _model.state.altitude.height;
+    failsafe.landingShadowActive =
+        false;
 
-    failsafe.landingEntryVario =
-        _model.state.altitude.vario;
+    failsafe.landingShadowLevelRequested =
+        false;
 
-    // Record that the requested Stage-2 procedure was LAND.
-    //
-    // The current vertical controller is still shadow-only,
-    // therefore this state must NOT be connected to motors.
+    failsafe.landingShadowDescentRequested =
+        false;
+
+    failsafe.landingShadowFault =
+        false;
+
+    failsafe.landingShadowOutputBlocked =
+        true;
+
+    failsafe.landingShadowLastUpdateUs =
+        0;
+
     failsafe.phase =
         FC_FAILSAFE_LANDING;
   }
   else
   {
-    // DROP selected.
-    failsafe.landingRequested =
-        false;
+    // ===================================================
+    // DROP
+    // ===================================================
 
-    failsafe.landingShadowEligible =
+    failsafe.landingRequested =
         false;
 
     failsafe.landingShadowEstimatorHealthy =
         false;
 
+    failsafe.landingShadowEligible =
+        false;
+
+    failsafe.landingShadowActive =
+        false;
+
+    failsafe.landingShadowLevelRequested =
+        false;
+
+    failsafe.landingShadowDescentRequested =
+        false;
+
+    failsafe.landingShadowFault =
+        false;
+
+    failsafe.landingShadowOutputBlocked =
+        true;
+
     failsafe.landingRequestedUs =
+        0;
+
+    failsafe.landingShadowLastUpdateUs =
         0;
 
     failsafe.landingEntryHeight =
@@ -761,11 +826,11 @@ void FAST_CODE_ATTR Input::failsafeStage2()
   }
 
   // =====================================================
-  // CURRENT OPERATIONAL SAFETY FALLBACK
+  // CURRENT OPERATIONAL FALLBACK
   //
-  // Until the V2 vertical controller becomes actuating
-  // and has its own regression coverage, Stage 2 keeps
-  // the existing disarm behavior.
+  // LAND remains a dry-run feature until the V2 vertical
+  // controller has an independently validated actuator
+  // interface.
   // =====================================================
 
   failsafe.phase =
