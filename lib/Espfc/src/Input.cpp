@@ -549,20 +549,20 @@ bool FAST_CODE_ATTR Input::failsafe(
   // RECEIVER QUALIFICATION INTERRUPTION
   // =====================================================
 
-  if (status == INPUT_RECEIVED &&
-      !input.channelsValid)
-  {
-    failsafe.recoveryActive =
-        false;
-  }
+const bool recoveryInterrupted =
+    (status == INPUT_RECEIVED &&
+     !input.channelsValid) ||
+    status == INPUT_LOST ||
+    status == INPUT_FAILSAFE;
 
-  if (status == INPUT_LOST ||
-      status == INPUT_FAILSAFE)
-  {
-    failsafe.recoveryActive =
-        false;
-  }
-
+if (recoveryInterrupted)
+{
+  // Break the current continuous-healthy qualification
+  // window. The MONITORING phase remains active, so input
+  // stays blocked until a new full recovery period passes.
+  failsafe.recoveryActive =
+      false;
+}
   // =====================================================
   // STARTUP WITH NO QUALIFIED RECEIVER
   //
@@ -666,17 +666,25 @@ bool FAST_CODE_ATTR Input::failsafe(
     return true;
   }
 
-  // If we are currently qualifying recovery after an
-  // actual failsafe, keep pilot input blocked between
-  // individual receiver frames.
-  if (failsafe.recoveryActive &&
-      failsafe.phase ==
-          FC_FAILSAFE_RX_LOSS_MONITORING)
-  {
-    return true;
-  }
+// =====================================================
+// RECOVERY INPUT GATE
+//
+// FC_FAILSAFE_RX_LOSS_MONITORING means receiver control
+// has NOT yet been re-qualified.
+//
+// recoveryActive only tells us whether a continuous
+// healthy-frame timing window is currently accumulating.
+// An interrupted recovery deliberately clears that timer,
+// but must NOT hand pilot input back to the controller.
+// =====================================================
 
-  return false;
+if (failsafe.phase ==
+    FC_FAILSAFE_RX_LOSS_MONITORING)
+{
+  return true;
+}
+
+return false;
 }
 
 void FAST_CODE_ATTR Input::failsafeIdle()
