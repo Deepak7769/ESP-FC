@@ -153,7 +153,26 @@ public:
 
   bool landingShadowEstimatorHealthy{false};
 
+  // True while the dry-run LAND supervisor considers
+  // the request healthy enough to continue.
+  bool landingShadowActive{false};
+
+  // These are requests only. They do not modify
+  // Controller setpoints or motor outputs.
+  bool landingShadowLevelRequested{false};
+  bool landingShadowDescentRequested{false};
+
+  // Latches when LAND was requested but the required
+  // estimator state is not healthy.
+  bool landingShadowFault{false};
+
+  // Hard diagnostic interlock.
+  // LAND shadow must never own motor output.
+  bool landingShadowOutputBlocked{true};
+
   uint32_t landingRequestedUs{0};
+
+  uint32_t landingShadowLastUpdateUs{0};
 
   float landingEntryHeight{0.0f};
 
