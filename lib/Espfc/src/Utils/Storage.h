@@ -4,6 +4,7 @@ namespace Espfc {
 
 enum StorageResult
 {
+
   STORAGE_NONE,
   STORAGE_LOAD_SUCCESS,
   STORAGE_SAVE_SUCCESS,
