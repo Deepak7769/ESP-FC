@@ -399,6 +399,12 @@ const Cli::Param* Cli::initialize(ModelConfig& c)
   static const char* ledTypeChoices[] = { "SIMPLE", "STRIP", nullptr };
   static const char* simplifiedTunigModeChoices[] = { "OFF", "RP", "RPY", nullptr };
   static const char* tpaModeChoices[] = { "PD", "D", nullptr };
+    static const char*
+      failsafeProcedureChoices[] = {
+          "AUTO-LAND",
+          "DROP",
+          nullptr
+      };
 
   size_t i = 0;
   static const Param params[] = {
@@ -561,8 +567,18 @@ const Cli::Param* Cli::initialize(ModelConfig& c)
       Param("input_14", &c.input.channel[14]),
       Param("input_15", &c.input.channel[15]),
 
-      Param("failsafe_delay", &c.failsafe.delay),
-      Param("failsafe_kill_switch", &c.failsafe.killSwitch),
+Param(
+    "failsafe_delay",
+    &c.failsafe.delay),
+
+Param(
+    "failsafe_kill_switch",
+    &c.failsafe.killSwitch),
+
+Param(
+    "failsafe_procedure",
+    &c.failsafe.procedure,
+    failsafeProcedureChoices),
 
       Param("arming_small_angle", &c.arming.smallAngle),
 
