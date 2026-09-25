@@ -605,6 +605,16 @@ void setOutputSaturated(bool val)
 
     void sanitize()
     {
+            // -------------------------------------------------
+      // FAILSAFE CONFIG SANITIZATION
+      // -------------------------------------------------
+
+      if (config.failsafe.procedure >=
+          FAILSAFE_PROCEDURE_COUNT)
+      {
+        config.failsafe.procedure =
+            FAILSAFE_PROCEDURE_DROP;
+      }
       // for spi gyro allow full speed mode
       if (state.gyro.dev && state.gyro.dev->getBus()->isSPI())
       {
