@@ -546,10 +546,23 @@ struct WirelessConfig
   char pass[MAX_LEN + 1];
 };
 
+enum FailsafeProcedure : uint8_t
+{
+  // Keep Betaflight/MSP numeric compatibility.
+  FAILSAFE_PROCEDURE_AUTO_LAND = 0,
+  FAILSAFE_PROCEDURE_DROP = 1,
+
+  FAILSAFE_PROCEDURE_COUNT
+};
+
 struct FailsafeConfig
 {
   uint8_t delay = 4;
   uint8_t killSwitch = 0;
+
+  // DROP remains the safe/default operational procedure.
+  uint8_t procedure =
+      FAILSAFE_PROCEDURE_DROP;
 };
 
 struct BlackboxConfig
