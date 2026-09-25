@@ -1073,8 +1073,13 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU16(1000);                             // failsafe_throttle
       r.writeU8(_model.config.failsafe.killSwitch); // failsafe_kill_switch
       r.writeU16(0);                                // failsafe_throttle_low_delay
-     r.writeU8(
-    _model.config.failsafe.procedure);
+ // AUTO-LAND currently exists only as an internal
+// non-actuating diagnostic shadow.
+//
+// Standard MSP cannot represent "LAND-SHADOW", therefore
+// advertise the only currently operational procedure.
+r.writeU8(
+    FAILSAFE_PROCEDURE_DROP);
       break;
 
 case MSP_SET_FAILSAFE_CONFIG:
@@ -1090,14 +1095,13 @@ case MSP_SET_FAILSAFE_CONFIG:
 
   m.readU16(); // failsafe_throttle_low_delay
 
-  const uint8_t procedure =
-      m.readU8();
+// Read the standard MSP procedure field, but do not allow
+// Configurator to enable the unfinished operational LAND
+// path.
+m.readU8();
 
-  _model.config.failsafe.procedure =
-      procedure <
-              FAILSAFE_PROCEDURE_COUNT
-          ? procedure
-          : FAILSAFE_PROCEDURE_DROP;
+_model.config.failsafe.procedure =
+    FAILSAFE_PROCEDURE_DROP;
 
   break;
 }
