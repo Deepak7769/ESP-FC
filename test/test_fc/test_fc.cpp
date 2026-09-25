@@ -3046,14 +3046,27 @@ void test_failsafe_startup_requires_sustained_rx_recovery()
   ArduinoFakeReset();
 
   When(
-      Method(
-          ArduinoFake(),
-          micros))
-      .Return(
-          1000000,
-          1200000,
-          1500001);
+    Method(
+        ArduinoFake(),
+        micros))
+    .Return(
+        // First failsafe() call:
+        // Stats start, failsafe now, Stats end
+        1000000,
+        1000000,
+        1000000,
 
+        // Second failsafe() call:
+        // 200 ms after qualification started
+        1200000,
+        1200000,
+        1200000,
+
+        // Third failsafe() call:
+        // just over 500 ms after qualification started
+        1500001,
+        1500001,
+        1500001);
   Model model;
 
   TelemetryManager telemetry(
