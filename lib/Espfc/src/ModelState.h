@@ -130,18 +130,34 @@ public:
 
   uint32_t timeout{0};
 
-  // True only after the FC has received a continuously
-  // healthy receiver signal for the qualification period.
-  //
-  // Important:
-  // "No RX since boot" is NOT the same thing as
-  // "RX was working and was then lost in flight".
+  // -----------------------------------------------------
+  // RECEIVER ACQUISITION / RECOVERY
+  // -----------------------------------------------------
+
   bool rxEverValid{false};
 
-  // Receiver recovery qualification.
   bool recoveryActive{false};
 
   uint32_t recoveryStartedUs{0};
+
+  // -----------------------------------------------------
+  // FAILSAFE LAND SHADOW STATE
+  //
+  // These values describe what the LAND supervisor would
+  // have requested. They DO NOT command motor output.
+  // -----------------------------------------------------
+
+  bool landingRequested{false};
+
+  bool landingShadowEligible{false};
+
+  bool landingShadowEstimatorHealthy{false};
+
+  uint32_t landingRequestedUs{0};
+
+  float landingEntryHeight{0.0f};
+
+  float landingEntryVario{0.0f};
 };
 
 constexpr float ACCEL_G = 9.80665f;
