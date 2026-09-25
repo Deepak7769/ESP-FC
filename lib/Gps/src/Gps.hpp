@@ -6,7 +6,8 @@
 #include <tuple>
 
 namespace Gps {
-   
+   inline constexpr float PI_F =
+    3.14159265358979323846f;
 /**
  * Calculates the distance between two GPS coordinates using the equirectangular approximation.
  * valid for short distances < few km
@@ -30,11 +31,23 @@ inline std::tuple<float, float> calculateDistanceAndBearing(int32_t homeLat, int
   else if (dlon_raw < -LON_180) dlon_raw += LON_360;
   
   const float dlat = (curLat - homeLat) * LAT_TO_M;
-  const float dlon = (float)dlon_raw * LAT_TO_M * cosf(homeLat * 1e-7f * (float)M_PI / 180.0f);
+const float dlon =
+    static_cast<float>(dlon_raw) *
+    LAT_TO_M *
+    cosf(
+        homeLat *
+        1e-7f *
+        PI_F /
+        180.0f);
 
   const float distance = sqrtf(dlat * dlat + dlon * dlon);
   float bearing = atan2f(dlon, dlat);
-  if (bearing < 0.0f) bearing += 2.0f * (float)M_PI; // normalize to [0, 2PI]
+ if (bearing < 0.0f)
+{
+  bearing +=
+      2.0f *
+      PI_F;
+} // normalize to [0, 2PI]
 
   return std::make_tuple(distance, bearing);
 }
