@@ -3802,7 +3802,123 @@ void test_new_arm_clears_previous_land_latch()
       model.state.failsafe
           .landingEntryVario);
 }
- 
+
+void test_failsafe_repeated_stage2_preserves_landed_state()
+{
+  Model model;
+
+  TelemetryManager telemetry(
+      model);
+
+  Input input(
+      model,
+      telemetry);
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.config.failsafe.procedure =
+      FAILSAFE_PROCEDURE_DROP;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  // First Stage 2 completes failsafe and disarms.
+  input.failsafeStage2();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_LANDED,
+      model.state.failsafe.phase);
+
+  // Stage 2 can be called again by later timeout cycles.
+  input.failsafeStage2();
+
+  // Terminal state must remain terminal.
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_LANDED,
+      model.state.failsafe.phase);
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ARMED));
+}
+
+void test_failsafe_land_shadow_fault_latches()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      6000000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.failsafe.landingRequested =
+      true;
+
+  Actuator actuator(
+      model);
+
+  // First update: estimator fault.
+  model.state.altitude.healthy =
+      false;
+
+  actuator.updateFailsafeLandShadow();
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowFault);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingShadowEstimatorHealthy);
+
+  // Estimator later recovers.
+  model.state.altitude.healthy =
+      true;
+
+  actuator.updateFailsafeLandShadow();
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowEstimatorHealthy);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowEligible);
+
+  // Historical fault remains latched for this LAND
+  // lifecycle.
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowFault);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -3887,7 +4003,17 @@ RUN_TEST(
 
 RUN_TEST(
     test_failsafe_startup_requires_sustained_rx_recovery);
+RUN_TEST(
+    test_failsafe_recovery_interrupted_by_loss_stays_blocked);
 
+RUN_TEST(
+    test_failsafe_recovery_interrupted_by_invalid_frame_stays_blocked);
+
+RUN_TEST(
+    test_failsafe_repeated_stage2_preserves_landed_state);
+
+RUN_TEST(
+    test_failsafe_land_shadow_fault_latches);
 RUN_TEST(
     test_failsafe_default_procedure_is_drop);
 
