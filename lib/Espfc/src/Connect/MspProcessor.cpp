@@ -1073,13 +1073,8 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU16(1000);                             // failsafe_throttle
       r.writeU8(_model.config.failsafe.killSwitch); // failsafe_kill_switch
       r.writeU16(0);                                // failsafe_throttle_low_delay
- // AUTO-LAND currently exists only as an internal
-// non-actuating diagnostic shadow.
-//
-// Standard MSP cannot represent "LAND-SHADOW", therefore
-// advertise the only currently operational procedure.
 r.writeU8(
-    FAILSAFE_PROCEDURE_DROP);
+    _model.config.failsafe.procedure);
       break;
 
 case MSP_SET_FAILSAFE_CONFIG:
