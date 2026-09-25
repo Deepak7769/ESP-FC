@@ -3120,6 +3120,190 @@ void test_failsafe_startup_requires_sustained_rx_recovery()
       model.state.failsafe.phase);
 }
 
+void test_failsafe_recovery_interrupted_by_loss_stays_blocked()
+{
+  ArduinoFakeReset();
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .Return(
+          // Begin recovery.
+          1000000,
+          1000000,
+          1000000,
+
+          // INPUT_LOST only 20 ms later.
+          1020000,
+          1020000,
+          1020000,
+
+          // Following idle cycle.
+          1030000,
+          1030000,
+          1030000);
+
+  Model model;
+
+  TelemetryManager telemetry(
+      model);
+
+  Input input(
+      model,
+      telemetry);
+
+  // Receiver had been valid previously, then entered
+  // failsafe.
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.failsafe.phase =
+      FC_FAILSAFE_RX_LOSS_DETECTED;
+
+  model.state.input.rxLoss =
+      true;
+
+  model.state.input.rxFailSafe =
+      true;
+
+  model.state.input.channelsValid =
+      true;
+
+  model.state.input.frameTime =
+      1000000;
+
+  // First healthy frame starts the 500 ms recovery
+  // qualification window.
+  TEST_ASSERT_TRUE(
+      input.failsafe(
+          INPUT_RECEIVED));
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .recoveryActive);
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_RX_LOSS_MONITORING,
+      model.state.failsafe.phase);
+
+  // Link is interrupted only 20 ms later.
+  //
+  // Recovery timer must reset, but input must remain
+  // blocked.
+  TEST_ASSERT_TRUE(
+      input.failsafe(
+          INPUT_LOST));
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .recoveryActive);
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_RX_LOSS_MONITORING,
+      model.state.failsafe.phase);
+
+  // Even the following idle cycle is still blocked.
+  TEST_ASSERT_TRUE(
+      input.failsafe(
+          INPUT_IDLE));
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_RX_LOSS_MONITORING,
+      model.state.failsafe.phase);
+}
+
+void test_failsafe_recovery_interrupted_by_invalid_frame_stays_blocked()
+{
+  ArduinoFakeReset();
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .Return(
+          // Begin recovery.
+          2000000,
+          2000000,
+          2000000,
+
+          // Invalid receiver frame 20 ms later.
+          2020000,
+          2020000,
+          2020000,
+
+          // Following idle cycle.
+          2030000,
+          2030000,
+          2030000);
+
+  Model model;
+
+  TelemetryManager telemetry(
+      model);
+
+  Input input(
+      model,
+      telemetry);
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.failsafe.phase =
+      FC_FAILSAFE_RX_LOSS_DETECTED;
+
+  model.state.input.rxLoss =
+      true;
+
+  model.state.input.rxFailSafe =
+      true;
+
+  model.state.input.channelsValid =
+      true;
+
+  model.state.input.frameTime =
+      2000000;
+
+  // Begin post-failsafe recovery.
+  TEST_ASSERT_TRUE(
+      input.failsafe(
+          INPUT_RECEIVED));
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .recoveryActive);
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_RX_LOSS_MONITORING,
+      model.state.failsafe.phase);
+
+  // Next receiver frame exists, but its channels are
+  // invalid.
+  model.state.input.channelsValid =
+      false;
+
+  TEST_ASSERT_TRUE(
+      input.failsafe(
+          INPUT_RECEIVED));
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .recoveryActive);
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_RX_LOSS_MONITORING,
+      model.state.failsafe.phase);
+
+  // Still blocked on the next cycle.
+  TEST_ASSERT_TRUE(
+      input.failsafe(
+          INPUT_IDLE));
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_RX_LOSS_MONITORING,
+      model.state.failsafe.phase);
+}
+
 void test_failsafe_default_procedure_is_drop()
 {
   ModelConfig config;
