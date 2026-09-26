@@ -140,55 +140,61 @@ if (_model.state.actuatorTimer.check())
       _model.state.loopTimer.syncTo(
           _model.state.gyro.timer);
 
+  // Receiver supervision must not depend on a successful gyro transaction.
+  // Otherwise a gyro-bus fault can also stop RX-loss qualification/failsafe
+  // from advancing and leave the last actuator command resident longer than
+  // intended. Keep RX handling on its own scheduler cadence.
+  if (_model.state.input.timer.syncTo(
+          _model.state.gyro.timer,
+          1u))
+  {
+    const bool wasArmedBeforeInput =
+        _model.isModeActive(
+            MODE_ARMED);
+
+    _input.update();
+
+    if (wasArmedBeforeInput &&
+        !_model.isModeActive(
+            MODE_ARMED))
+    {
+      _mixer.writeDisarmed();
+    }
+  }
+
   // Advance the loop divider even on a failed gyro transaction, but never run
-  // the controller from a stale sample. This mirrors the guarded multicore
-  // path and prevents a transient bus error from being interpreted as a new
-  // zero-order-held gyro measurement.
+  // the controller from a stale sample.
   if (gyroSampleValid &&
       controlDue)
   {
     _controller.update();
-    if (_model.state.mixer.timer.syncTo(_model.state.loopTimer))
+
+    if (_model.state.mixer.timer.syncTo(
+            _model.state.loopTimer))
     {
       _mixer.update();
     }
+
     _blackbox.update();
-    if (_model.state.input.timer.syncTo(_model.state.gyro.timer, 1u))
-    {
-      // Input::failsafeStage2() may disarm directly.  Flush the disarmed
-      // command immediately instead of waiting for the next mixer tick.
-      const bool wasArmedBeforeInput =
-          _model.isModeActive(
-              MODE_ARMED);
+  }
 
-      _input.update();
-
-      if (wasArmedBeforeInput &&
-          !_model.isModeActive(
-              MODE_ARMED))
-      {
-        _mixer.writeDisarmed();
-      }
-    }
-if (_model.state.actuatorTimer.check())
-{
-  const bool wasArmed =
-      _model.isModeActive(
-          MODE_ARMED);
-
-  _actuator.update();
-
-  const bool isArmed =
-      _model.isModeActive(
-          MODE_ARMED);
-
-  if (wasArmed &&
-      !isArmed)
+  // Arming/failsafe supervision is likewise independent of the PID sample.
+  if (_model.state.actuatorTimer.check())
   {
-    _mixer.writeDisarmed();
+    const bool wasArmed =
+        _model.isModeActive(
+            MODE_ARMED);
+
+    _actuator.update();
+
+    if (wasArmed &&
+        !_model.isModeActive(
+            MODE_ARMED))
+    {
+      _mixer.writeDisarmed();
+    }
   }
-}
-  }
+
   _sensor.updateDelayed();
 
 #endif
