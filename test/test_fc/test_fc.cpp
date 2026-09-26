@@ -528,6 +528,166 @@ model.state.attitude.euler.set(
       shadow.rollAngleTarget <= 0.30f);
 }
 
+#if defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
+
+void test_controller_angle_v2_active_path_is_bumpless_and_negative_feedback()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      1000000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  model.state.gyro.clock =
+      1000;
+
+  model.config.gyro.dlpf =
+      GYRO_DLPF_256;
+
+  model.config.loopSync =
+      1;
+
+  model.config.mixerSync =
+      1;
+
+  model.config.mixer.type =
+      FC_MIXER_QUADX;
+
+  model.config.level.angleLimit =
+      30;
+
+  model.config.level.rateLimit =
+      200;
+
+  model.config.pid[
+      FC_PID_LEVEL] =
+      {
+          .P = 45u,
+          .I = 0u,
+          .D = 0u,
+          .F = 0
+      };
+
+  model.begin();
+
+  Controller controller(
+      model);
+
+  controller.begin();
+
+  // Valid estimator state.
+  model.state.attitude.healthy =
+      true;
+
+  model.state.attitude.lastUpdateUs =
+      NOW_US;
+
+  // Begin already tilted:
+  // positive Roll and negative Pitch.
+  model.state.attitude.euler[
+      AXIS_ROLL] =
+      Utils::toRad(
+          10.0f);
+
+  model.state.attitude.euler[
+      AXIS_PITCH] =
+      Utils::toRad(
+          -8.0f);
+
+  // Centered sticks request level attitude.
+  model.state.input.ch[
+      AXIS_ROLL] =
+      0.0f;
+
+  model.state.input.ch[
+      AXIS_PITCH] =
+      0.0f;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ANGLE);
+
+  controller.update();
+
+  const auto& v2 =
+      model.state.assistedShadow;
+
+  TEST_ASSERT_TRUE(
+      v2.angleActive);
+
+  // Positive measured Roll must request a negative
+  // Roll rate.
+  TEST_ASSERT_TRUE(
+      v2.rollRateTarget <
+      0.0f);
+
+  // Negative measured Pitch must request a positive
+  // Pitch rate.
+  TEST_ASSERT_TRUE(
+      v2.pitchRateTarget >
+      0.0f);
+
+  // In this dedicated validation build, V2 must be
+  // the authoritative Roll/Pitch rate target.
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      v2.rollRateTarget,
+      model.state.setpoint.rate[
+          AXIS_ROLL]);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      v2.pitchRateTarget,
+      model.state.setpoint.rate[
+          AXIS_PITCH]);
+
+  const float rateLimit =
+      Utils::toRad(
+          static_cast<float>(
+              model.config.level.rateLimit));
+
+  TEST_ASSERT_TRUE(
+      std::fabs(
+          model.state.setpoint.rate[
+              AXIS_ROLL]) <=
+      rateLimit +
+          0.0001f);
+
+  TEST_ASSERT_TRUE(
+      std::fabs(
+          model.state.setpoint.rate[
+              AXIS_PITCH]) <=
+      rateLimit +
+          0.0001f);
+
+  // Bumpless entry:
+  //
+  // V2 captured the current attitude before beginning
+  // to slew toward level, therefore the first command
+  // must be much smaller than the old instantaneous
+  // 10-degree LEVEL-P correction.
+  const float oldLegacyEquivalent =
+      4.5f *
+      Utils::toRad(
+          10.0f);
+
+  TEST_ASSERT_TRUE(
+      std::fabs(
+          model.state.setpoint.rate[
+              AXIS_ROLL]) <
+      std::fabs(
+          oldLegacyEquivalent));
+}
+
+#endif
 
 void test_controller_shadow_althold_captures_current_altitude()
 {
