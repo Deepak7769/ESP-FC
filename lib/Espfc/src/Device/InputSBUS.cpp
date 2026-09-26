@@ -1,4 +1,5 @@
 #include "InputSBUS.h"
+#include "Hal/Time.hpp"
 #include <algorithm>
 #include "Utils/MemoryHelper.h"
 
@@ -11,6 +12,12 @@ InputSBUS::InputSBUS(): _serial(nullptr), _state(SBUS_START), _idx(0), _new_data
 int InputSBUS::begin(Stream::ReadWritable* serial)
 {
   _serial = serial;
+  _state = SBUS_START;
+  _idx = 0;
+  _new_data = false;
+  _lastByteUs = 0;
+  _timingValid = false;
+
   for(size_t i = 0; i < SBUS_FRAME_SIZE; i++)
   {
     _data[i] = 0;
@@ -84,7 +91,28 @@ bool InputSBUS::needAverage() const { return false; }
 
 void FAST_CODE_ATTR InputSBUS::parse(int d)
 {
-  char c = (char)(d & 0xff);
+  constexpr uint32_t SBUS_INTERBYTE_TIMEOUT_US =
+      600;
+
+  const uint32_t now =
+      micros();
+
+  if (_timingValid &&
+      static_cast<uint32_t>(
+          now - _lastByteUs) >
+          SBUS_INTERBYTE_TIMEOUT_US)
+  {
+    _state = SBUS_START;
+    _idx = 0;
+  }
+
+  _lastByteUs = now;
+  _timingValid = true;
+
+  const uint8_t c =
+      static_cast<uint8_t>(
+          d & 0xff);
+
   switch(_state)
   {
     case SBUS_START:

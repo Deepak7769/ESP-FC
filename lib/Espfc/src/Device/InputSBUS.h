@@ -71,6 +71,8 @@ class InputSBUS: public InputDevice
     SbusState _state;
     uint8_t _idx = 0;
     bool _new_data;
+    uint32_t _lastByteUs = 0;
+    bool _timingValid = false;
 
     uint8_t _data[SBUS_FRAME_SIZE];
     uint16_t _channels[CHANNELS];

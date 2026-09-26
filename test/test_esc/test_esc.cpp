@@ -240,6 +240,51 @@ void test_esc_extract_telemetry_dshot300_idle()
   TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.0f, rpm);
 }
 
+void test_esc_protocol_sanitize_rejects_invalid_values()
+{
+  TEST_ASSERT_EQUAL_INT(
+      ESC_PROTOCOL_DISABLED,
+      ESC_PROTOCOL_SANITIZE(-1));
+
+  TEST_ASSERT_EQUAL_INT(
+      ESC_PROTOCOL_DISABLED,
+      ESC_PROTOCOL_SANITIZE(
+          ESC_PROTOCOL_COUNT));
+
+  TEST_ASSERT_EQUAL_INT(
+      ESC_PROTOCOL_DSHOT600,
+      ESC_PROTOCOL_SANITIZE(
+          ESC_PROTOCOL_PROSHOT));
+}
+
+void test_esc_invalid_pole_count_is_safe()
+{
+  TEST_ASSERT_EQUAL_FLOAT(
+      0.0f,
+      EscDriverBase::getErpmToHzRatio(0));
+
+  TEST_ASSERT_EQUAL_FLOAT(
+      0.0f,
+      EscDriverBase::getErpmToHzRatio(-2));
+
+  TEST_ASSERT_EQUAL_STRING(
+      "?",
+      EscDriverBase::getProtocolName(
+          static_cast<EscProtocol>(-1)));
+}
+
+void test_esc_telemetry_zero_bit_length_is_safe()
+{
+  uint32_t sample = 0xffffffffu;
+
+  TEST_ASSERT_EQUAL_UINT32(
+      0u,
+      EscDriverBase::extractTelemetryGcr(
+          &sample,
+          1,
+          0));
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -255,6 +300,9 @@ int main(int argc, char** argv)
   RUN_TEST(test_esc_extract_telemetry_dshot300_sample);
   RUN_TEST(test_esc_extract_telemetry_dshot300_running);
   RUN_TEST(test_esc_extract_telemetry_dshot300_idle);
+  RUN_TEST(test_esc_protocol_sanitize_rejects_invalid_values);
+  RUN_TEST(test_esc_invalid_pole_count_is_safe);
+  RUN_TEST(test_esc_telemetry_zero_bit_length_is_safe);
 
   return UNITY_END();
 }

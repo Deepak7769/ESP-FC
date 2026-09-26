@@ -13,7 +13,12 @@ const char * const * EscDriverBase::getProtocolNames()
 
 const char * const EscDriverBase::getProtocolName(EscProtocol protocol)
 {
-  if(protocol >= ESC_PROTOCOL_COUNT) return "?";
+  if (protocol < ESC_PROTOCOL_PWM ||
+      protocol >= ESC_PROTOCOL_COUNT)
+  {
+    return "?";
+  }
+
   return getProtocolNames()[protocol];
 }
 
@@ -45,6 +50,11 @@ uint16_t IRAM_ATTR EscDriverBase::dshotEncode(uint16_t value, bool inverted)
 
 uint32_t IRAM_ATTR EscDriverBase::durationToBitLen(uint32_t duration, uint32_t len)
 {
+  if (len == 0)
+  {
+    return 0;
+  }
+
   return (duration + (len >> 1)) / len;
 }
 
@@ -66,6 +76,13 @@ uint32_t IRAM_ATTR EscDriverBase::pushBits(uint32_t value, uint32_t bitVal, size
  */
 uint32_t IRAM_ATTR EscDriverBase::extractTelemetryGcr(uint32_t* data, size_t len, uint32_t bitLen)
 {
+  if (!data ||
+      len == 0 ||
+      bitLen == 0)
+  {
+    return 0;
+  }
+
   int bitCount = 0;
   uint32_t value = 0;
   for(size_t i = 0; i < len; i++)
@@ -102,7 +119,15 @@ uint32_t IRAM_ATTR EscDriverBase::extractTelemetryGcr(uint32_t* data, size_t len
 
 float IRAM_ATTR EscDriverBase::getErpmToHzRatio(int poles)
 {
-  return ERPM_PER_LSB / SECONDS_PER_MINUTE / (poles / 2.0f);
+  if (poles < 2)
+  {
+    return 0.0f;
+  }
+
+  return
+      ERPM_PER_LSB /
+      SECONDS_PER_MINUTE /
+      (poles / 2.0f);
 }
 
 uint32_t IRAM_ATTR EscDriverBase::convertToErpm(uint32_t value)

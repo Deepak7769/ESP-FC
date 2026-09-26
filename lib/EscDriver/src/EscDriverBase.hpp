@@ -27,7 +27,12 @@ struct EscConfig
 };
 
 #define PWM_TO_DSHOT(v) (((v - 1000) * 2) + 47)
-#define ESC_PROTOCOL_SANITIZE(p) (p > ESC_PROTOCOL_DSHOT600 && p != ESC_PROTOCOL_DISABLED ? ESC_PROTOCOL_DSHOT600 : p)
+#define ESC_PROTOCOL_SANITIZE(p) \
+  (((p) < ESC_PROTOCOL_PWM || (p) >= ESC_PROTOCOL_COUNT) \
+       ? ESC_PROTOCOL_DISABLED \
+       : ((p) > ESC_PROTOCOL_DSHOT600 && (p) != ESC_PROTOCOL_DISABLED \
+              ? ESC_PROTOCOL_DSHOT600 \
+              : (p)))
 
 class EscDriverBase
 {
