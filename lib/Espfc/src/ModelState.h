@@ -174,6 +174,13 @@ public:
 
   uint32_t landingShadowLastUpdateUs{0};
 
+  // LAND V2 touchdown confirmation. A low vertical-speed
+  // observation must persist for a dwell interval before
+  // the controller is allowed to declare LANDED.
+  bool landingTouchdownCandidate{false};
+
+  uint32_t landingTouchdownStartedUs{0};
+
   float landingEntryHeight{0.0f};
 
   float landingEntryVario{0.0f};
