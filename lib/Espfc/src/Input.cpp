@@ -1,5 +1,6 @@
 
 #include "Input.h"
+#include "Control/AssistedModeV2.h"
 #include "Hal/Time.hpp"
 #include "ModelConfig.h"
 #include "Utils/Filter.h"
@@ -500,15 +501,15 @@ bool FAST_CODE_ATTR Input::failsafe(
         input.rxLoss ||
         input.rxFailSafe)
     {
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+#if defined(ESPFC_LAND_V2_ACTIVE)
       // -------------------------------------------------
       // RX RECOVERY DURING ACTIVE LAND
       //
-      // Keep LAND authoritative until the receiver has
-      // remained continuously healthy for the normal
-      // qualification interval. Then cancel LAND and hand
-      // control back deliberately instead of switching on
-      // the first recovered packet.
+      // A failsafe LAND is terminal for the current armed flight. We still
+      // qualify the recovered receiver for diagnostics, but we do not hand
+      // throttle authority back in mid-descent. This avoids a discontinuity
+      // with stateful/accumulated transmitter throttle. LAND stays in control
+      // through touchdown and disarm; the pilot can re-arm afterward.
       // -------------------------------------------------
       if (failsafe.phase ==
               FC_FAILSAFE_LANDING &&
@@ -526,63 +527,15 @@ bool FAST_CODE_ATTR Input::failsafe(
           return true;
         }
 
-        failsafe.recoveryActive =
-            false;
-
-        failsafe.phase =
-            FC_FAILSAFE_RX_LOSS_RECOVERED;
-
+        // Receiver is continuously healthy again, but pilot input remains
+        // gated while LAND owns the current flight.
         input.rxLoss =
             false;
 
         input.rxFailSafe =
             false;
 
-        failsafe.landingRequested =
-            false;
-
-        failsafe.landingShadowEstimatorHealthy =
-            false;
-
-        failsafe.landingShadowEligible =
-            false;
-
-        failsafe.landingShadowActive =
-            false;
-
-        failsafe.landingShadowLevelRequested =
-            false;
-
-        failsafe.landingShadowDescentRequested =
-            false;
-
-        failsafe.landingShadowFault =
-            false;
-
-        failsafe.landingShadowOutputBlocked =
-            true;
-
-        failsafe.landingShadowLastUpdateUs =
-            0;
-
-        failsafe.landingTouchdownCandidate =
-            false;
-
-        failsafe.landingTouchdownStartedUs =
-            0;
-
-        failsafe.landingRequestedUs =
-            0;
-
-        failsafe.landingEntryHeight =
-            0.0f;
-
-        failsafe.landingEntryVario =
-            0.0f;
-
-        failsafeIdle();
-
-        return false;
+        return true;
       }
 #endif
 
@@ -774,7 +727,7 @@ if (failsafe.phase ==
   return true;
 }
 
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+#if defined(ESPFC_LAND_V2_ACTIVE)
 if (failsafe.phase ==
         FC_FAILSAFE_LANDING &&
     failsafe.landingRequested)
@@ -956,14 +909,13 @@ void FAST_CODE_ATTR Input::failsafeStage2()
         0.0f;
   }
 
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+#if defined(ESPFC_LAND_V2_ACTIVE)
   if (_model.config.failsafe.procedure ==
       FAILSAFE_PROCEDURE_AUTO_LAND)
   {
-    // The dedicated validation build keeps the aircraft
-    // logically armed so Controller/Actuator can exercise
-    // the LAND path. ESPFC_SAFE_BENCH_BUILD guarantees
-    // that no physical motor driver is attached.
+    // Active Assisted V2 keeps the aircraft logically armed so the LAND
+    // controller can own attitude and vertical thrust until touchdown. In a
+    // safe-bench build Mixer.cpp still prevents physical ESC attachment.
     return;
   }
 #endif
