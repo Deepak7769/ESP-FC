@@ -73,7 +73,11 @@ EscDriverEsp32::EscDriverEsp32() : _protocol(ESC_PROTOCOL_PWM), _async(true), _r
 {
   for (size_t i = 0; i < ESC_CHANNEL_COUNT; i++)
   {
-    _channel[i].pin = gpio_num_t(-1);
+    _channel[i].pin =
+        gpio_num_t(-1);
+
+    _channel[i].telemetryValue =
+        INVALID_TELEMETRY_VALUE;
   }
 }
 
@@ -334,6 +338,12 @@ void IRAM_ATTR EscDriverEsp32::readTelemetry()
     if(!_channel[i].attached()) continue;
 
     rmt_channel_t rx_ch = (rmt_channel_t)RMT_ENCODE_RX_CHANNEL(i);
+
+    // Telemetry is a sampled measurement, not a persistent command/state.
+    // Mark it invalid for this cycle before looking for a newly received
+    // response so a lost packet cannot masquerade as fresh RPM forever.
+    _channel[i].telemetryValue =
+        INVALID_TELEMETRY_VALUE;
 
     RingbufHandle_t rb = NULL;
     if(ESP_OK != rmt_get_ringbuf_handle((rmt_channel_t)rx_ch, &rb)) continue;

@@ -437,6 +437,15 @@ void FAST_CODE_ATTR Mixer::readTelemetry()
     if (value == EscDriver::INVALID_TELEMETRY_VALUE)
     {
       _model.state.output.telemetry.errorsSum[i]++;
+
+      // Do not leave the last valid speed latched indefinitely after telemetry
+      // disappears. The frequency PT1 below will decay this loss smoothly.
+      _model.state.output.telemetry.erpm[i] =
+          0;
+
+      _model.state.output.telemetry.rpm[i] =
+          0;
+
       continue;
     }
 
