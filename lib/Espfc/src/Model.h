@@ -836,11 +836,77 @@ for (size_t i = 0; i < 3; i++)
           1998);
 }
 
+// Keep persisted actuator pulse settings inside the same broad validity window
+// used by mature RC/motor stacks. Invalid stored/MSP values must not expand
+// into out-of-range PWM commands or invert the available throttle range.
+config.output.minCommand =
+    std::clamp<int16_t>(
+        config.output.minCommand,
+        750,
+        2250);
+
+config.output.maxThrottle =
+    std::clamp<int16_t>(
+        config.output.maxThrottle,
+        750,
+        2250);
+
+if (config.output.minCommand >=
+    config.output.maxThrottle)
+{
+  config.output.minCommand =
+      1000;
+
+  config.output.maxThrottle =
+      2000;
+}
+
+config.output.motorIdle =
+    std::clamp<int16_t>(
+        config.output.motorIdle,
+        0,
+        2000);
+
+const int32_t maxMotorIdle =
+    std::max<int32_t>(
+        0,
+        static_cast<int32_t>(
+            config.output.maxThrottle -
+            config.output.minCommand) *
+            10);
+
+config.output.motorIdle =
+    static_cast<int16_t>(
+        std::min<int32_t>(
+            config.output.motorIdle,
+            maxMotorIdle));
+
+if (config.output.servoRate != 0)
+{
+  config.output.servoRate =
+      std::clamp<int16_t>(
+          config.output.servoRate,
+          50,
+          498);
+}
+
 for (size_t i = 0;
      i < OUTPUT_CHANNELS;
      i++)
 {
   auto& ch = config.output.channel[i];
+
+  ch.min =
+      std::clamp<int16_t>(
+          ch.min,
+          750,
+          2250);
+
+  ch.max =
+      std::clamp<int16_t>(
+          ch.max,
+          750,
+          2250);
 
   if (ch.min > ch.max)
   {

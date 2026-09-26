@@ -5951,6 +5951,27 @@ void test_model_sanitize_preserves_rc_safety_invariants()
   model.config.debug.mode =
       -1;
 
+  model.config.output.minCommand =
+      2200;
+
+  model.config.output.maxThrottle =
+      800;
+
+  model.config.output.motorIdle =
+      30000;
+
+  model.config.output.servoRate =
+      1;
+
+  model.config.output.channel[0].min =
+      -30000;
+
+  model.config.output.channel[0].max =
+      30000;
+
+  model.config.output.channel[0].neutral =
+      32000;
+
   model.sanitize();
 
   TEST_ASSERT_EQUAL_INT16(
@@ -5998,6 +6019,34 @@ void test_model_sanitize_preserves_rc_safety_invariants()
   TEST_ASSERT_EQUAL_INT(
       DEBUG_NONE,
       model.config.debug.mode);
+
+  TEST_ASSERT_EQUAL_INT16(
+      1000,
+      model.config.output.minCommand);
+
+  TEST_ASSERT_EQUAL_INT16(
+      2000,
+      model.config.output.maxThrottle);
+
+  TEST_ASSERT_TRUE(
+      model.config.output.motorIdle >= 0 &&
+      model.config.output.motorIdle <= 2000);
+
+  TEST_ASSERT_EQUAL_INT16(
+      50,
+      model.config.output.servoRate);
+
+  TEST_ASSERT_EQUAL_INT16(
+      750,
+      model.config.output.channel[0].min);
+
+  TEST_ASSERT_EQUAL_INT16(
+      2250,
+      model.config.output.channel[0].max);
+
+  TEST_ASSERT_EQUAL_INT16(
+      2250,
+      model.config.output.channel[0].neutral);
 }
 
 void test_fusion_mode_name_rejects_negative_enum()
