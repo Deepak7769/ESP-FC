@@ -46,12 +46,30 @@ InputStatus FAST_CODE_ATTR InputSBUS::update()
   if(_new_data)
   {
     _new_data = false;
-    if(_flags & SBUS_FLAG_FAILSAFE_ACTIVE) return INPUT_FAILSAFE;
-    if(_flags & SBUS_FLAG_SIGNAL_LOSS) return INPUT_LOST;
-    return INPUT_RECEIVED;
+    return classifyFlags(_flags);
   }
 
   return INPUT_IDLE;
+}
+
+InputStatus FAST_CODE_ATTR InputSBUS::classifyFlags(uint8_t flags)
+{
+  if (flags & SBUS_FLAG_FAILSAFE_ACTIVE)
+  {
+    return INPUT_FAILSAFE;
+  }
+
+  if (flags & SBUS_FLAG_SIGNAL_LOSS)
+  {
+    // SBUS "frame lost" means the receiver is repeating the last valid
+    // channels after a skipped RF frame. Betaflight treats this as a complete
+    // but dropped frame, and ArduPilot explicitly warns against treating one
+    // such indication as total link loss. Let ESP-FC's normal frame-age
+    // timeout decide when the link is actually lost.
+    return INPUT_DROPPED;
+  }
+
+  return INPUT_RECEIVED;
 }
 
 uint16_t FAST_CODE_ATTR InputSBUS::get(uint8_t i) const

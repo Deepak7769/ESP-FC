@@ -9,6 +9,10 @@ namespace Espfc {
 enum InputStatus {
   INPUT_IDLE,
   INPUT_RECEIVED,
+  // A complete receiver frame was present, but the protocol reports that one
+  // or more preceding RF frames were dropped. Keep the repeated frame briefly,
+  // but do not refresh receiver-health timing.
+  INPUT_DROPPED,
   INPUT_LOST,
   INPUT_FAILSAFE
 };

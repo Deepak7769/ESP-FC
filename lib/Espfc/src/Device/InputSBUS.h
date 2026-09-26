@@ -59,10 +59,13 @@ class InputSBUS: public InputDevice
     size_t getChannelCount() const override;
     bool needAverage() const override;
 
+#ifndef UNIT_TEST
   private:
+#endif
     void parse(int d);
     void apply();
     uint16_t convert(int v);
+    static InputStatus classifyFlags(uint8_t flags);
 
     static constexpr size_t SBUS_FRAME_SIZE = sizeof(SbusData);
     static constexpr size_t CHANNELS = 16;

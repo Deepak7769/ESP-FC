@@ -616,6 +616,7 @@ bool FAST_CODE_ATTR Input::failsafe(
 const bool recoveryInterrupted =
     (status == INPUT_RECEIVED &&
      !input.channelsValid) ||
+    status == INPUT_DROPPED ||
     status == INPUT_LOST ||
     status == INPUT_FAILSAFE;
 

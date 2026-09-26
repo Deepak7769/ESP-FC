@@ -1,5 +1,6 @@
 #include "Device/InputCRSF.h"
 #include "Device/InputIBUS.hpp"
+#include "Device/InputSBUS.h"
 #include "msp/msp_protocol.h"
 #include <ArduinoFake.h>
 #include <Gps.hpp>
@@ -697,6 +698,29 @@ void test_input_ibus_rc_valid()
   TEST_ASSERT_EQUAL_HEX16(0xA55A, copied[15]);
 }
 
+void test_input_sbus_frame_lost_is_dropped_not_total_loss()
+{
+  TEST_ASSERT_EQUAL(
+      INPUT_RECEIVED,
+      InputSBUS::classifyFlags(0));
+
+  TEST_ASSERT_EQUAL(
+      INPUT_DROPPED,
+      InputSBUS::classifyFlags(
+          SBUS_FLAG_SIGNAL_LOSS));
+
+  TEST_ASSERT_EQUAL(
+      INPUT_FAILSAFE,
+      InputSBUS::classifyFlags(
+          SBUS_FLAG_FAILSAFE_ACTIVE));
+
+  TEST_ASSERT_EQUAL(
+      INPUT_FAILSAFE,
+      InputSBUS::classifyFlags(
+          SBUS_FLAG_SIGNAL_LOSS |
+          SBUS_FLAG_FAILSAFE_ACTIVE));
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -714,6 +738,7 @@ int main(int argc, char** argv)
   RUN_TEST(test_crsf_decode_msp_v1);
   RUN_TEST(test_csrf_decode_msp_v1_fragmented);
   RUN_TEST(test_input_ibus_rc_valid);
+  RUN_TEST(test_input_sbus_frame_lost_is_dropped_not_total_loss);
 
   return UNITY_END();
 }
