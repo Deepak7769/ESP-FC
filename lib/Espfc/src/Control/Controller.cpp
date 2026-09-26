@@ -13,7 +13,23 @@ namespace {
 // non-actuating SIL/HIL verification.
 constexpr bool ENABLE_LEGACY_ALTHOLD_OUTPUT =
     false;
+// -----------------------------------------------------
+// ANGLE V2 ACTIVE VALIDATION
+//
+// Angle V2 may become the authoritative Roll/Pitch
+// setpoint generator only in a build where physical
+// actuator attachment is blocked.
+//
+// Mixer.cpp already implements ESPFC_SAFE_BENCH_BUILD
+// by not creating/attaching the motor ESC driver.
+// -----------------------------------------------------
 
+#if defined(ESPFC_ANGLE_V2_ACTIVE_TEST) && \
+    !defined(ESPFC_SAFE_BENCH_BUILD)
+
+#error "ESPFC_ANGLE_V2_ACTIVE_TEST requires ESPFC_SAFE_BENCH_BUILD"
+
+#endif
 } // namespace
 
 Controller::Controller(Model& model): _model(model), _rates{} {}
@@ -191,14 +207,79 @@ void Controller::innerLoopRobot()
 void FAST_CODE_ATTR Controller::outerLoop()
 {
   // Roll/Pitch rates control
-  if (_model.isModeActive(MODE_ANGLE))
+if (_model.isModeActive(MODE_ANGLE))
+{
+#if defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
+
+  // ---------------------------------------------------
+  // ANGLE V2 AUTHORITATIVE SETPOINT — BENCH/SIL/HIL ONLY
+  //
+  // updateAssistedModesShadow() runs before outerLoop()
+  // in Controller::update(), so these V2 targets have
+  // already been calculated for the current controller
+  // cycle.
+  //
+  // The V2 controller does NOT bypass the existing
+  // inner Roll/Pitch rate PID. It replaces only the old
+  // Angle outer-loop target generator.
+  // ---------------------------------------------------
+
+  const auto& angleV2 =
+      _model.state.assistedShadow;
+
+  if (angleV2.angleActive)
   {
-    for (size_t i = 0; i < AXIS_COUNT_RP; i++)
-    {
-      const float angleSetpoint = Utils::toRad(_model.config.level.angleLimit) * _model.state.input.ch[i];
-      _model.state.setpoint.rate[i] = _model.state.outerPid[i].update(angleSetpoint, _model.state.attitude.euler[i]);
-    }
+    _model.state.setpoint.rate[
+        AXIS_ROLL] =
+        angleV2.rollRateTarget;
+
+    _model.state.setpoint.rate[
+        AXIS_PITCH] =
+        angleV2.pitchRateTarget;
   }
+  else
+  {
+    // Never feed stale V2 data into the inner controller.
+    //
+    // The assisted-mode supervisor should normally remove
+    // MODE_ANGLE when attitude health is lost. Until that
+    // mode update occurs, keep the experimental setpoint
+    // neutral.
+    _model.state.setpoint.rate[
+        AXIS_ROLL] =
+        0.0f;
+
+    _model.state.setpoint.rate[
+        AXIS_PITCH] =
+        0.0f;
+  }
+
+#else
+
+  // ---------------------------------------------------
+  // LEGACY ANGLE CONTROLLER
+  //
+  // Retained for normal builds until V2 has completed
+  // non-actuating validation.
+  // ---------------------------------------------------
+
+  for (size_t i = 0;
+       i < AXIS_COUNT_RP;
+       ++i)
+  {
+    const float angleSetpoint =
+        Utils::toRad(
+            _model.config.level.angleLimit) *
+        _model.state.input.ch[i];
+
+    _model.state.setpoint.rate[i] =
+        _model.state.outerPid[i].update(
+            angleSetpoint,
+            _model.state.attitude.euler[i]);
+  }
+
+#endif
+}
   else
   {
     for (size_t i = 0; i < AXIS_COUNT_RP; i++)
@@ -488,6 +569,15 @@ const bool angleActive =
     _shadowAngleTarget[AXIS_PITCH] =
         attitude.euler[AXIS_PITCH];
   }
+
+    // The V2 outer controller intentionally starts from the
+// measured attitude instead of immediately commanding
+// stick-derived level.
+//
+// This is the attitude equivalent of bumpless transfer:
+// the controller begins with approximately zero attitude
+// error and then moves the reference toward the pilot
+// request through the target slew limiter.
 
   if (angleActive)
   {
