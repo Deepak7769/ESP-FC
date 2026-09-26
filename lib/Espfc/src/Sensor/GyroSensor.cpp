@@ -3,6 +3,7 @@
 #include "Utils/FilterHelper.h"
 #include "Utils/Sma.ipp"
 #include "Hal/Time.hpp"
+#include <cmath>
 #ifdef ESPFC_DSP
 #include "Utils/FFTAnalyzer.ipp"
 #endif
@@ -82,8 +83,21 @@ int GyroSensor::reload(ModelChangeEvent event)
     _rpm_harmonics > 0 &&
     _model.config.output.dshotTelemetry;
       _rpm_motor_index = 0;
-      _rpm_min_freq = _model.config.gyro.rpmFilter.minFreq;
-      _rpm_max_freq = 0.48f * _model.state.loopTimer.rate;
+
+      _rpm_max_freq =
+          std::max(
+              1.0f,
+              0.48f *
+                  _model.state.loopTimer.rate);
+
+      _rpm_min_freq =
+          std::clamp(
+              static_cast<float>(
+                  _model.config.gyro
+                      .rpmFilter.minFreq),
+              1.0f,
+              _rpm_max_freq);
+
       const float fade =
     _model.config.gyro.rpmFilter.fade;
 
@@ -272,18 +286,49 @@ void FAST_CODE_ATTR GyroSensor::rpmFilterUpdate()
 
   Utils::Stats::Measure measure(_model.state.stats, COUNTER_RPM_UPDATE);
 
-  const float motorFreq = _model.state.output.telemetry.freq[_rpm_motor_index];
- for (size_t n = 0;
-     n < _rpm_harmonics;
-     n++)
+  const float motorFreq =
+      _model.state.output.telemetry.freq[
+          _rpm_motor_index];
+
+  const bool motorFreqValid =
+      std::isfinite(
+          motorFreq) &&
+      motorFreq > 0.0f;
+
+  for (size_t n = 0;
+       n < _rpm_harmonics;
+       n++)
   {
-    const float freq = std::clamp(motorFreq * (n + 1), _rpm_min_freq, _rpm_max_freq);
-    const float freqMargin = freq - _rpm_min_freq;
-    float weight = _rpm_weights[n];
-    if (freqMargin < _model.config.gyro.rpmFilter.fade)
+    const float freq =
+        motorFreqValid
+            ? std::clamp(
+                  motorFreq * (n + 1),
+                  _rpm_min_freq,
+                  _rpm_max_freq)
+            : _rpm_min_freq;
+
+    const float freqMargin =
+        freq -
+        _rpm_min_freq;
+
+    // No fresh/valid motor frequency means there is nothing to track. A zero
+    // telemetry slot commonly represents a stopped or absent motor and must
+    // not create a full-strength fixed notch at rpmFilter.minFreq.
+    float weight =
+        motorFreqValid
+            ? _rpm_weights[n]
+            : 0.0f;
+
+    if (motorFreqValid &&
+        _model.config.gyro.rpmFilter.fade > 0 &&
+        freqMargin <
+            _model.config.gyro.rpmFilter.fade)
     {
-      weight *= freqMargin * _rpm_fade_inv;
+      weight *=
+          freqMargin *
+          _rpm_fade_inv;
     }
+
     _model.state.gyro.rpmFilter[_rpm_motor_index][n][0].reconfigure(freq, freq, _rpm_q, weight);
     for (size_t i = 1; i < AXIS_COUNT_RPY; ++i)
     {
