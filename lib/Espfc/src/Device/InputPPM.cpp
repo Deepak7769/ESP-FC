@@ -16,15 +16,23 @@ void InputPPM::begin(int pin, int mode)
     detachInterrupt(_pin);
     _pin = -1;
   }
+
+  _channel = 0;
+  _channelCount = 0;
+  _lastFrameChannels = 0;
+  _stableFrames = 0;
+  _frameValid = true;
+  _new_data = false;
+  _last_tick = micros();
+
+  for(size_t i = 0; i < CHANNELS; i++)
+  {
+    _channels[i] = (i == 2) ? 1000 : 1500; // throttle
+  }
+
   if(pin != -1)
   {
     _pin = pin;
-    _channel = 0;
-    _last_tick = micros();
-    for(size_t i = 0; i < CHANNELS; i++)
-    {
-      _channels[i] = (i == 2) ? 1000 : 1500; // throttle
-    }
     pinMode(_pin, INPUT);
 #if defined(UNIT_TEST)
     // no mock available
@@ -75,32 +83,106 @@ void FAST_CODE_ATTR InputPPM::get(
   }
 }
 
-size_t InputPPM::getChannelCount() const { return CHANNELS; }
+size_t InputPPM::getChannelCount() const
+{
+  return _channelCount;
+}
 
 bool InputPPM::needAverage() const { return true; }
 
 void IRAM_ATTR InputPPM::handle()
 {
-  uint32_t now = micros();
-  uint32_t width = now - _last_tick;
+  const uint32_t now =
+      micros();
 
-  _last_tick = now;
+  const uint32_t width =
+      static_cast<uint32_t>(
+          now -
+          _last_tick);
+
+  _last_tick =
+      now;
 
   if(width > 3000) // sync
   {
-    _channel = 0;
+    const bool completeFrame =
+        _frameValid &&
+        _channel >=
+            MIN_FRAME_CHANNELS &&
+        _channel <=
+            CHANNELS;
+
+    if (completeFrame)
+    {
+      if (_channel ==
+          _lastFrameChannels)
+      {
+        if (_stableFrames <
+            STABLE_FRAMES_REQUIRED)
+        {
+          ++_stableFrames;
+        }
+      }
+      else
+      {
+        _lastFrameChannels =
+            _channel;
+
+        _stableFrames =
+            1;
+      }
+
+      // Match mature PPM decoders conceptually: only expose a frame after the
+      // receiver has demonstrated a stable channel count. Do not publish after
+      // only the first four pulses; AUX/mode channels belong to the same frame.
+      if (_stableFrames >=
+          STABLE_FRAMES_REQUIRED)
+      {
+        _channelCount =
+            _channel;
+
+        _new_data =
+            true;
+      }
+    }
+    else
+    {
+      _stableFrames =
+          0;
+
+      _lastFrameChannels =
+          0;
+    }
+
+    _channel =
+        0;
+
+    _frameValid =
+        true;
+
     return;
   }
 
-  if(_channel < CHANNELS) // ignore exceding channels
+  constexpr uint32_t MIN_PULSE_US =
+      750;
+
+  constexpr uint32_t MAX_PULSE_US =
+      2250;
+
+  if (width < MIN_PULSE_US ||
+      width > MAX_PULSE_US ||
+      _channel >= CHANNELS)
   {
-    _channels[_channel] = width;
+    _frameValid =
+        false;
+
+    return;
   }
-  if(_channel == 3)
-  {
-    _new_data = true; // increase responsivnes for sticks channels
-  }
-  _channel++;
+
+  _channels[
+      _channel++] =
+      static_cast<uint16_t>(
+          width);
 }
 
 void IRAM_ATTR InputPPM::handle_isr(void* args)

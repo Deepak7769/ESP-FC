@@ -253,6 +253,13 @@ InputStatus FAST_CODE_ATTR Input::readInputs()
 
   if (status == INPUT_IDLE) return status;
 
+  // Some receiver formats (notably PPM) discover their actual channel count
+  // only after a complete, stable frame has been observed.
+  _model.state.input.channelCount =
+      std::min<size_t>(
+          _device->getChannelCount(),
+          INPUT_CHANNELS);
+
   _model.state.input.rxLoss = (status == INPUT_LOST || status == INPUT_FAILSAFE);
   _model.state.input.rxFailSafe = (status == INPUT_FAILSAFE);
   _model.state.input.frameCount++;

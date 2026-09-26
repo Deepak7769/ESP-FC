@@ -3,6 +3,7 @@
 #include "Control/Controller.h"
 #include "Control/Altitude.hpp"
 #include "Input.h"
+#include "Device/InputPPM.h"
 #include "TelemetryManager.h"
 #include <Complementary.hpp>
 #include "Control/Fusion.h"
@@ -5740,6 +5741,101 @@ void test_actuator_gps_arming_block_clears_when_feature_disabled()
           ARMING_DISABLED_GPS));
 }
 
+void test_ppm_only_publishes_complete_stable_frames()
+{
+  ArduinoFakeReset();
+
+  Device::InputPPM ppm;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .Return(
+          0u,
+          4000u,
+          5000u,
+          6500u,
+          8000u,
+          9500u,
+          13500u,
+          14500u,
+          16000u,
+          17500u,
+          19000u,
+          23000u,
+          24000u,
+          25500u,
+          27000u,
+          28500u,
+          32500u,
+          33500u,
+          35000u,
+          36500u,
+          38000u,
+          42000u);
+
+  ppm.begin(
+      -1);
+
+  TEST_ASSERT_EQUAL_UINT32(
+      0u,
+      ppm.getChannelCount());
+
+  // Frame 1: sync + four valid channels + sync.
+  ppm.handle();
+  ppm.handle();
+  ppm.handle();
+  ppm.handle();
+  ppm.handle();
+  ppm.handle();
+
+  TEST_ASSERT_EQUAL(
+      INPUT_IDLE,
+      ppm.update());
+
+  // Frame 2: same width, still qualifying.
+  ppm.handle();
+  ppm.handle();
+  ppm.handle();
+  ppm.handle();
+  ppm.handle();
+
+  TEST_ASSERT_EQUAL(
+      INPUT_IDLE,
+      ppm.update());
+
+  // Frame 3: stable channel count is now authoritative.
+  ppm.handle();
+  ppm.handle();
+  ppm.handle();
+  ppm.handle();
+  ppm.handle();
+
+  TEST_ASSERT_EQUAL(
+      INPUT_RECEIVED,
+      ppm.update());
+
+  TEST_ASSERT_EQUAL_UINT32(
+      4u,
+      ppm.getChannelCount());
+
+  // A truncated/corrupt frame must not be published as a fresh receiver frame.
+  ppm.handle();
+  ppm.handle();
+  ppm.handle();
+  ppm.handle();
+  ppm.handle();
+
+  TEST_ASSERT_EQUAL(
+      INPUT_IDLE,
+      ppm.update());
+
+  TEST_ASSERT_EQUAL_UINT32(
+      4u,
+      ppm.getChannelCount());
+}
+
 void test_input_frame_rate_ignores_startup_and_loss_gaps()
 {
   ArduinoFakeReset();
@@ -6063,6 +6159,7 @@ RUN_TEST(
   RUN_TEST(test_actuator_missing_aux_channel_does_not_apply_scaler);
   RUN_TEST(test_actuator_no_receiver_cannot_activate_aux_mode);
   RUN_TEST(test_actuator_gps_arming_block_clears_when_feature_disabled);
+  RUN_TEST(test_ppm_only_publishes_complete_stable_frames);
   RUN_TEST(test_input_frame_rate_ignores_startup_and_loss_gaps);
   RUN_TEST(test_model_sanitize_preserves_rc_safety_invariants);
   RUN_TEST(test_fusion_mode_name_rejects_negative_enum);
