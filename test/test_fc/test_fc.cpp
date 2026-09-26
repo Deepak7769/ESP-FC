@@ -81,6 +81,9 @@ static void setHealthyAssistedEstimatorState(
   model.state.baro.lastUpdateUs =
       nowUs;
 
+  model.state.altitude.lastUpdateUs =
+      nowUs;
+
   // Assisted-mode tests represent a receiver frame that actually contains
   // the configured AltHold pilot channel unless a test overrides this.
   model.state.input.channelCount =
@@ -1341,6 +1344,9 @@ void test_actuator_althold_fault_requires_switch_cycle()
 
   model.state.altitude.vario =
       0.0f;
+
+  model.state.altitude.lastUpdateUs =
+      50000;
 
   // --------------------------------------------------
   // Required attitude-estimator state
