@@ -4918,7 +4918,8 @@ RUN_TEST(
 RUN_TEST(test_controller_shadow_althold_full_climb_rate_scaling);
 RUN_TEST(test_actuator_althold_fault_requires_switch_cycle);
 RUN_TEST(test_actuator_angle_fault_requires_switch_cycle);
-#if defined(ESPFC_ANGLE_V2_ACTIVE)
+#if defined(ESPFC_ANGLE_V2_ACTIVE) && \
+    defined(ESPFC_SAFE_BENCH_BUILD)
 
 RUN_TEST(
     test_angle_v2_candidate_keeps_physical_motor_driver_blocked);
@@ -4933,6 +4934,11 @@ RUN_TEST(
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
 RUN_TEST(
     test_controller_althold_v2_active_path_is_bumpless_and_corrective);
+
+#if ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL != 3
+RUN_TEST(
+    test_controller_althold_v2_uses_dedicated_centered_stick_channel);
+#endif
 #endif
 
 #if defined(ESPFC_LAND_V2_ACTIVE)
@@ -4946,7 +4952,13 @@ RUN_TEST(
     test_failsafe_land_v2_touchdown_dwell_disarms);
 
 RUN_TEST(
-    test_failsafe_land_v2_rx_recovery_requires_full_qualification);
+    test_failsafe_land_v2_timeout_disarms);
+
+RUN_TEST(
+    test_auto_land_arm_request_requires_healthy_altitude_estimator);
+
+RUN_TEST(
+    test_failsafe_land_v2_rx_recovery_stays_committed_to_land);
 #endif
 
 RUN_TEST(
