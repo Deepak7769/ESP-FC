@@ -1406,6 +1406,10 @@ void test_actuator_althold_fault_requires_switch_cycle()
   model.state.input.ch[
       ALTHOLD_PILOT_CHANNEL] =
       0.0f;
+
+  model.state.input.raw[
+      ALTHOLD_PILOT_CHANNEL] =
+      PWM_RANGE_MID;
 #endif
 
   Actuator actuator(
