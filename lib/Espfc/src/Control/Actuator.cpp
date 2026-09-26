@@ -411,6 +411,9 @@ const bool altHoldHealthy =
       !altHoldPilotValid ||
       altHoldEntryUnsafe);
 #else
+  constexpr bool altHoldPilotValid =
+      true;
+
   _model.setArmingDisabled(
       ARMING_DISABLED_ALTHOLD,
       false);
