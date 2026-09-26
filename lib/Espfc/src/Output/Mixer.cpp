@@ -357,7 +357,53 @@ void FAST_CODE_ATTR Mixer::writeOutput(const MixerConfig& mixer, float* out)
       }
     }
   }
+#ifdef ESPFC_SAFE_BENCH_BUILD
 
+  // ---------------------------------------------------
+  // ACTUATION-CANDIDATE DIAGNOSTICS
+  //
+  // state.output.us[] contains the exact output command
+  // produced by the complete FC control/mixer pipeline,
+  // while the physical ESC driver remains disconnected.
+  // ---------------------------------------------------
+
+  if (_model.config.debug.mode ==
+      DEBUG_BLACKBOX_OUTPUT)
+  {
+    for (size_t i = 0;
+         i < std::min<size_t>(
+             mixer.count,
+             4);
+         ++i)
+    {
+      _model.state.debug[i] =
+          _model.state.output.us[i];
+    }
+
+    _model.state.debug[4] =
+        _model.isModeActive(
+            MODE_ARMED)
+            ? 1
+            : 0;
+
+    _model.state.debug[5] =
+        _model.isModeActive(
+            MODE_ANGLE)
+            ? 1
+            : 0;
+
+    _model.state.debug[6] =
+        _model.state.attitude.healthy
+            ? 1
+            : 0;
+
+    _model.state.debug[7] =
+        _model.state.output.saturated
+            ? 1
+            : 0;
+  }
+
+#endif
   for (size_t i = 0; i < OUTPUT_CHANNELS; i++)
   {
     const OutputChannelConfig& och = _model.config.output.channel[i];
