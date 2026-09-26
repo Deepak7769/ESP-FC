@@ -429,9 +429,19 @@ void FAST_CODE_ATTR Controller::innerLoop()
   const float fScale =
       pid.fScale;
 
-  if (_model.isModeActive(MODE_ANGLE) &&
+#if defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
+  const bool assistedAttitudeRateOwned =
+      _model.state.assistedShadow.angleActive;
+#else
+  const bool assistedAttitudeRateOwned =
+      _model.isModeActive(MODE_ANGLE);
+#endif
+
+  if (assistedAttitudeRateOwned &&
       i < AXIS_COUNT_RP)
   {
+    // Angle V2 and LAND V2 both generate an outer-loop
+    // rate target. Do not layer stick/feed-forward on top.
     pid.fScale = 0.f;
   }
 
@@ -486,8 +496,13 @@ if (altHoldV2OutputActive)
     // BUMPLESS VERTICAL-CONTROL ENTRY
     //
     // Seed the PID history from the measured state and
-    // choose I-term so P+I+F initially reproduces the
-    // thrust that was already being commanded.
+    // choose I-term so P+I+F is already close to the
+    // thrust that was being commanded.
+    //
+    // The first authoritative cycle explicitly preserves
+    // the previous thrust as an additional hard guarantee
+    // against a transfer step if the configured I-term
+    // limits cannot exactly reproduce that thrust.
     // --------------------------------------------------
 
     const float entrySetpoint =
@@ -541,12 +556,23 @@ if (altHoldV2OutputActive)
                 entryF,
             verticalPid.iLimitLow,
             verticalPid.iLimitHigh);
-  }
 
-  output.ch[AXIS_THRUST] =
-      verticalPid.update(
-          setpoint.rate[AXIS_THRUST],
-          altitude.vario);
+    // Advance internal PID history once, but preserve the
+    // pre-transfer actuator command on this cycle.
+    verticalPid.update(
+        setpoint.rate[AXIS_THRUST],
+        altitude.vario);
+
+    output.ch[AXIS_THRUST] =
+        existingThrust;
+  }
+  else
+  {
+    output.ch[AXIS_THRUST] =
+        verticalPid.update(
+            setpoint.rate[AXIS_THRUST],
+            altitude.vario);
+  }
 
   _altHoldV2OutputWasActive =
       true;
