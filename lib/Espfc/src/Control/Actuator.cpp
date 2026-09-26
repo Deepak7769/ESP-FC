@@ -443,7 +443,29 @@ void Actuator::updateFailsafeLandShadow()
   auto& failsafe =
       _model.state.failsafe;
 
-  // LAND shadow never owns actuator output.
+  const auto& altitude =
+      _model.state.altitude;
+
+  const uint32_t now =
+      micros();
+
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+  const bool activeLandRequest =
+      failsafe.landingRequested &&
+      failsafe.phase ==
+          FC_FAILSAFE_LANDING &&
+      _model.isModeActive(
+          MODE_ARMED);
+#else
+  constexpr bool activeLandRequest =
+      false;
+#endif
+
+  // The logical LAND controller starts blocked. In the
+  // dedicated V2 validation build this flag is cleared
+  // only while a healthy LAND request owns the controller.
+  // ESPFC_SAFE_BENCH_BUILD separately prevents a physical
+  // ESC driver from being attached.
   failsafe.landingShadowOutputBlocked =
       true;
 
@@ -473,14 +495,17 @@ void Actuator::updateFailsafeLandShadow()
 
     failsafe.landingShadowLastUpdateUs =
         0;
+
+    failsafe.landingTouchdownCandidate =
+        false;
+
+    failsafe.landingTouchdownStartedUs =
+        0;
   }
   else
   {
     // ---------------------------------------------------
     // CONTINUOUS ESTIMATOR VALIDATION
-    //
-    // Reuse exactly the same estimator-health function
-    // that guards normal AltHold activation.
     // ---------------------------------------------------
 
     const bool estimatorHealthy =
@@ -496,21 +521,176 @@ void Actuator::updateFailsafeLandShadow()
     failsafe.landingShadowActive =
         failsafe.landingShadowEligible;
 
-    // These remain requests only.
     failsafe.landingShadowLevelRequested =
         failsafe.landingShadowActive;
 
     failsafe.landingShadowDescentRequested =
         failsafe.landingShadowActive;
 
-  if (!failsafe.landingShadowEligible)
-{
-  failsafe.landingShadowFault =
-      true;
-}
+    if (!failsafe.landingShadowEligible)
+    {
+      failsafe.landingShadowFault =
+          true;
+    }
 
     failsafe.landingShadowLastUpdateUs =
-        micros();
+        now;
+
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+    if (activeLandRequest)
+    {
+      if (!failsafe.landingShadowEligible)
+      {
+        // An automatic descent without a trustworthy
+        // attitude/altitude estimate is not allowed.
+        // The active validation path falls back to DROP.
+        failsafe.landingShadowOutputBlocked =
+            true;
+
+        failsafe.landingTouchdownCandidate =
+            false;
+
+        failsafe.landingTouchdownStartedUs =
+            0;
+
+        failsafe.landingRequested =
+            false;
+
+        failsafe.landingShadowActive =
+            false;
+
+        failsafe.landingShadowLevelRequested =
+            false;
+
+        failsafe.landingShadowDescentRequested =
+            false;
+
+        failsafe.phase =
+            FC_FAILSAFE_LANDED;
+
+        _model.disarm(
+            DISARM_REASON_FAILSAFE);
+      }
+      else
+      {
+        // Logical controller authority is enabled. The
+        // safe-bench build still hard-blocks the physical
+        // ESC driver.
+        failsafe.landingShadowOutputBlocked =
+            false;
+
+        // -------------------------------------------------
+        // TOUCHDOWN CONFIRMATION
+        //
+        // Barometer-only touchdown detection is purposely
+        // conservative. Require:
+        //   1) some landing time,
+        //   2) near-zero vertical speed,
+        //   3) evidence that the aircraft descended,
+        //   4) the condition to persist for a dwell time.
+        // -------------------------------------------------
+
+        constexpr uint32_t
+            MIN_LANDING_TIME_US =
+                1500000;
+
+        constexpr uint32_t
+            TOUCHDOWN_DWELL_US =
+                1000000;
+
+        constexpr float
+            TOUCHDOWN_VARIO_MS =
+                0.15f;
+
+        constexpr float
+            MIN_DESCENT_EVIDENCE_M =
+                0.20f;
+
+        constexpr float
+            LOW_ENTRY_HEIGHT_M =
+                0.25f;
+
+        const uint32_t landingElapsedUs =
+            static_cast<uint32_t>(
+                now -
+                failsafe.landingRequestedUs);
+
+        const float descendedM =
+            failsafe.landingEntryHeight -
+            altitude.height;
+
+        const bool slowVerticalMotion =
+            std::fabs(
+                altitude.vario) <=
+            TOUCHDOWN_VARIO_MS;
+
+        const bool descentEvidence =
+            descendedM >=
+                MIN_DESCENT_EVIDENCE_M ||
+            failsafe.landingEntryHeight <=
+                LOW_ENTRY_HEIGHT_M;
+
+        const bool touchdownEvidence =
+            landingElapsedUs >=
+                MIN_LANDING_TIME_US &&
+            slowVerticalMotion &&
+            descentEvidence;
+
+        if (touchdownEvidence)
+        {
+          if (!failsafe.landingTouchdownCandidate)
+          {
+            failsafe.landingTouchdownCandidate =
+                true;
+
+            failsafe.landingTouchdownStartedUs =
+                now;
+          }
+          else
+          {
+            const uint32_t touchdownDwellUs =
+                static_cast<uint32_t>(
+                    now -
+                    failsafe
+                        .landingTouchdownStartedUs);
+
+            if (touchdownDwellUs >=
+                TOUCHDOWN_DWELL_US)
+            {
+              failsafe.landingRequested =
+                  false;
+
+              failsafe.landingShadowActive =
+                  false;
+
+              failsafe.landingShadowLevelRequested =
+                  false;
+
+              failsafe.landingShadowDescentRequested =
+                  false;
+
+              failsafe.landingShadowOutputBlocked =
+                  true;
+
+              failsafe.phase =
+                  FC_FAILSAFE_LANDED;
+
+              _model.disarm(
+                  DISARM_REASON_FAILSAFE);
+            }
+          }
+        }
+        else
+        {
+          failsafe.landingTouchdownCandidate =
+              false;
+
+          failsafe.landingTouchdownStartedUs =
+              0;
+        }
+      }
+    }
+#endif
   }
 
   // -----------------------------------------------------
@@ -634,6 +814,12 @@ void Actuator::updateArmed()
           0;
 
       failsafe.landingShadowLastUpdateUs =
+          0;
+
+      failsafe.landingTouchdownCandidate =
+          false;
+
+      failsafe.landingTouchdownStartedUs =
           0;
 
       failsafe.landingEntryHeight =
