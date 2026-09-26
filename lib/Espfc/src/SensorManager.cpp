@@ -124,7 +124,11 @@ int FAST_CODE_ATTR SensorManager::fusion()
 // main task
 int FAST_CODE_ATTR SensorManager::update()
 {
-  _gyro.read();
+  if (!_gyro.read())
+  {
+    return 0;
+  }
+
   return preLoop();
 }
 

@@ -66,7 +66,21 @@ int FAST_CODE_ATTR Espfc::update(bool externalTrigger)
           _model.state.gyro.timer,
           1u))
   {
+    const bool wasArmedBeforeInput =
+        _model.isModeActive(
+            MODE_ARMED);
+
     _input.update();
+
+    // RX Stage-2 DROP can disarm outside the normal mixer cadence. Push the
+    // configured disarmed outputs immediately instead of leaving the previous
+    // motor command active until the next scheduled mixer tick.
+    if (wasArmedBeforeInput &&
+        !_model.isModeActive(
+            MODE_ARMED))
+    {
+      _mixer.writeDisarmed();
+    }
   }
 
   // Only preprocess gyro data when a valid gyro sample
@@ -119,8 +133,19 @@ if (_model.state.actuatorTimer.check())
 #else
 
 
-  _sensor.update();
-  if (_model.state.loopTimer.syncTo(_model.state.gyro.timer))
+  const bool gyroSampleValid =
+      _sensor.update() != 0;
+
+  const bool controlDue =
+      _model.state.loopTimer.syncTo(
+          _model.state.gyro.timer);
+
+  // Advance the loop divider even on a failed gyro transaction, but never run
+  // the controller from a stale sample. This mirrors the guarded multicore
+  // path and prevents a transient bus error from being interpreted as a new
+  // zero-order-held gyro measurement.
+  if (gyroSampleValid &&
+      controlDue)
   {
     _controller.update();
     if (_model.state.mixer.timer.syncTo(_model.state.loopTimer))
