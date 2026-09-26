@@ -1,4 +1,5 @@
 #include "Control/Controller.h"
+#include "Control/AssistedModeV2.h"
 #include "Hal/Time.hpp"
 #include "Utils/Math.hpp"
 #include <algorithm>
@@ -13,51 +14,7 @@ namespace {
 // non-actuating SIL/HIL verification.
 constexpr bool ENABLE_LEGACY_ALTHOLD_OUTPUT =
     false;
-// -----------------------------------------------------
-// ANGLE V2 ACTIVE VALIDATION
-//
-// Angle V2 may become the authoritative Roll/Pitch
-// setpoint generator only in a build where physical
-// actuator attachment is blocked.
-//
-// Mixer.cpp already implements ESPFC_SAFE_BENCH_BUILD
-// by not creating/attaching the motor ESC driver.
-// -----------------------------------------------------
 
-#if defined(ESPFC_ANGLE_V2_ACTIVE_TEST) && \
-    !defined(ESPFC_SAFE_BENCH_BUILD)
-
-#error "ESPFC_ANGLE_V2_ACTIVE_TEST requires ESPFC_SAFE_BENCH_BUILD"
-
-#endif
-
-#if defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST) && \
-    !defined(ESPFC_SAFE_BENCH_BUILD)
-
-#error "ESPFC_ALTHOLD_V2_ACTIVE_TEST requires ESPFC_SAFE_BENCH_BUILD"
-
-#endif
-
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST) && \
-    !defined(ESPFC_SAFE_BENCH_BUILD)
-
-#error "ESPFC_LAND_V2_ACTIVE_TEST requires ESPFC_SAFE_BENCH_BUILD"
-
-#endif
-
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST) && \
-    !defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST)
-
-#error "ESPFC_LAND_V2_ACTIVE_TEST requires ESPFC_ALTHOLD_V2_ACTIVE_TEST"
-
-#endif
-
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST) && \
-    !defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
-
-#error "ESPFC_LAND_V2_ACTIVE_TEST requires ESPFC_ANGLE_V2_ACTIVE_TEST"
-
-#endif
 } // namespace
 
 Controller::Controller(Model& model): _model(model), _rates{} {}
@@ -136,12 +93,9 @@ int FAST_CODE_ATTR Controller::update()
 
   resetIterm();
 
-// Update assisted-mode V2 controllers.
-//
-// Angle V2 becomes authoritative for Roll/Pitch
-// setpoint generation in ESPFC_ANGLE_V2_ACTIVE_TEST.
-//
-// AltHold V2 remains shadow-only and non-actuating.
+// Update the shared Assisted V2 controller state.
+// Depending on the build policy in AssistedModeV2.h, the same state can be
+// shadow-only, safe-bench authoritative, or production-authoritative.
 updateAssistedModesShadow();
 
   switch (_model.config.mixer.type)
@@ -241,7 +195,7 @@ void Controller::innerLoopRobot()
 
 void FAST_CODE_ATTR Controller::outerLoop()
 {
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+#if defined(ESPFC_LAND_V2_ACTIVE)
   const bool landingV2Requested =
       _model.state.failsafe.landingRequested &&
       _model.state.failsafe.phase ==
@@ -263,7 +217,7 @@ void FAST_CODE_ATTR Controller::outerLoop()
   if (_model.isModeActive(MODE_ANGLE) ||
       landingV2Requested)
   {
-#if defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
+#if defined(ESPFC_ANGLE_V2_ACTIVE)
     const auto& angleV2 =
         _model.state.assistedShadow;
 
@@ -342,7 +296,7 @@ void FAST_CODE_ATTR Controller::outerLoop()
   // THRUST / VERTICAL-RATE SETPOINT
   // -----------------------------------------------------
 
-#if defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST)
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
   const bool altHoldV2Active =
       _model.state.assistedShadow.altitudeActive &&
       (_model.isModeActive(MODE_ALTHOLD) ||
@@ -363,7 +317,7 @@ void FAST_CODE_ATTR Controller::outerLoop()
         _model.state.assistedShadow
             .verticalRateTarget;
   }
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+#if defined(ESPFC_LAND_V2_ACTIVE)
   else if (landingV2Requested)
   {
     // LAND was requested, but the estimator has not yet
@@ -429,7 +383,7 @@ void FAST_CODE_ATTR Controller::innerLoop()
   const float fScale =
       pid.fScale;
 
-#if defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
+#if defined(ESPFC_ANGLE_V2_ACTIVE)
   const bool assistedAttitudeRateOwned =
       _model.state.assistedShadow.angleActive;
 #else
@@ -461,7 +415,7 @@ void FAST_CODE_ATTR Controller::innerLoop()
 // THRUST OUTPUT
 // -----------------------------------------------------
 
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+#if defined(ESPFC_LAND_V2_ACTIVE)
 const bool landingV2Requested =
     _model.state.failsafe.landingRequested &&
     _model.state.failsafe.phase ==
@@ -471,7 +425,7 @@ constexpr bool landingV2Requested =
     false;
 #endif
 
-#if defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST)
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
 const bool altHoldV2OutputActive =
     _model.state.assistedShadow.altitudeActive &&
     (_model.isModeActive(MODE_ALTHOLD) ||
@@ -644,10 +598,18 @@ float Controller::calculatePilotClimbRateShadow() const
   constexpr float MAX_CLIMB_MS =
       1.5f;
 
+  constexpr size_t PILOT_CHANNEL =
+      static_cast<size_t>(
+          ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL);
+
+  static_assert(
+      PILOT_CHANNEL < AXIS_COUNT,
+      "AltHold V2 centered-stick channel exceeds input channel count");
+
   float stick =
       std::clamp(
           _model.state.input.ch[
-              AXIS_THRUST],
+              PILOT_CHANNEL],
           -1.0f,
           1.0f);
 
@@ -683,15 +645,11 @@ float Controller::calculatePilotClimbRateShadow() const
       MAX_DESCENT_MS;
 }
 
-// NOTE:
-// This function contains two different maturity levels:
+// Shared Assisted V2 state generator.
 //
-// ANGLE V2:
-//   authoritative setpoint source in the dedicated
-//   V2 validation build.
-//
-// ALTHOLD V2:
-//   shadow-only and must not command thrust.
+// In ordinary builds this state is diagnostic/shadow data.
+// In Assisted V2 active builds it is the authoritative outer-loop source for
+// Angle, AltHold, and failsafe LAND.
 void Controller::updateAssistedModesShadow()
 {
   auto& shadow =
@@ -709,7 +667,7 @@ void Controller::updateAssistedModesShadow()
   const auto& failsafe =
       _model.state.failsafe;
 
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+#if defined(ESPFC_LAND_V2_ACTIVE)
   const bool landingV2Requested =
       failsafe.landingRequested &&
       failsafe.phase ==
