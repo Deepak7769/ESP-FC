@@ -12,6 +12,30 @@ namespace Espfc::Control {
 
 namespace {
 
+bool inputChannelAvailable(
+    const Model& model,
+    size_t channel)
+{
+  if (channel >= AXIS_COUNT)
+  {
+    return false;
+  }
+
+  const auto& input =
+      model.state.input;
+
+  if (input.channelCount > 0)
+  {
+    return channel <
+        input.channelCount;
+  }
+
+  // Before Input::begin() the receiver width is unknown. After Input::begin()
+  // a missing receiver is represented by channelCount == 0 and rxLoss == true,
+  // so default/stale 1500-us AUX slots must not act like real switches.
+  return !input.rxLoss;
+}
+
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
 bool altHoldPilotStickValid(
     const Model& model)
@@ -199,6 +223,30 @@ int Actuator::update()
 
 void Actuator::updateScaler()
 {
+  // Scalers are transient modifiers. Rebuild them from neutral every actuator
+  // cycle so a removed/invalid AUX channel or disabled scaler cannot leave a
+  // stale gain multiplier behind.
+  for (size_t axis = 0;
+       axis < AXIS_COUNT_RPYT;
+       ++axis)
+  {
+    auto& inner =
+        _model.state.innerPid[axis];
+
+    auto& outer =
+        _model.state.outerPid[axis];
+
+    inner.pScale = 1.0f;
+    inner.iScale = 1.0f;
+    inner.dScale = 1.0f;
+    inner.fScale = 1.0f;
+
+    outer.pScale = 1.0f;
+    outer.iScale = 1.0f;
+    outer.dScale = 1.0f;
+    outer.fScale = 1.0f;
+  }
+
   for (size_t i = 0; i < SCALER_COUNT; i++)
   {
     uint32_t mode = _model.config.scaler[i].dimension;
@@ -211,9 +259,9 @@ void Actuator::updateScaler()
       continue;
     }
 
-    if (_model.state.input.channelCount > 0 &&
-        static_cast<size_t>(c) >=
-            _model.state.input.channelCount)
+    if (!inputChannelAvailable(
+            _model,
+            static_cast<size_t>(c)))
     {
       continue;
     }
@@ -310,8 +358,18 @@ else
 }
   if (_model.isFeatureActive(FEATURE_GPS))
   {
-    _model.setArmingDisabled(ARMING_DISABLED_GPS,
-                             !_model.state.gps.present || _model.state.gps.numSats < _model.config.gps.minSats);
+    _model.setArmingDisabled(
+        ARMING_DISABLED_GPS,
+        !_model.state.gps.present ||
+        _model.state.gps.numSats <
+            _model.config.gps.minSats);
+  }
+  else
+  {
+    // Do not retain a stale GPS arming block after the feature is disabled.
+    _model.setArmingDisabled(
+        ARMING_DISABLED_GPS,
+        false);
   }
 }
 
@@ -348,8 +406,9 @@ if (ch < AXIS_AUX_1 ||
   continue;
 }
 
-if (_model.state.input.channelCount > 0 &&
-    ch >= _model.state.input.channelCount)
+if (!inputChannelAvailable(
+        _model,
+        ch))
 {
   // A configured AUX condition must never become active from the default
   // 1500-us contents of a channel the receiver does not actually provide.

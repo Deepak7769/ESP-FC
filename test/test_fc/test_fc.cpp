@@ -5484,9 +5484,6 @@ void test_actuator_missing_aux_channel_does_not_apply_scaler()
 {
   Model model;
 
-  model.state.input.channelCount =
-      AXIS_AUX_1;
-
   auto& scaler =
       model.config.scaler[0];
 
@@ -5503,12 +5500,11 @@ void test_actuator_missing_aux_channel_does_not_apply_scaler()
   scaler.maxScale =
       400;
 
+  model.state.input.channelCount =
+      AXIS_AUX_1 + 1;
+
   model.state.input.ch[
       AXIS_AUX_1] =
-      1.0f;
-
-  model.state.innerPid[
-      AXIS_ROLL].pScale =
       1.0f;
 
   Actuator actuator(
@@ -5518,9 +5514,108 @@ void test_actuator_missing_aux_channel_does_not_apply_scaler()
 
   TEST_ASSERT_FLOAT_WITHIN(
       0.0001f,
+      4.0f,
+      model.state.innerPid[
+          AXIS_ROLL].pScale);
+
+  // If AUX1 disappears, the previous 4x multiplier must not remain latched.
+  model.state.input.channelCount =
+      AXIS_AUX_1;
+
+  actuator.updateScaler();
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
       1.0f,
       model.state.innerPid[
           AXIS_ROLL].pScale);
+
+  // Disabling the scaler must also restore neutral scaling.
+  model.state.input.channelCount =
+      AXIS_AUX_1 + 1;
+
+  model.config.scaler[0].dimension =
+      0;
+
+  model.state.innerPid[
+      AXIS_ROLL].pScale =
+      3.0f;
+
+  actuator.updateScaler();
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      1.0f,
+      model.state.innerPid[
+          AXIS_ROLL].pScale);
+}
+
+void test_actuator_no_receiver_cannot_activate_aux_mode()
+{
+  Model model;
+
+  model.state.input.channelCount =
+      0;
+
+  model.state.input.rxLoss =
+      true;
+
+  auto& condition =
+      model.config.conditions[0];
+
+  condition.id =
+      MODE_BUZZER;
+
+  condition.ch =
+      AXIS_AUX_1;
+
+  condition.min =
+      1200;
+
+  condition.max =
+      1800;
+
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1500;
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_BUZZER));
+}
+
+void test_actuator_gps_arming_block_clears_when_feature_disabled()
+{
+  Model model;
+  Actuator actuator(
+      model);
+
+  model.config.featureMask |=
+      FEATURE_GPS;
+
+  model.state.gps.present =
+      false;
+
+  actuator.updateArmingDisabled();
+
+  TEST_ASSERT_TRUE(
+      model.getArmingDisabled(
+          ARMING_DISABLED_GPS));
+
+  model.config.featureMask &=
+      ~FEATURE_GPS;
+
+  actuator.updateArmingDisabled();
+
+  TEST_ASSERT_FALSE(
+      model.getArmingDisabled(
+          ARMING_DISABLED_GPS));
 }
 
 void test_input_frame_rate_ignores_startup_and_loss_gaps()
@@ -5844,6 +5939,8 @@ RUN_TEST(
   RUN_TEST(test_actuator_arming_gyro_motor_calbration);
   RUN_TEST(test_actuator_missing_aux_channel_cannot_activate_mode);
   RUN_TEST(test_actuator_missing_aux_channel_does_not_apply_scaler);
+  RUN_TEST(test_actuator_no_receiver_cannot_activate_aux_mode);
+  RUN_TEST(test_actuator_gps_arming_block_clears_when_feature_disabled);
   RUN_TEST(test_input_frame_rate_ignores_startup_and_loss_gaps);
   RUN_TEST(test_model_sanitize_preserves_rc_safety_invariants);
   RUN_TEST(test_fusion_mode_name_rejects_negative_enum);
