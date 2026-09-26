@@ -18,7 +18,7 @@ void test_input_crsf_rc_valid()
   memset(&frame, 0, sizeof(frame));
   uint8_t* frame_data = reinterpret_cast<uint8_t*>(&frame);
 
-  When(Method(ArduinoFake(), micros)).Return(0);
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
 
   input.begin(nullptr, nullptr);
 
@@ -59,7 +59,7 @@ void test_input_crsf_rejects_short_rc_frame()
   CrsfMessage frame;
   memset(&frame, 0, sizeof(frame));
 
-  When(Method(ArduinoFake(), micros)).Return(0);
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
 
   input.begin(nullptr, nullptr);
 
@@ -82,7 +82,7 @@ void test_input_crsf_rc_prefix()
   CrsfMessage frame;
   memset(&frame, 0, sizeof(frame));
 
-  When(Method(ArduinoFake(), micros)).Return(0);
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
 
   input.begin(nullptr, nullptr);
 
@@ -620,7 +620,7 @@ void test_input_ibus_rc_valid()
   memset(&frame, 0, sizeof(frame));
   uint8_t* frame_data = reinterpret_cast<uint8_t*>(&frame);
 
-  When(Method(ArduinoFake(), micros)).Return(0);
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
 
   input.begin(nullptr);
 
