@@ -26,8 +26,20 @@ bool altHoldPilotStickCentered(
   constexpr float ENTRY_CENTER_WINDOW =
       0.15f;
 
+  const auto& input =
+      model.state.input;
+
+  // The dedicated spring-centered vertical command must actually exist in
+  // the current receiver frame.  A missing AUX channel otherwise retains
+  // its zero-initialized value and can look falsely centered.
+  if (!input.channelsValid ||
+      input.channelCount <= PILOT_CHANNEL)
+  {
+    return false;
+  }
+
   const float command =
-      model.state.input.ch[
+      input.ch[
           PILOT_CHANNEL];
 
   return

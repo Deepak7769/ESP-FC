@@ -80,6 +80,14 @@ static void setHealthyAssistedEstimatorState(
 
   model.state.baro.lastUpdateUs =
       nowUs;
+
+  // Assisted-mode tests represent a receiver frame that actually contains
+  // the configured AltHold pilot channel unless a test overrides this.
+  model.state.input.channelCount =
+      ALTHOLD_PILOT_CHANNEL + 1;
+
+  model.state.input.channelsValid =
+      true;
 }
 /*void setUp(void)
 {
@@ -1926,6 +1934,86 @@ void test_actuator_althold_v2_requires_centered_pilot_stick_on_entry()
   model.state.input.ch[
       ALTHOLD_PILOT_CHANNEL] =
       0.0f;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  TEST_ASSERT_FALSE(
+      model.getArmingDisabled(
+          ARMING_DISABLED_ALTHOLD));
+}
+
+void test_actuator_althold_v2_rejects_missing_pilot_channel()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      1850000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  auto& condition =
+      model.config.conditions[0];
+
+  condition.id =
+      MODE_ALTHOLD;
+
+  condition.ch =
+      AXIS_AUX_1;
+
+  condition.min =
+      1200;
+
+  condition.max =
+      1800;
+
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1500;
+
+  model.state.input.ch[
+      ALTHOLD_PILOT_CHANNEL] =
+      0.0f;
+
+  // Pretend the generic receiver frame itself is valid, but make it too
+  // short to contain the configured dedicated AltHold channel.
+  model.state.input.channelsValid =
+      true;
+
+  model.state.input.channelCount =
+      ALTHOLD_PILOT_CHANNEL;
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  TEST_ASSERT_TRUE(
+      model.getArmingDisabled(
+          ARMING_DISABLED_ALTHOLD));
+
+  // Once the channel really exists, the same centered command is eligible.
+  model.state.input.channelCount =
+      ALTHOLD_PILOT_CHANNEL + 1;
 
   actuator.updateModeMask();
 
@@ -5019,6 +5107,9 @@ RUN_TEST(
 
 RUN_TEST(
     test_actuator_althold_v2_requires_centered_pilot_stick_on_entry);
+
+RUN_TEST(
+    test_actuator_althold_v2_rejects_missing_pilot_channel);
 
 #if ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL != 3
 RUN_TEST(

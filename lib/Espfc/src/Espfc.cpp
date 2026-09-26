@@ -130,7 +130,20 @@ if (_model.state.actuatorTimer.check())
     _blackbox.update();
     if (_model.state.input.timer.syncTo(_model.state.gyro.timer, 1u))
     {
+      // Input::failsafeStage2() may disarm directly.  Flush the disarmed
+      // command immediately instead of waiting for the next mixer tick.
+      const bool wasArmedBeforeInput =
+          _model.isModeActive(
+              MODE_ARMED);
+
       _input.update();
+
+      if (wasArmedBeforeInput &&
+          !_model.isModeActive(
+              MODE_ARMED))
+      {
+        _mixer.writeDisarmed();
+      }
     }
 if (_model.state.actuatorTimer.check())
 {
