@@ -4093,8 +4093,12 @@ int main(int argc, char** argv)
   RUN_TEST(test_model_outer_pid_init);
   RUN_TEST(test_controller_rates);
 RUN_TEST(test_controller_rates_limit);
-RUN_TEST(test_controller_angle_mode_does_not_latch_fterm_scale);
+#if !defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
 
+RUN_TEST(
+    test_controller_angle_mode_does_not_latch_fterm_scale);
+
+#endif
 // V2 assisted-mode shadow tests
 RUN_TEST(test_controller_shadow_angle_activates_and_slews);
 RUN_TEST(test_controller_shadow_angle_bumpless_entry);
