@@ -650,6 +650,12 @@ config.customMixerCount =
         0,
         OUTPUT_CHANNELS);
 
+// eRPM -> mechanical RPM conversion divides by pole-pairs.
+config.output.motorPoles =
+    std::max<int8_t>(
+        config.output.motorPoles,
+        2);
+
 config.gyro.rpmFilter.harmonics =
     std::min<uint8_t>(
         config.gyro.rpmFilter.harmonics,

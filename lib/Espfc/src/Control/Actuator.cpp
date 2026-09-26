@@ -13,7 +13,7 @@ namespace Espfc::Control {
 namespace {
 
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
-bool altHoldPilotStickCentered(
+bool altHoldPilotStickValid(
     const Model& model)
 {
   constexpr size_t PILOT_CHANNEL =
@@ -70,14 +70,55 @@ bool altHoldPilotStickCentered(
     return false;
   }
 
-  const float command =
-      input.ch[
-          PILOT_CHANNEL];
+  return
+      std::isfinite(
+          input.ch[
+              PILOT_CHANNEL]);
+}
+
+bool altHoldPilotStickCentered(
+    const Model& model)
+{
+  constexpr size_t PILOT_CHANNEL =
+      static_cast<size_t>(
+          ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL);
+
+  constexpr float ENTRY_CENTER_WINDOW =
+      0.15f;
+
+  if (!altHoldPilotStickValid(
+          model))
+  {
+    return false;
+  }
 
   return
-      std::isfinite(command) &&
-      std::fabs(command) <=
-          ENTRY_CENTER_WINDOW;
+      std::fabs(
+          model.state.input.ch[
+              PILOT_CHANNEL]) <=
+      ENTRY_CENTER_WINDOW;
+}
+
+bool assistedVerticalControlOwnsThrust(
+    const Model& model)
+{
+  const bool altHold =
+      model.isModeActive(
+          MODE_ALTHOLD);
+
+#if defined(ESPFC_LAND_V2_ACTIVE)
+  const bool land =
+      model.state.failsafe.landingRequested &&
+      model.state.failsafe.phase ==
+          FC_FAILSAFE_LANDING;
+#else
+  constexpr bool land =
+      false;
+#endif
+
+  return
+      altHold ||
+      land;
 }
 #endif
 
@@ -346,8 +387,20 @@ const bool altHoldHealthy =
 #endif
       ;
 
-  const bool altHoldPilotUnsafe =
+  const bool altHoldWasActive =
+      _model.isModeActive(
+          MODE_ALTHOLD);
+
+  const bool altHoldPilotValid =
+      !altHoldRequested ||
+      altHoldPilotStickValid(
+          _model);
+
+  // Centering is an entry-only gate. Once AltHold is active, stick deflection
+  // is the intended climb/descent command and must not be treated as a fault.
+  const bool altHoldEntryUnsafe =
       altHoldRequested &&
+      !altHoldWasActive &&
       !altHoldPilotStickCentered(
           _model);
 
@@ -355,7 +408,8 @@ const bool altHoldHealthy =
       ARMING_DISABLED_ALTHOLD,
       (assistedAltitudeRequired &&
        !altHoldHealthy) ||
-      altHoldPilotUnsafe);
+      !altHoldPilotValid ||
+      altHoldEntryUnsafe);
 #else
   _model.setArmingDisabled(
       ARMING_DISABLED_ALTHOLD,
@@ -399,16 +453,18 @@ const bool altHoldHealthy =
     _altHoldFaultLatched =
         false;
   }
-  else if (!altHoldHealthy)
+  else if (!altHoldHealthy ||
+           !altHoldPilotValid)
   {
-    // Sensor/estimator failure requires a deliberate
-    // OFF -> ON switch cycle before re-entry.
+    // Sensor/estimator or dedicated vertical-channel failure requires a
+    // deliberate OFF -> ON switch cycle before re-entry.
     _altHoldFaultLatched =
         true;
   }
 
   if (_altHoldFaultLatched ||
-      !altHoldHealthy)
+      !altHoldHealthy ||
+      !altHoldPilotValid)
   {
     newMask &=
         ~ALTHOLD_BIT;
@@ -1076,10 +1132,35 @@ void Actuator::updateBuzzer()
 }
 void Actuator::updateDynLpf()
 {
+  float throttleUs =
+      _model.state.input.us[
+          AXIS_THRUST];
+
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
+  if (assistedVerticalControlOwnsThrust(
+          _model))
+  {
+    const float normalizedThrust =
+        std::clamp(
+            _model.state.output.ch[
+                AXIS_THRUST],
+            -1.0f,
+            1.0f);
+
+    throttleUs =
+        Utils::map(
+            normalizedThrust,
+            -1.0f,
+            1.0f,
+            1000.0f,
+            2000.0f);
+  }
+#endif
+
   const int throttle =
       std::clamp(
-          (int)_model.state.input.us[
-              AXIS_THRUST],
+          (int)lrintf(
+              throttleUs),
           1000,
           2000);
 

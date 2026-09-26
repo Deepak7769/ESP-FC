@@ -13,6 +13,33 @@ namespace {
 constexpr bool ENABLE_LEGACY_ALTHOLD_OUTPUT =
     false;
 
+bool assistedVerticalControlOwnsThrust(
+    const Model& model)
+{
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
+  const bool altHold =
+      model.isModeActive(
+          MODE_ALTHOLD);
+
+  #if defined(ESPFC_LAND_V2_ACTIVE)
+  const bool land =
+      model.state.failsafe.landingRequested &&
+      model.state.failsafe.phase ==
+          FC_FAILSAFE_LANDING;
+  #else
+  constexpr bool land =
+      false;
+  #endif
+
+  return
+      altHold ||
+      land;
+#else
+  (void)model;
+  return false;
+#endif
+}
+
 } // namespace
 
 Controller::Controller(Model& model): _model(model), _rates{} {}
@@ -1149,9 +1176,29 @@ float Controller::getTpaFactor() const
           1000.f,
           1999.f);
 
+  float throttleUs =
+      _model.state.input.us[
+          AXIS_THRUST];
+
+  if (assistedVerticalControlOwnsThrust(
+          _model))
+  {
+    throttleUs =
+        Utils::map(
+            std::clamp(
+                _model.state.output.ch[
+                    AXIS_THRUST],
+                -1.0f,
+                1.0f),
+            -1.0f,
+            1.0f,
+            1000.0f,
+            2000.0f);
+  }
+
   const float throttle =
       std::clamp(
-          (float)_model.state.input.us[AXIS_THRUST],
+          throttleUs,
           breakpoint,
           2000.f);
 
@@ -1170,9 +1217,15 @@ float Controller::getTpaFactor() const
 
 void Controller::resetIterm()
 {
+  const bool assistedVerticalThrust =
+      assistedVerticalControlOwnsThrust(
+          _model);
+
   if (!_model.isModeActive(MODE_ARMED) // when not armed
-      || (!_model.isAirModeActive() && _model.config.iterm.lowThrottleZeroIterm &&
-          _model.isThrottleLow()) // on low throttle (not in air mode)
+      || (!assistedVerticalThrust &&
+          !_model.isAirModeActive() &&
+          _model.config.iterm.lowThrottleZeroIterm &&
+          _model.isThrottleLow()) // low manual throttle only when manual thrust owns output
   )
   {
     for (size_t i = 0; i < AXIS_COUNT_RPY; i++)

@@ -1786,6 +1786,239 @@ void test_controller_althold_v2_active_path_is_bumpless_and_corrective()
       ENTRY_THRUST);
 }
 
+void test_controller_althold_v2_low_manual_throttle_preserves_rate_iterm()
+{
+  Model model;
+  Controller controller(
+      model);
+
+  model.config.iterm.lowThrottleZeroIterm =
+      true;
+
+  model.state.input.us[
+      AXIS_THRUST] =
+      1000;
+
+  model.state.innerPid[
+      AXIS_ROLL].iTerm =
+      0.20f;
+
+  model.state.innerPid[
+      AXIS_ROLL].iReset =
+      0.0f;
+
+  model.updateModes(
+      (uint32_t{1} << MODE_ARMED) |
+      (uint32_t{1} << MODE_ALTHOLD));
+
+  controller.resetIterm();
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      0.20f,
+      model.state.innerPid[
+          AXIS_ROLL].iTerm);
+}
+
+void test_controller_althold_v2_tpa_uses_assisted_thrust()
+{
+  Model model;
+  Controller controller(
+      model);
+
+  model.config.controller.tpaScale =
+      50;
+
+  model.config.controller.tpaBreakpoint =
+      1500;
+
+  // Manual/stateful throttle is deliberately low while AltHold owns thrust.
+  model.state.input.us[
+      AXIS_THRUST] =
+      1000;
+
+  model.state.output.ch[
+      AXIS_THRUST] =
+      1.0f;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ALTHOLD);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.001f,
+      0.50f,
+      controller.getTpaFactor());
+}
+
+void test_actuator_althold_v2_allows_stick_deflection_after_entry()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      1900000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  auto& condition =
+      model.config.conditions[0];
+
+  condition.id =
+      MODE_ALTHOLD;
+  condition.ch =
+      AXIS_AUX_1;
+  condition.min =
+      1200;
+  condition.max =
+      1800;
+
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1500;
+
+  model.state.input.ch[
+      ALTHOLD_PILOT_CHANNEL] =
+      0.0f;
+
+  model.state.input.raw[
+      ALTHOLD_PILOT_CHANNEL] =
+      PWM_RANGE_MID;
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  // Deflection is a valid climb command after entry, not a mode fault.
+  model.state.input.ch[
+      ALTHOLD_PILOT_CHANNEL] =
+      0.6f;
+
+  model.state.input.raw[
+      ALTHOLD_PILOT_CHANNEL] =
+      1800;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  TEST_ASSERT_FALSE(
+      model.getArmingDisabled(
+          ARMING_DISABLED_ALTHOLD));
+}
+
+void test_actuator_althold_v2_invalid_pilot_channel_exits_and_latches()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      1925000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  auto& condition =
+      model.config.conditions[0];
+
+  condition.id =
+      MODE_ALTHOLD;
+  condition.ch =
+      AXIS_AUX_1;
+  condition.min =
+      1200;
+  condition.max =
+      1800;
+
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1500;
+
+  model.state.input.ch[
+      ALTHOLD_PILOT_CHANNEL] =
+      0.0f;
+
+  model.state.input.raw[
+      ALTHOLD_PILOT_CHANNEL] =
+      PWM_RANGE_MID;
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  // Receiver frame still exists, but the dedicated vertical channel itself
+  // has gone out of the accepted RC range.
+  model.state.input.raw[
+      ALTHOLD_PILOT_CHANNEL] =
+      0;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  TEST_ASSERT_TRUE(
+      model.getArmingDisabled(
+          ARMING_DISABLED_ALTHOLD));
+
+  // A recovered channel must not silently re-enter while the switch stays on.
+  model.state.input.raw[
+      ALTHOLD_PILOT_CHANNEL] =
+      PWM_RANGE_MID;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+}
+
 #if ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL != 3
 
 void test_controller_althold_v2_uses_dedicated_centered_stick_channel()
@@ -5213,6 +5446,18 @@ RUN_TEST(
 
 RUN_TEST(
     test_actuator_althold_v2_rejects_invalid_raw_pilot_channel);
+
+RUN_TEST(
+    test_controller_althold_v2_low_manual_throttle_preserves_rate_iterm);
+
+RUN_TEST(
+    test_controller_althold_v2_tpa_uses_assisted_thrust);
+
+RUN_TEST(
+    test_actuator_althold_v2_allows_stick_deflection_after_entry);
+
+RUN_TEST(
+    test_actuator_althold_v2_invalid_pilot_channel_exits_and_latches);
 
 #if ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL != 3
 RUN_TEST(
