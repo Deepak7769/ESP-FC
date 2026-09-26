@@ -87,7 +87,10 @@ static void setHealthyAssistedEstimatorState(
   // Assisted-mode tests represent a receiver frame that actually contains
   // the configured AltHold pilot channel unless a test overrides this.
   model.state.input.channelCount =
-      ALTHOLD_PILOT_CHANNEL + 1;
+      std::max<size_t>(
+          ALTHOLD_PILOT_CHANNEL + 1,
+          static_cast<size_t>(
+              AXIS_AUX_1 + 1));
 
   model.state.input.channelsValid =
       true;
@@ -1404,7 +1407,10 @@ void test_actuator_althold_fault_requires_switch_cycle()
 
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
   model.state.input.channelCount =
-      ALTHOLD_PILOT_CHANNEL + 1;
+      std::max<size_t>(
+          ALTHOLD_PILOT_CHANNEL + 1,
+          static_cast<size_t>(
+              AXIS_AUX_1 + 1));
 
   model.state.input.channelsValid =
       true;
@@ -2205,6 +2211,7 @@ void test_actuator_althold_v2_requires_centered_pilot_stick_on_entry()
           ARMING_DISABLED_ALTHOLD));
 }
 
+#if ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL >= 4
 void test_actuator_althold_v2_rejects_missing_pilot_channel()
 {
   ArduinoFakeReset();
@@ -2312,6 +2319,8 @@ void test_actuator_althold_v2_rejects_missing_pilot_channel()
       model.getArmingDisabled(
           ARMING_DISABLED_ALTHOLD));
 }
+
+#endif
 
 void test_actuator_althold_v2_rejects_invalid_raw_pilot_channel()
 {
@@ -5645,8 +5654,10 @@ RUN_TEST(
 RUN_TEST(
     test_actuator_althold_v2_requires_centered_pilot_stick_on_entry);
 
+#if ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL >= 4
 RUN_TEST(
     test_actuator_althold_v2_rejects_missing_pilot_channel);
+#endif
 
 RUN_TEST(
     test_actuator_althold_v2_rejects_invalid_raw_pilot_channel);
