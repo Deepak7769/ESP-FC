@@ -30,7 +30,9 @@ jobs:
           platformio test -e native
           platformio test -e native_angle_v2 -f test_fc
           platformio test -e native_assisted_v2 -f test_fc
+          platformio test -e native_assisted_v2_active -f test_fc
           platformio run -e esp32_assisted_v2_bench
+          platformio run -e esp32_assisted_v2_candidate
   build:
     needs: test
     runs-on: ubuntu-24.04
