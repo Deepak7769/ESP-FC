@@ -3448,14 +3448,15 @@ void test_actuator_stale_gyro_blocks_arm_and_disarms()
       AXIS_THRUST] =
       1000;
 
-  model.updateModes(
-      uint32_t{1} <<
-      MODE_ARMED);
-
   Actuator actuator(
       model);
 
   actuator.begin();
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
   actuator.updateArmingDisabled();
 
   TEST_ASSERT_TRUE(
@@ -3533,10 +3534,13 @@ void test_actuator_arming_gyro_motor_calbration()
 
 void test_actuator_arming_failsafe()
 {
+  ArduinoFakeReset();
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(1000);
+
   Model model;
   model.state.gyro.present = true;
   model.state.gyro.sampleValid = true;
-  model.state.gyro.lastUpdateUs = 0;
+  model.state.gyro.lastUpdateUs = 1000;
   model.config.output.protocol = ESC_PROTOCOL_DSHOT150;
   model.state.failsafe.phase = FC_FAILSAFE_RX_LOSS_DETECTED;
   model.state.gyro.calibrationState = CALIBRATION_UPDATE;
@@ -3558,13 +3562,16 @@ void test_actuator_arming_failsafe()
 
 void test_actuator_arming_throttle()
 {
+  ArduinoFakeReset();
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(1000);
+
   Model model;
   model.config.output.protocol = ESC_PROTOCOL_DSHOT150;
   model.config.input.minCheck = 1050;
   model.state.input.us[AXIS_THRUST] = 1100;
   model.state.gyro.present = true;
   model.state.gyro.sampleValid = true;
-  model.state.gyro.lastUpdateUs = 0;
+  model.state.gyro.lastUpdateUs = 1000;
 
   // model.begin();
 
