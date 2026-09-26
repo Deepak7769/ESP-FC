@@ -182,6 +182,13 @@ void FAST_CODE_ATTR Mixer::updateMixer(const MixerConfig& mixer, float* outputs)
 {
   Utils::Stats::Measure measure(_model.state.stats, COUNTER_MIXER);
 
+  const size_t mixerCount =
+      (mixer.count <= OUTPUT_CHANNELS &&
+       mixer.mixes != nullptr)
+          ? static_cast<size_t>(
+                mixer.count)
+          : 0u;
+
   float sources[MIXER_SOURCE_MAX];
   sources[MIXER_SOURCE_NULL] = 0;
 
@@ -205,17 +212,49 @@ void FAST_CODE_ATTR Mixer::updateMixer(const MixerConfig& mixer, float* outputs)
     outputs[i] = 0.f;
   }
 
-  // mix stabilized sources first
-  const MixerEntry* entry = mixer.mixes;
-  const MixerEntry* end = mixer.mixes + MIXER_RULE_MAX;
-  while (entry != end)
+  // Mix stabilized sources first. Custom mixer entries are persisted
+  // configuration, so validate signed source/destination indices before they
+  // are ever used as array subscripts.
+  if (mixer.mixes)
   {
-    if (entry->src == MIXER_SOURCE_NULL) break; // break on terminator
-    if (entry->src <= MIXER_SOURCE_YAW && entry->dst < mixer.count && entry->rate != 0)
+    for (size_t rule = 0;
+         rule < MIXER_RULE_MAX;
+         ++rule)
     {
-      outputs[entry->dst] += sources[entry->src] * (entry->rate * 0.01f);
+      const auto& entry =
+          mixer.mixes[rule];
+
+      if (entry.src ==
+          MIXER_SOURCE_NULL)
+      {
+        break;
+      }
+
+      const bool sourceValid =
+          entry.src >=
+              MIXER_SOURCE_ROLL &&
+          entry.src <=
+              MIXER_SOURCE_YAW;
+
+      const bool destinationValid =
+          entry.dst >= 0 &&
+          static_cast<size_t>(
+              entry.dst) <
+              mixerCount;
+
+      if (sourceValid &&
+          destinationValid &&
+          entry.rate != 0)
+      {
+        outputs[
+            static_cast<size_t>(
+                entry.dst)] +=
+            sources[
+                static_cast<size_t>(
+                    entry.src)] *
+            (entry.rate * 0.01f);
+      }
     }
-    entry++;
   }
 
   // airmode logic
@@ -224,7 +263,7 @@ void FAST_CODE_ATTR Mixer::updateMixer(const MixerConfig& mixer, float* outputs)
   if (_model.isAirModeActive())
   {
     float min = 0.f, max = 0.f;
-    for (size_t i = 0; i < mixer.count; i++)
+    for (size_t i = 0; i < mixerCount; i++)
     {
       max = std::max(max, outputs[i]);
       min = std::min(min, outputs[i]);
@@ -232,7 +271,7 @@ void FAST_CODE_ATTR Mixer::updateMixer(const MixerConfig& mixer, float* outputs)
     float range = (max - min) * 0.5f;
     if (range > 1.f)
     {
-      for (size_t i = 0; i < mixer.count; i++)
+      for (size_t i = 0; i < mixerCount; i++)
       {
         outputs[i] /= range;
       }
@@ -244,28 +283,61 @@ void FAST_CODE_ATTR Mixer::updateMixer(const MixerConfig& mixer, float* outputs)
     }
   }
 
-  // apply other channels
-  entry = mixer.mixes;
-  while (entry != end)
+  // Apply thrust and raw-RC sources.
+  if (mixer.mixes)
   {
-    if (entry->src == MIXER_SOURCE_NULL) break; // break on terminator
-    if (entry->dst < mixer.count)
+    for (size_t rule = 0;
+         rule < MIXER_RULE_MAX;
+         ++rule)
     {
-      if (entry->src == MIXER_SOURCE_THRUST)
+      const auto& entry =
+          mixer.mixes[rule];
+
+      if (entry.src ==
+          MIXER_SOURCE_NULL)
       {
-        outputs[entry->dst] += thrust * (entry->rate * 0.01f);
+        break;
       }
-      else if (entry->src > MIXER_SOURCE_THRUST && entry->src < MIXER_SOURCE_MAX)
+
+      const bool destinationValid =
+          entry.dst >= 0 &&
+          static_cast<size_t>(
+              entry.dst) <
+              mixerCount;
+
+      if (!destinationValid)
       {
-        outputs[entry->dst] += sources[entry->src] * (entry->rate * 0.01f);
+        continue;
+      }
+
+      const size_t destination =
+          static_cast<size_t>(
+              entry.dst);
+
+      if (entry.src ==
+          MIXER_SOURCE_THRUST)
+      {
+        outputs[destination] +=
+            thrust *
+            (entry.rate * 0.01f);
+      }
+      else if (entry.src >
+                   MIXER_SOURCE_THRUST &&
+               entry.src <
+                   MIXER_SOURCE_MAX)
+      {
+        outputs[destination] +=
+            sources[
+                static_cast<size_t>(
+                    entry.src)] *
+            (entry.rate * 0.01f);
       }
     }
-    entry++;
   }
 
   bool saturated = false;
 
-  for (size_t i = 0; i < mixer.count; i++)
+  for (size_t i = 0; i < mixerCount; i++)
   {
      const OutputChannelConfig& occ =
          _model.config.output.channel[i];
@@ -332,11 +404,18 @@ void FAST_CODE_ATTR Mixer::writeOutput(const MixerConfig& mixer, float* out)
 {
   Utils::Stats::Measure measure(_model.state.stats, COUNTER_MIXER_WRITE);
 
+  const size_t mixerCount =
+      (mixer.count <= OUTPUT_CHANNELS &&
+       mixer.mixes != nullptr)
+          ? static_cast<size_t>(
+                mixer.count)
+          : 0u;
+
   bool stop = _stop();
   for (size_t i = 0; i < OUTPUT_CHANNELS; i++)
   {
     const OutputChannelConfig& och = _model.config.output.channel[i];
-    if (i >= mixer.count || stop)
+    if (i >= mixerCount || stop)
     {
       _model.state.output.us[i] =
           och.servo && _model.state.output.disarmed[i] == 1000 ? och.neutral : _model.state.output.disarmed[i];
@@ -372,7 +451,7 @@ void FAST_CODE_ATTR Mixer::writeOutput(const MixerConfig& mixer, float* out)
   {
     for (size_t i = 0;
          i < std::min<size_t>(
-             mixer.count,
+             mixerCount,
              4);
          ++i)
     {

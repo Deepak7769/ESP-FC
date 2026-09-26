@@ -3301,6 +3301,128 @@ void test_actuator_arming_throttle()
   TEST_ASSERT_EQUAL_UINT32(ARMING_DISABLED_THROTTLE, model.state.mode.armingDisabledFlags);
 }
 
+void test_mixer_invalid_custom_entries_are_ignored()
+{
+  Model model;
+  Output::Mixer mixer(
+      model);
+
+  MixerEntry rules[MIXER_RULE_MAX] = {};
+
+  rules[0] =
+      MixerEntry(
+          -1,
+          0,
+          100);
+
+  rules[1] =
+      MixerEntry(
+          MIXER_SOURCE_ROLL,
+          -1,
+          100);
+
+  rules[2] =
+      MixerEntry(
+          MIXER_SOURCE_MAX,
+          0,
+          100);
+
+  rules[3] =
+      MixerEntry(
+          MIXER_SOURCE_ROLL,
+          0,
+          100);
+
+  rules[4] =
+      MixerEntry();
+
+  MixerConfig config(
+      4,
+      rules);
+
+  model.state.output.ch[
+      AXIS_ROLL] =
+      0.25f;
+
+  float outputs[
+      OUTPUT_CHANNELS];
+
+  std::fill_n(
+      outputs,
+      OUTPUT_CHANNELS,
+      99.0f);
+
+  mixer.updateMixer(
+      config,
+      outputs);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      0.25f,
+      outputs[0]);
+
+  for (size_t i = 1;
+       i < OUTPUT_CHANNELS;
+       ++i)
+  {
+    TEST_ASSERT_FLOAT_WITHIN(
+        0.0001f,
+        0.0f,
+        outputs[i]);
+  }
+}
+
+void test_mixer_invalid_output_count_fails_closed()
+{
+  Model model;
+  Output::Mixer mixer(
+      model);
+
+  MixerEntry rules[MIXER_RULE_MAX] = {};
+  rules[0] =
+      MixerEntry(
+          MIXER_SOURCE_THRUST,
+          0,
+          100);
+  rules[1] =
+      MixerEntry();
+
+  MixerConfig invalidConfig(
+      255,
+      rules);
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  for (size_t i = 0;
+       i < OUTPUT_CHANNELS;
+       ++i)
+  {
+    model.state.output.disarmed[i] =
+        1000;
+
+    model.state.output.us[i] =
+        1800;
+  }
+
+  float outputs[
+      OUTPUT_CHANNELS] = {};
+
+  mixer.writeOutput(
+      invalidConfig,
+      outputs);
+
+  for (size_t i = 0;
+       i < OUTPUT_CHANNELS;
+       ++i)
+  {
+    TEST_ASSERT_EQUAL_INT16(
+        1000,
+        model.state.output.us[i]);
+  }
+}
+
 void test_mixer_throttle_limit_none()
 {
   Model model;
@@ -5987,6 +6109,8 @@ RUN_TEST(
 RUN_TEST(
     test_actuator_arming_failsafe);
   RUN_TEST(test_actuator_arming_throttle);
+  RUN_TEST(test_mixer_invalid_custom_entries_are_ignored);
+  RUN_TEST(test_mixer_invalid_output_count_fails_closed);
   RUN_TEST(test_mixer_throttle_limit_none);
   RUN_TEST(test_mixer_throttle_limit_scale);
   RUN_TEST(test_mixer_throttle_limit_clip);
