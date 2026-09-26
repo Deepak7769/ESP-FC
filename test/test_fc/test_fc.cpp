@@ -1854,6 +1854,89 @@ void test_controller_althold_v2_uses_dedicated_centered_stick_channel()
       0.0f);
 }
 
+
+void test_actuator_althold_v2_requires_centered_pilot_stick_on_entry()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      1800000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  auto& condition =
+      model.config.conditions[0];
+
+  condition.id =
+      MODE_ALTHOLD;
+
+  condition.ch =
+      AXIS_AUX_1;
+
+  condition.min =
+      1200;
+
+  condition.max =
+      1800;
+
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1500;
+
+  // An off-center raw vertical stick must not cause AltHold to engage and
+  // immediately command a climb/descent during the mode handoff.
+  model.state.input.ch[
+      ALTHOLD_PILOT_CHANNEL] =
+      0.50f;
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  TEST_ASSERT_TRUE(
+      model.getArmingDisabled(
+          ARMING_DISABLED_ALTHOLD));
+
+  // Releasing the spring-centered stick makes the mode eligible without
+  // requiring a power cycle.
+  model.state.input.ch[
+      ALTHOLD_PILOT_CHANNEL] =
+      0.0f;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  TEST_ASSERT_FALSE(
+      model.getArmingDisabled(
+          ARMING_DISABLED_ALTHOLD));
+}
+
 #endif
 
 #endif
@@ -4934,6 +5017,9 @@ RUN_TEST(
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
 RUN_TEST(
     test_controller_althold_v2_active_path_is_bumpless_and_corrective);
+
+RUN_TEST(
+    test_actuator_althold_v2_requires_centered_pilot_stick_on_entry);
 
 #if ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL != 3
 RUN_TEST(
