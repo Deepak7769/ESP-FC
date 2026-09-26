@@ -341,6 +341,11 @@ struct GyroState
   VectorFloat adc;
   VectorFloat sampled;
   VectorFloat scaled;
+
+  // Runtime gyro freshness. Detection at boot is not enough: a disconnected
+  // or failed MPU/IMU must not remain "present" forever.
+  bool sampleValid{false};
+  uint32_t lastUpdateUs{0};
   VectorFloat dynNotch;
 
   float scale;

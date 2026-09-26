@@ -44,6 +44,12 @@ static void setHealthyAssistedEstimatorState(
   model.state.gyro.present =
       true;
 
+  model.state.gyro.sampleValid =
+      true;
+
+  model.state.gyro.lastUpdateUs =
+      nowUs;
+
   model.state.accel.present =
       true;
 
@@ -3409,6 +3415,106 @@ void test_rates_kiss_expo()
   TEST_ASSERT_FLOAT_WITHIN(0.01f, -11.89f, rates.getSetpoint(AXIS_ROLL, -1.0f));
 }
 
+void test_actuator_stale_gyro_blocks_arm_and_disarms()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      500000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  model.state.gyro.present =
+      true;
+
+  model.state.gyro.sampleValid =
+      true;
+
+  model.state.gyro.lastUpdateUs =
+      NOW_US -
+      200000u;
+
+  model.config.output.protocol =
+      ESC_PROTOCOL_DSHOT150;
+
+  model.state.input.us[
+      AXIS_THRUST] =
+      1000;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+  actuator.updateArmingDisabled();
+
+  TEST_ASSERT_TRUE(
+      model.getArmingDisabled(
+          ARMING_DISABLED_NO_GYRO));
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  TEST_ASSERT_EQUAL_UINT32(
+      DISARM_REASON_SYSTEM,
+      model.state.mode.disarmReason);
+}
+
+void test_actuator_fresh_gyro_passes_runtime_health_gate()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      500000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  model.state.gyro.present =
+      true;
+
+  model.state.gyro.sampleValid =
+      true;
+
+  model.state.gyro.lastUpdateUs =
+      NOW_US -
+      1000u;
+
+  model.config.output.protocol =
+      ESC_PROTOCOL_DSHOT150;
+
+  model.state.input.us[
+      AXIS_THRUST] =
+      1000;
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+  actuator.updateArmingDisabled();
+
+  TEST_ASSERT_FALSE(
+      model.getArmingDisabled(
+          ARMING_DISABLED_NO_GYRO));
+}
+
 void test_actuator_arming_gyro_motor_calbration()
 {
   Model model;
@@ -3429,6 +3535,8 @@ void test_actuator_arming_failsafe()
 {
   Model model;
   model.state.gyro.present = true;
+  model.state.gyro.sampleValid = true;
+  model.state.gyro.lastUpdateUs = 0;
   model.config.output.protocol = ESC_PROTOCOL_DSHOT150;
   model.state.failsafe.phase = FC_FAILSAFE_RX_LOSS_DETECTED;
   model.state.gyro.calibrationState = CALIBRATION_UPDATE;
@@ -3455,6 +3563,8 @@ void test_actuator_arming_throttle()
   model.config.input.minCheck = 1050;
   model.state.input.us[AXIS_THRUST] = 1100;
   model.state.gyro.present = true;
+  model.state.gyro.sampleValid = true;
+  model.state.gyro.lastUpdateUs = 0;
 
   // model.begin();
 
@@ -6374,6 +6484,8 @@ RUN_TEST(
   RUN_TEST(test_rates_raceflight_expo);
   RUN_TEST(test_rates_kiss);
   RUN_TEST(test_rates_kiss_expo);
+  RUN_TEST(test_actuator_stale_gyro_blocks_arm_and_disarms);
+  RUN_TEST(test_actuator_fresh_gyro_passes_runtime_health_gate);
   RUN_TEST(test_actuator_arming_gyro_motor_calbration);
   RUN_TEST(test_actuator_missing_aux_channel_cannot_activate_mode);
   RUN_TEST(test_actuator_missing_aux_channel_does_not_apply_scaler);

@@ -19,6 +19,12 @@ GyroSensor::~GyroSensor() {}
 
 int GyroSensor::begin()
 {
+  _model.state.gyro.sampleValid =
+      false;
+
+  _model.state.gyro.lastUpdateUs =
+      0;
+
   _gyro = _model.state.gyro.dev;
   if (!_gyro) return 0;
 
@@ -185,7 +191,7 @@ int FAST_CODE_ATTR GyroSensor::read()
 
   if (!_gyro->readGyro(_model.state.gyro.raw))
   {
-     return 0;
+    return 0;
   }
 
   VectorFloat input = static_cast<VectorFloat>(_model.state.gyro.raw) * _model.state.gyro.scale;
@@ -200,6 +206,22 @@ int FAST_CODE_ATTR GyroSensor::read()
   {
     _model.state.gyro.sampled = _sma.update(input);
   }
+
+  const auto& sampled =
+      _model.state.gyro.sampled;
+
+  if (!std::isfinite(sampled.x) ||
+      !std::isfinite(sampled.y) ||
+      !std::isfinite(sampled.z))
+  {
+    return 0;
+  }
+
+  _model.state.gyro.lastUpdateUs =
+      micros();
+
+  _model.state.gyro.sampleValid =
+      true;
 
   return 1;
 }

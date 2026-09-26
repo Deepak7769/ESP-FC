@@ -295,7 +295,35 @@ void Actuator::updateArmingDisabled()
   int errors = _model.state.i2cErrorDelta;
   _model.state.i2cErrorDelta = 0;
 
-  _model.setArmingDisabled(ARMING_DISABLED_NO_GYRO, !_model.state.gyro.present || errors);
+  constexpr uint32_t
+      GYRO_STALE_US =
+          100000;
+
+  const uint32_t now =
+      micros();
+
+  const bool gyroFresh =
+      _model.state.gyro.present &&
+      _model.state.gyro.sampleValid &&
+      static_cast<uint32_t>(
+          now -
+          _model.state.gyro.lastUpdateUs) <
+          GYRO_STALE_US;
+
+  _model.setArmingDisabled(
+      ARMING_DISABLED_NO_GYRO,
+      !gyroFresh ||
+      errors);
+
+  // A quadrotor has no safe attitude-control fallback after the sole gyro
+  // stops updating. Do not leave the previous motor command resident.
+  if (_model.isModeActive(
+          MODE_ARMED) &&
+      !gyroFresh)
+  {
+    _model.disarm(
+        DISARM_REASON_SYSTEM);
+  }
   _model.setArmingDisabled(ARMING_DISABLED_FAILSAFE, _model.state.failsafe.phase != FC_FAILSAFE_IDLE);
   _model.setArmingDisabled(ARMING_DISABLED_RX_FAILSAFE, _model.state.input.rxLoss || _model.state.input.rxFailSafe);
   _model.setArmingDisabled(ARMING_DISABLED_THROTTLE, !_model.isThrottleLow());
