@@ -928,12 +928,43 @@ void Actuator::updateFailsafeLandShadow()
             altitude.height <=
             TOUCHDOWN_HEIGHT_M;
 
+        // Mature multicopter landing detectors do not declare touchdown from
+        // low vertical speed alone: they also require evidence that thrust has
+        // fallen below the hover region. This prevents a near-ground hover or
+        // a temporarily stalled descent from being mistaken for contact.
+        const float configuredHoverThrust =
+            std::clamp(
+                -1.0f +
+                    2.0f *
+                        (static_cast<float>(
+                             _model.config.altHold
+                                 .itermCenter) *
+                         0.01f),
+                -0.8f,
+                0.8f);
+
+        constexpr float
+            TOUCHDOWN_THRUST_MARGIN =
+                0.05f;
+
+        const float commandedThrust =
+            _model.state.output.ch[
+                AXIS_THRUST];
+
+        const bool lowLandingThrust =
+            std::isfinite(
+                commandedThrust) &&
+            commandedThrust <=
+                configuredHoverThrust -
+                    TOUCHDOWN_THRUST_MARGIN;
+
         const bool touchdownEvidence =
             landingElapsedUs >=
                 MIN_LANDING_TIME_US &&
             slowVerticalMotion &&
             nearGround &&
-            descentEvidence;
+            descentEvidence &&
+            lowLandingThrust;
 
         if (landingTimedOut)
         {

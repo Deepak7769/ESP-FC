@@ -2644,6 +2644,10 @@ void test_failsafe_land_v2_touchdown_dwell_disarms()
   model.state.altitude.vario =
       0.05f;
 
+  model.state.output.ch[
+      AXIS_THRUST] =
+      -0.20f;
+
   model.state.failsafe.rxEverValid =
       true;
 
@@ -2694,6 +2698,85 @@ void test_failsafe_land_v2_touchdown_dwell_disarms()
   TEST_ASSERT_TRUE(
       model.state.failsafe
           .landingShadowOutputBlocked);
+}
+
+void test_failsafe_land_v2_near_ground_hover_does_not_disarm()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      6000000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  model.state.altitude.height =
+      0.10f;
+
+  model.state.altitude.vario =
+      0.02f;
+
+  // At/above the configured hover region: this may be a low hover or a
+  // temporarily stalled descent, not confirmed ground contact.
+  model.state.output.ch[
+      AXIS_THRUST] =
+      0.10f;
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.failsafe.landingRequested =
+      true;
+
+  model.state.failsafe.landingRequestedUs =
+      NOW_US -
+      3000000u;
+
+  model.state.failsafe.landingEntryHeight =
+      2.0f;
+
+  model.state.failsafe.landingEntryVario =
+      -0.5f;
+
+  model.state.failsafe.phase =
+      FC_FAILSAFE_LANDING;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  Actuator actuator(
+      model);
+
+  actuator.updateFailsafeLandShadow();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_LANDING,
+      model.state.failsafe.phase);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingTouchdownCandidate);
 }
 
 void test_failsafe_land_v2_timeout_disarms()
@@ -6151,6 +6234,9 @@ RUN_TEST(
 
 RUN_TEST(
     test_failsafe_land_v2_touchdown_dwell_disarms);
+
+RUN_TEST(
+    test_failsafe_land_v2_near_ground_hover_does_not_disarm);
 
 RUN_TEST(
     test_failsafe_land_v2_timeout_disarms);
