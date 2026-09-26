@@ -30,6 +30,34 @@ constexpr bool ENABLE_LEGACY_ALTHOLD_OUTPUT =
 #error "ESPFC_ANGLE_V2_ACTIVE_TEST requires ESPFC_SAFE_BENCH_BUILD"
 
 #endif
+
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST) && \
+    !defined(ESPFC_SAFE_BENCH_BUILD)
+
+#error "ESPFC_ALTHOLD_V2_ACTIVE_TEST requires ESPFC_SAFE_BENCH_BUILD"
+
+#endif
+
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST) && \
+    !defined(ESPFC_SAFE_BENCH_BUILD)
+
+#error "ESPFC_LAND_V2_ACTIVE_TEST requires ESPFC_SAFE_BENCH_BUILD"
+
+#endif
+
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST) && \
+    !defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST)
+
+#error "ESPFC_LAND_V2_ACTIVE_TEST requires ESPFC_ALTHOLD_V2_ACTIVE_TEST"
+
+#endif
+
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST) && \
+    !defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
+
+#error "ESPFC_LAND_V2_ACTIVE_TEST requires ESPFC_ANGLE_V2_ACTIVE_TEST"
+
+#endif
 } // namespace
 
 Controller::Controller(Model& model): _model(model), _rates{} {}
@@ -47,6 +75,9 @@ int Controller::begin()
       false;
 
   _shadowAltWasActive =
+      false;
+
+  _altHoldV2OutputWasActive =
       false;
 
   _shadowAngleTarget[AXIS_ROLL] =
@@ -210,109 +241,168 @@ void Controller::innerLoopRobot()
 
 void FAST_CODE_ATTR Controller::outerLoop()
 {
-  // Roll/Pitch rates control
-if (_model.isModeActive(MODE_ANGLE))
-{
-#if defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
-
-  // ---------------------------------------------------
-  // ANGLE V2
-  //
-  // The V2 attitude controller is now the only Angle
-  // controller in the V2 validation architecture.
-  //
-  // updateAssistedModesShadow() executes before this
-  // function and produces the current Roll/Pitch rate
-  // targets.
-  //
-  // Those rate targets feed the existing inner rate
-  // controller exactly as Acro does.
-  // ---------------------------------------------------
-
-  const auto& angleV2 =
-      _model.state.assistedShadow;
-
-  if (angleV2.angleActive)
-  {
-    _model.state.setpoint.rate[
-        AXIS_ROLL] =
-        angleV2.rollRateTarget;
-
-    _model.state.setpoint.rate[
-        AXIS_PITCH] =
-        angleV2.pitchRateTarget;
-  }
-  else
-  {
-    // Never reuse stale assisted-mode targets.
-    _model.state.setpoint.rate[
-        AXIS_ROLL] =
-        0.0f;
-
-    _model.state.setpoint.rate[
-        AXIS_PITCH] =
-        0.0f;
-  }
-
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+  const bool landingV2Requested =
+      _model.state.failsafe.landingRequested &&
+      _model.state.failsafe.phase ==
+          FC_FAILSAFE_LANDING;
 #else
-
-  // Angle V2 is intentionally unavailable in ordinary
-  // builds until the non-actuating validation phase is
-  // complete.
-  //
-  // Do not silently fall back to the obsolete legacy
-  // Angle controller.
-  _model.state.setpoint.rate[
-      AXIS_ROLL] =
-      0.0f;
-
-  _model.state.setpoint.rate[
-      AXIS_PITCH] =
-      0.0f;
-
+  constexpr bool landingV2Requested =
+      false;
 #endif
-}
+
+  // -----------------------------------------------------
+  // ROLL / PITCH
+  // -----------------------------------------------------
+  //
+  // LAND V2 deliberately reuses the same Angle V2
+  // controller instead of creating a second leveling loop.
+  // This keeps one authoritative attitude path.
+  // -----------------------------------------------------
+
+  if (_model.isModeActive(MODE_ANGLE) ||
+      landingV2Requested)
+  {
+#if defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
+    const auto& angleV2 =
+        _model.state.assistedShadow;
+
+    if (angleV2.angleActive)
+    {
+      _model.state.setpoint.rate[
+          AXIS_ROLL] =
+          angleV2.rollRateTarget;
+
+      _model.state.setpoint.rate[
+          AXIS_PITCH] =
+          angleV2.pitchRateTarget;
+    }
+    else
+    {
+      // A requested assisted mode with an unhealthy
+      // estimator must never reuse stale rate targets.
+      _model.state.setpoint.rate[
+          AXIS_ROLL] =
+          0.0f;
+
+      _model.state.setpoint.rate[
+          AXIS_PITCH] =
+          0.0f;
+    }
+#else
+    // Angle/LAND V2 is unavailable in an ordinary build.
+    _model.state.setpoint.rate[
+        AXIS_ROLL] =
+        0.0f;
+
+    _model.state.setpoint.rate[
+        AXIS_PITCH] =
+        0.0f;
+#endif
+  }
   else
   {
-    for (size_t i = 0; i < AXIS_COUNT_RP; i++)
+    for (size_t i = 0;
+         i < AXIS_COUNT_RP;
+         ++i)
     {
-      _model.state.setpoint.rate[i] = calculateSetpointRate(i, _model.state.input.ch[i]);
+      _model.state.setpoint.rate[i] =
+          calculateSetpointRate(
+              i,
+              _model.state.input.ch[i]);
     }
   }
 
-  // Yaw rates control
-  _model.state.setpoint.rate[AXIS_YAW] = calculateSetpointRate(AXIS_YAW, _model.state.input.ch[AXIS_YAW]);
+  // -----------------------------------------------------
+  // YAW
+  // -----------------------------------------------------
+  //
+  // During automatic LAND there is no valid pilot yaw
+  // command. Request zero yaw rate and let the existing
+  // rate loop damp rotation.
+  // -----------------------------------------------------
 
-// -----------------------------------------------------
-// THRUST CONTROL
-//
-// AltHold V2 currently runs in SHADOW MODE only.
-// Therefore MODE_ALTHOLD must not hand thrust control
-// to the old legacy altitude controller.
-// -----------------------------------------------------
-
-const bool legacyAltHoldActive =
-    ENABLE_LEGACY_ALTHOLD_OUTPUT &&
-    _model.isModeActive(MODE_ALTHOLD);
-
-if (legacyAltHoldActive)
-{
-  _model.state.setpoint.rate[AXIS_THRUST] =
-      calcualteAltHoldSetpoint();
-}
-else
-{
-  // Manual thrust remains authoritative while V2 is
-  // being validated in shadow mode.
-  _model.state.setpoint.rate[AXIS_THRUST] =
-      _model.state.input.ch[AXIS_THRUST];
-}
-  // debug
-  if (_model.config.debug.mode == DEBUG_ANGLERATE)
+  if (landingV2Requested)
   {
-    for (size_t i = 0; i < AXIS_COUNT_RPY; ++i)
+    _model.state.setpoint.rate[
+        AXIS_YAW] =
+        0.0f;
+  }
+  else
+  {
+    _model.state.setpoint.rate[
+        AXIS_YAW] =
+        calculateSetpointRate(
+            AXIS_YAW,
+            _model.state.input.ch[
+                AXIS_YAW]);
+  }
+
+  // -----------------------------------------------------
+  // THRUST / VERTICAL-RATE SETPOINT
+  // -----------------------------------------------------
+
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST)
+  const bool altHoldV2Active =
+      _model.state.assistedShadow.altitudeActive &&
+      (_model.isModeActive(MODE_ALTHOLD) ||
+       landingV2Requested);
+#else
+  constexpr bool altHoldV2Active =
+      false;
+#endif
+
+  const bool legacyAltHoldActive =
+      ENABLE_LEGACY_ALTHOLD_OUTPUT &&
+      _model.isModeActive(MODE_ALTHOLD);
+
+  if (altHoldV2Active)
+  {
+    _model.state.setpoint.rate[
+        AXIS_THRUST] =
+        _model.state.assistedShadow
+            .verticalRateTarget;
+  }
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+  else if (landingV2Requested)
+  {
+    // LAND was requested, but the estimator has not yet
+    // been accepted (or just failed). Preserve the last
+    // commanded thrust for this supervisor cycle. The
+    // Actuator LAND supervisor will either validate the
+    // estimator or perform the configured hard fallback.
+    _model.state.setpoint.rate[
+        AXIS_THRUST] =
+        _model.state.output.ch[
+            AXIS_THRUST];
+  }
+#endif
+  else if (legacyAltHoldActive)
+  {
+    _model.state.setpoint.rate[
+        AXIS_THRUST] =
+        calcualteAltHoldSetpoint();
+  }
+  else
+  {
+    _model.state.setpoint.rate[
+        AXIS_THRUST] =
+        _model.state.input.ch[
+            AXIS_THRUST];
+  }
+
+  // debug
+  if (_model.config.debug.mode ==
+      DEBUG_ANGLERATE)
+  {
+    for (size_t i = 0;
+         i < AXIS_COUNT_RPY;
+         ++i)
     {
-      _model.state.debug[i] = lrintf(Utils::toDeg(_model.state.setpoint.rate[i]));
+      _model.state.debug[i] =
+          lrintf(
+              Utils::toDeg(
+                  _model.state.setpoint.rate[i]));
     }
   }
 }
@@ -359,37 +449,141 @@ void FAST_CODE_ATTR Controller::innerLoop()
 
 // -----------------------------------------------------
 // THRUST OUTPUT
-//
-// Keep legacy AltHold disconnected while V2 remains
-// non-actuating.
 // -----------------------------------------------------
+
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+const bool landingV2Requested =
+    _model.state.failsafe.landingRequested &&
+    _model.state.failsafe.phase ==
+        FC_FAILSAFE_LANDING;
+#else
+constexpr bool landingV2Requested =
+    false;
+#endif
+
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST)
+const bool altHoldV2OutputActive =
+    _model.state.assistedShadow.altitudeActive &&
+    (_model.isModeActive(MODE_ALTHOLD) ||
+     landingV2Requested);
+#else
+constexpr bool altHoldV2OutputActive =
+    false;
+#endif
 
 const bool legacyAltHoldActive =
     ENABLE_LEGACY_ALTHOLD_OUTPUT &&
     _model.isModeActive(MODE_ALTHOLD);
 
-if (legacyAltHoldActive)
+auto& verticalPid =
+    innerPid[AXIS_THRUST];
+
+if (altHoldV2OutputActive)
 {
+  if (!_altHoldV2OutputWasActive)
+  {
+    // --------------------------------------------------
+    // BUMPLESS VERTICAL-CONTROL ENTRY
+    //
+    // Seed the PID history from the measured state and
+    // choose I-term so P+I+F initially reproduces the
+    // thrust that was already being commanded.
+    // --------------------------------------------------
+
+    const float entrySetpoint =
+        setpoint.rate[AXIS_THRUST];
+
+    const float entryMeasurement =
+        altitude.vario;
+
+    const float entryError =
+        entrySetpoint -
+        entryMeasurement;
+
+    const float entryP =
+        verticalPid.Kp *
+        verticalPid.pScale *
+        entryError;
+
+    const float entryF =
+        verticalPid.Kf *
+        verticalPid.fScale *
+        entrySetpoint;
+
+    const float existingThrust =
+        std::clamp(
+            output.ch[AXIS_THRUST],
+            verticalPid.oLimitLow,
+            verticalPid.oLimitHigh);
+
+    verticalPid.prevMeasurement =
+        entryMeasurement;
+
+    verticalPid.prevError =
+        entryError;
+
+    verticalPid.prevSetpoint =
+        entrySetpoint;
+
+    verticalPid.pTerm =
+        entryP;
+
+    verticalPid.dTerm =
+        0.0f;
+
+    verticalPid.fTerm =
+        entryF;
+
+    verticalPid.iTerm =
+        std::clamp(
+            existingThrust -
+                entryP -
+                entryF,
+            verticalPid.iLimitLow,
+            verticalPid.iLimitHigh);
+  }
+
   output.ch[AXIS_THRUST] =
-      innerPid[AXIS_THRUST].update(
+      verticalPid.update(
           setpoint.rate[AXIS_THRUST],
           altitude.vario);
+
+  _altHoldV2OutputWasActive =
+      true;
+}
+else if (legacyAltHoldActive)
+{
+  output.ch[AXIS_THRUST] =
+      verticalPid.update(
+          setpoint.rate[AXIS_THRUST],
+          altitude.vario);
+
+  _altHoldV2OutputWasActive =
+      false;
 }
 else
 {
-  // Keep the legacy vertical PID synchronized without
-  // allowing it to command the output.
-  innerPid[AXIS_THRUST].update(
+  // Keep the vertical PID state synchronized while
+  // manual thrust owns the output. This also gives the
+  // V2 controller a current derivative history when it
+  // is engaged later.
+  verticalPid.update(
       0.0f,
       altitude.vario);
 
-  innerPid[AXIS_THRUST].iTerm =
-      _model.state.input.ch[
-          AXIS_THRUST];
+  verticalPid.iTerm =
+      std::clamp(
+          _model.state.input.ch[
+              AXIS_THRUST],
+          verticalPid.iLimitLow,
+          verticalPid.iLimitHigh);
 
   output.ch[AXIS_THRUST] =
       setpoint.rate[
           AXIS_THRUST];
+
+  _altHoldV2OutputWasActive =
+      false;
 }
 
   if (_model.config.debug.mode == DEBUG_STACK)
@@ -486,6 +680,19 @@ void Controller::updateAssistedModesShadow()
   const auto& input =
       _model.state.input;
 
+  const auto& failsafe =
+      _model.state.failsafe;
+
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+  const bool landingV2Requested =
+      failsafe.landingRequested &&
+      failsafe.phase ==
+          FC_FAILSAFE_LANDING;
+#else
+  constexpr bool landingV2Requested =
+      false;
+#endif
+
 const float nominalDt =
     1.0f /
     static_cast<float>(
@@ -556,7 +763,8 @@ _shadowLastUpdateUs =
   // =====================================================
 
 const bool angleActive =
-    _model.isModeActive(MODE_ANGLE) &&
+    (_model.isModeActive(MODE_ANGLE) ||
+     landingV2Requested) &&
     shadowAttitudeFresh;
 
   if (angleActive &&
@@ -602,9 +810,11 @@ const bool angleActive =
          ++axis)
     {
       const float requestedAngle =
-          Utils::toRad(
-              _model.config.level.angleLimit) *
-          input.ch[axis];
+          landingV2Requested
+              ? 0.0f
+              : Utils::toRad(
+                    _model.config.level.angleLimit) *
+                    input.ch[axis];
 
       const float change =
           std::clamp(
@@ -666,13 +876,19 @@ const bool angleActive =
   // =====================================================
 
 const bool altActive =
-    _model.isModeActive(MODE_ALTHOLD) &&
+    (_model.isModeActive(MODE_ALTHOLD) ||
+     landingV2Requested) &&
     altitude.healthy &&
     shadowAttitudeFresh &&
     shadowBaroFresh;
 
+  constexpr float LAND_DESCENT_RATE_MS =
+      -0.50f;
+
   const float pilotVz =
-      calculatePilotClimbRateShadow();
+      landingV2Requested
+          ? LAND_DESCENT_RATE_MS
+          : calculatePilotClimbRateShadow();
 
   if (altActive &&
       !_shadowAltWasActive)
