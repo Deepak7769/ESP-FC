@@ -26,7 +26,10 @@ enum TelemetryState {
 class TelemetryCRSF
 {
 public:
-  TelemetryCRSF(Model& model): _model(model) {}
+  TelemetryCRSF(Model& model):
+      _model(model),
+      _current(CRSF_TELEMETRY_STATE_ATTI)
+  {}
 
   int begin()
   {

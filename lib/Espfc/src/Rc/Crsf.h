@@ -142,6 +142,14 @@ struct CrsfMessage
 
   void writeU8(uint8_t v)
   {
+    // size includes Type and CRC.  A legal CRSF length is at most 62, so
+    // payload data may grow only while there is still one byte reserved for
+    // the CRC.
+    if (size >= CRSF_FRAME_SIZE_MAX - 2)
+    {
+      return;
+    }
+
     payload[size++ - 2] = v;
   }
 

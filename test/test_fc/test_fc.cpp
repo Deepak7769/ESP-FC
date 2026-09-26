@@ -88,6 +88,10 @@ static void setHealthyAssistedEstimatorState(
 
   model.state.input.channelsValid =
       true;
+
+  model.state.input.raw[
+      ALTHOLD_PILOT_CHANNEL] =
+      PWM_RANGE_MID;
 }
 /*void setUp(void)
 {
@@ -2042,6 +2046,84 @@ void test_actuator_althold_v2_rejects_missing_pilot_channel()
   TEST_ASSERT_FALSE(
       model.getArmingDisabled(
           ARMING_DISABLED_ALTHOLD));
+}
+
+void test_actuator_althold_v2_rejects_invalid_raw_pilot_channel()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      1875000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  auto& condition =
+      model.config.conditions[0];
+
+  condition.id =
+      MODE_ALTHOLD;
+
+  condition.ch =
+      AXIS_AUX_1;
+
+  condition.min =
+      1200;
+
+  condition.max =
+      1800;
+
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1500;
+
+  model.state.input.ch[
+      ALTHOLD_PILOT_CHANNEL] =
+      0.0f;
+
+  model.state.input.raw[
+      ALTHOLD_PILOT_CHANNEL] =
+      0;
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  TEST_ASSERT_TRUE(
+      model.getArmingDisabled(
+          ARMING_DISABLED_ALTHOLD));
+
+  model.state.input.raw[
+      ALTHOLD_PILOT_CHANNEL] =
+      PWM_RANGE_MID;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ALTHOLD));
 }
 
 #endif
@@ -5128,6 +5210,9 @@ RUN_TEST(
 
 RUN_TEST(
     test_actuator_althold_v2_rejects_missing_pilot_channel);
+
+RUN_TEST(
+    test_actuator_althold_v2_rejects_invalid_raw_pilot_channel);
 
 #if ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL != 3
 RUN_TEST(

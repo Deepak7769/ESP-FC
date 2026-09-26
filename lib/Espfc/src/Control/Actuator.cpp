@@ -38,6 +38,37 @@ bool altHoldPilotStickCentered(
     return false;
   }
 
+  const auto& channelConfig =
+      model.config.input.channel[
+          PILOT_CHANNEL];
+
+  if (channelConfig.map < 0 ||
+      static_cast<size_t>(
+          channelConfig.map) >=
+          input.channelCount)
+  {
+    return false;
+  }
+
+  // processInputs() stores the receiver sample in raw[] before replacing an
+  // invalid AUX sample with its configured failsafe value.  Validate that
+  // original sample here so a broken/missing spring-stick channel cannot be
+  // mistaken for a centered 1500-us fallback.
+  const int32_t correctedRaw =
+      static_cast<int32_t>(
+          input.raw[
+              PILOT_CHANNEL]) -
+      (model.config.input.midRc -
+       PWM_RANGE_MID);
+
+  if (correctedRaw <
+          model.config.input.minRc ||
+      correctedRaw >
+          model.config.input.maxRc)
+  {
+    return false;
+  }
+
   const float command =
       input.ch[
           PILOT_CHANNEL];

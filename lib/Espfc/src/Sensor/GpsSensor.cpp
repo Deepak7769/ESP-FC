@@ -203,7 +203,9 @@ void GpsSensor::handleReceive()
       handleNavSat();
     }
   }
-  else if (_state == WAIT && micros() > _timeout)
+  else if (_state == WAIT &&
+           static_cast<int32_t>(
+               micros() - _timeout) >= 0)
   {
     // timeout
     _state = _timeoutState;
@@ -214,7 +216,11 @@ void GpsSensor::handleReceive()
 
 void GpsSensor::detectBaud()
 {
-  if (micros() > _timeout)
+  const uint32_t now =
+      micros();
+
+  if (static_cast<int32_t>(
+          now - _timeout) >= 0)
   {
     // on timeout check next baud
     if (_counter < BAUDS.size())
@@ -229,7 +235,7 @@ void GpsSensor::detectBaud()
       _counter = 0;
       setBaud(_targetBaud);
     }
-    _timeout = micros() + DETECT_TIMEOUT;
+    _timeout = now + DETECT_TIMEOUT;
   }
 }
 
