@@ -471,22 +471,19 @@ void Actuator::updateFailsafeLandShadow()
   auto& failsafe =
       _model.state.failsafe;
 
-  const auto& altitude =
-      _model.state.altitude;
-
   const uint32_t now =
       micros();
 
 #if defined(ESPFC_LAND_V2_ACTIVE)
+  const auto& altitude =
+      _model.state.altitude;
+
   const bool activeLandRequest =
       failsafe.landingRequested &&
       failsafe.phase ==
           FC_FAILSAFE_LANDING &&
       _model.isModeActive(
           MODE_ARMED);
-#else
-  constexpr bool activeLandRequest =
-      false;
 #endif
 
   // The logical LAND controller starts blocked. It is cleared only while a
