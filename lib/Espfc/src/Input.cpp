@@ -21,8 +21,19 @@ int Input::begin()
             ? _device->getChannelCount()
             : INPUT_CHANNELS,
         INPUT_CHANNELS);
-  _model.state.input.frameDelta = FRAME_TIME_DEFAULT_US;
-  _model.state.input.frameRate = 1000000ul / _model.state.input.frameDelta;
+  _model.state.input.frameTime =
+      0;
+
+  _model.state.input.frameTimeValid =
+      false;
+
+  _model.state.input.frameDelta =
+      FRAME_TIME_DEFAULT_US;
+
+  _model.state.input.frameRate =
+      1000000ul /
+      _model.state.input.frameDelta;
+
   _model.state.input.frameCount = 0;
   // -----------------------------------------------------
   // RECEIVER STARTUP STATE
@@ -955,13 +966,59 @@ void FAST_CODE_ATTR Input::filterInputs(InputStatus status)
 
 void FAST_CODE_ATTR Input::updateFrameRate()
 {
-  auto& input = _model.state.input;
-  const uint32_t now = micros();
-  const uint32_t frameDelta = now - input.frameTime;
+  auto& input =
+      _model.state.input;
 
-  input.frameTime = now;
-  input.frameDelta += (((int)frameDelta - (int)input.frameDelta) >> 3); // avg * 0.125
-  input.frameRate = 1000000ul / input.frameDelta;
+  const uint32_t now =
+      micros();
+
+  if (!input.frameTimeValid)
+  {
+    // Do not fold the uptime before the first qualified frame into the RX-rate
+    // estimator. This is especially important when the transmitter is powered
+    // on long after the flight controller.
+    input.frameTime =
+        now;
+
+    input.frameTimeValid =
+        true;
+
+    return;
+  }
+
+  const uint32_t frameDelta =
+      static_cast<uint32_t>(
+          now -
+          input.frameTime);
+
+  input.frameTime =
+      now;
+
+  if (frameDelta >=
+      RX_RECOVERY_GAP_US)
+  {
+    // A receiver outage is not a slow frame. Keep the last known frame-rate
+    // estimate and use this frame only as the new timing baseline.
+    return;
+  }
+
+  const int32_t deltaError =
+      static_cast<int32_t>(
+          frameDelta) -
+      static_cast<int32_t>(
+          input.frameDelta);
+
+  input.frameDelta =
+      std::max<uint32_t>(
+          1u,
+          static_cast<uint32_t>(
+              static_cast<int32_t>(
+                  input.frameDelta) +
+              deltaError / 8));
+
+  input.frameRate =
+      1000000ul /
+      input.frameDelta;
 
   if (_model.config.debug.mode == DEBUG_RC_SMOOTHING_RATE)
   {

@@ -48,6 +48,8 @@ class InputCRSF: public InputDevice
     CrsfState _state;
     uint8_t _idx;
     bool _new_data;
+    uint32_t _frameStartUs = 0;
+    bool _timingValid = false;
     Rc::CrsfMessage _frame;
     uint16_t _channels[CHANNELS];
     uint32_t _telemetry_next;

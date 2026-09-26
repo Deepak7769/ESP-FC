@@ -47,6 +47,8 @@ private:
   IbusState _state;
   uint8_t _idx = 0;
   bool _new_data;
+  uint32_t _lastByteUs = 0;
+  bool _timingValid = false;
 
   IBusData _data;
   uint16_t _channels[CHANNELS];

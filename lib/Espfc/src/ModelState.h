@@ -252,6 +252,7 @@ struct InputState
   bool rxFailSafe;
 
   uint32_t frameTime;
+  bool frameTimeValid;
   uint32_t frameDelta;
   uint32_t frameRate;
   uint32_t frameCount;

@@ -1,4 +1,5 @@
 #include "InputIBUS.hpp"
+#include "Hal/Time.hpp"
 #include "Utils/MemoryHelper.h"
 #include <algorithm>
 
@@ -10,6 +11,11 @@ InputIBUS::InputIBUS() : _serial(nullptr), _state(IBUS_LENGTH), _idx(0), _new_da
 int InputIBUS::begin(Stream::ReadWritable* serial)
 {
   _serial = serial;
+  _state = IBUS_LENGTH;
+  _idx = 0;
+  _new_data = false;
+  _lastByteUs = 0;
+  _timingValid = false;
 
   std::fill_n((uint8_t*)&_data, IBUS_FRAME_SIZE, 0);
   std::fill_n(_channels, CHANNELS, 0);
@@ -69,6 +75,30 @@ void FAST_CODE_ATTR InputIBUS::parse(
     data[_idx++] = value;
     return true;
   };
+
+  constexpr uint32_t IBUS_FRAME_GAP_US =
+      500;
+
+  const uint32_t now =
+      micros();
+
+  if (_timingValid &&
+      static_cast<uint32_t>(
+          now -
+          _lastByteUs) >
+          IBUS_FRAME_GAP_US)
+  {
+    // FlySky iBUS receivers delimit frames with a gap. Reset on that boundary
+    // so a truncated/corrupt frame cannot keep the parser shifted into the
+    // following valid frame.
+    resetFrame();
+  }
+
+  _lastByteUs =
+      now;
+
+  _timingValid =
+      true;
 
   switch (_state)
   {

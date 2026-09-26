@@ -14,6 +14,9 @@ int InputCRSF::begin(Stream::ReadWritable* serial, TelemetryManager* telemetry)
   _serial = serial;
   _telemetry = telemetry;
   _telemetry_next = micros() + TELEMETRY_INTERVAL;
+  _frameStartUs = 0;
+  _timingValid = false;
+  reset();
   std::fill_n((uint8_t*)&_frame, sizeof(_frame), 0);
   std::fill_n(_channels, CHANNELS, 0);
   return 1;
@@ -100,11 +103,38 @@ void FAST_CODE_ATTR InputCRSF::parse(CrsfMessage& msg, int d)
 {
   uint8_t *data = reinterpret_cast<uint8_t*>(&msg);
   uint8_t c = (uint8_t)(d & 0xff);
+
+  constexpr uint32_t CRSF_FRAME_TIMEOUT_US =
+      2500;
+
+  const uint32_t now =
+      micros();
+
+  if (_state != CRSF_ADDR &&
+      _timingValid &&
+      static_cast<uint32_t>(
+          now -
+          _frameStartUs) >
+          CRSF_FRAME_TIMEOUT_US)
+  {
+    // A complete 64-byte CRSF frame fits comfortably inside this window at
+    // the protocol baud rate. Discard truncated frames before accepting bytes
+    // from the next packet, matching the frame-timeout strategy used by
+    // mature CRSF implementations.
+    reset();
+  }
+
   switch(_state)
   {
     case CRSF_ADDR:
       if(c == CRSF_SYNC_BYTE)
       {
+        _frameStartUs =
+            now;
+
+        _timingValid =
+            true;
+
         data[_idx++] = c;
         _state = CRSF_SIZE;
       }
@@ -198,6 +228,7 @@ void FAST_CODE_ATTR InputCRSF::reset()
 {
   _state = CRSF_ADDR;
   _idx = 0;
+  _timingValid = false;
 }
 
 void FAST_CODE_ATTR InputCRSF::apply(const CrsfMessage& msg)

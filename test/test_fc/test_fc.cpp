@@ -5508,6 +5508,78 @@ void test_actuator_missing_aux_channel_does_not_apply_scaler()
           AXIS_ROLL].pScale);
 }
 
+void test_input_frame_rate_ignores_startup_and_loss_gaps()
+{
+  ArduinoFakeReset();
+
+  Model model;
+  TelemetryManager telemetry(
+      model);
+  Input input(
+      model,
+      telemetry);
+
+  input.begin();
+
+  const uint32_t initialDelta =
+      model.state.input.frameDelta;
+
+  const uint32_t initialRate =
+      model.state.input.frameRate;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .Return(
+          30000000u,
+          30010000u,
+          31000000u);
+
+  // The first frame may arrive long after boot. It establishes the baseline
+  // but must not be interpreted as a 30-second receiver frame period.
+  input.updateFrameRate();
+
+  TEST_ASSERT_TRUE(
+      model.state.input.frameTimeValid);
+
+  TEST_ASSERT_EQUAL_UINT32(
+      initialDelta,
+      model.state.input.frameDelta);
+
+  TEST_ASSERT_EQUAL_UINT32(
+      initialRate,
+      model.state.input.frameRate);
+
+  input.updateFrameRate();
+
+  const uint32_t stableDelta =
+      model.state.input.frameDelta;
+
+  const uint32_t stableRate =
+      model.state.input.frameRate;
+
+  TEST_ASSERT_TRUE(
+      stableDelta <
+      initialDelta);
+
+  TEST_ASSERT_TRUE(
+      stableRate >
+      0u);
+
+  // A long RX outage is likewise not a slow frame; preserve the established
+  // rate estimate and restart timing from the recovery frame.
+  input.updateFrameRate();
+
+  TEST_ASSERT_EQUAL_UINT32(
+      stableDelta,
+      model.state.input.frameDelta);
+
+  TEST_ASSERT_EQUAL_UINT32(
+      stableRate,
+      model.state.input.frameRate);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -5655,6 +5727,7 @@ RUN_TEST(
   RUN_TEST(test_actuator_arming_gyro_motor_calbration);
   RUN_TEST(test_actuator_missing_aux_channel_cannot_activate_mode);
   RUN_TEST(test_actuator_missing_aux_channel_does_not_apply_scaler);
+  RUN_TEST(test_input_frame_rate_ignores_startup_and_loss_gaps);
 RUN_TEST(
     test_failsafe_startup_without_rx_does_not_enter_stage2);
 
