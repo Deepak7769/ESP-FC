@@ -610,6 +610,10 @@ void Actuator::updateFailsafeLandShadow()
             LOW_ENTRY_HEIGHT_M =
                 0.25f;
 
+        constexpr float
+            TOUCHDOWN_HEIGHT_M =
+                0.30f;
+
         const uint32_t landingElapsedUs =
             static_cast<uint32_t>(
                 now -
@@ -630,10 +634,15 @@ void Actuator::updateFailsafeLandShadow()
             failsafe.landingEntryHeight <=
                 LOW_ENTRY_HEIGHT_M;
 
+        const bool nearGround =
+            altitude.height <=
+            TOUCHDOWN_HEIGHT_M;
+
         const bool touchdownEvidence =
             landingElapsedUs >=
                 MIN_LANDING_TIME_US &&
             slowVerticalMotion &&
+            nearGround &&
             descentEvidence;
 
         if (touchdownEvidence)
