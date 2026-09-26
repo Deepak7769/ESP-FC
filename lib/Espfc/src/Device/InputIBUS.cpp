@@ -155,15 +155,32 @@ void FAST_CODE_ATTR InputIBUS::apply(IBusData& data)
 
 uint16_t FAST_CODE_ATTR InputIBUS::get(uint8_t i) const
 {
-  return _channels[i];
+  return
+      i < CHANNELS
+          ? _channels[i]
+          : 0;
 }
 
-void FAST_CODE_ATTR InputIBUS::get(uint16_t *data, size_t len) const
+void FAST_CODE_ATTR InputIBUS::get(
+    uint16_t* data,
+    size_t len) const
 {
-  const uint16_t *src = _channels;
-  while (len--)
+  if (!data)
   {
-    *data++ = *src++;
+    return;
+  }
+
+  len =
+      std::min(
+          len,
+          CHANNELS);
+
+  for (size_t i = 0;
+       i < len;
+       ++i)
+  {
+    data[i] =
+        _channels[i];
   }
 }
 

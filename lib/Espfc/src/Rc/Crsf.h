@@ -122,7 +122,11 @@ struct CrsfMessage
   uint8_t addr; // CrsfAddress
   uint8_t size; // counts size after this byte, so it must be the payload size + 2 (type and crc)
   uint8_t type; // CrsfFrameType
-  uint8_t payload[CRSF_PAYLOAD_SIZE_MAX + 1]; // +1 for crc
+  // Storage must cover the complete 64-byte CRSF frame.  The length byte
+  // can legally be 62, which means 61 bytes follow the type field
+  // (payload + CRC).  CRSF_PAYLOAD_SIZE_MAX remains the smaller MSP
+  // fragmentation payload limit used by encodeMspData().
+  uint8_t payload[CRSF_FRAME_SIZE_MAX - 3];
 
   void prepare(uint8_t t)
   {
@@ -179,6 +183,10 @@ struct CrsfMessage
     return Utils::crc8_dvb_s2(crc, payload, size - 2); // size includes type and crc
   }
 } __attribute__((__packed__));
+
+static_assert(
+    sizeof(CrsfMessage) == CRSF_FRAME_SIZE_MAX,
+    "CrsfMessage storage must hold the largest legal CRSF frame");
 
 class Crsf
 {

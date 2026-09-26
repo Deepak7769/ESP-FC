@@ -48,37 +48,32 @@ void test_input_crsf_rc_valid()
   TEST_ASSERT_EQUAL_UINT16(1500u, input.get(3));
   TEST_ASSERT_EQUAL_UINT16(1000u, input.get(4));
   TEST_ASSERT_EQUAL_UINT16(1000u, input.get(5));
+
+  TEST_ASSERT_EQUAL_UINT16(0, input.get(16));
+  TEST_ASSERT_EQUAL_UINT16(0, input.get(255));
 }
 
-void test_input_crsf_rc_valid_no_payload()
+void test_input_crsf_rejects_short_rc_frame()
 {
   InputCRSF input;
   CrsfMessage frame;
   memset(&frame, 0, sizeof(frame));
-  uint8_t* frame_data = reinterpret_cast<uint8_t*>(&frame);
 
   When(Method(ArduinoFake(), micros)).Return(0);
 
   input.begin(nullptr, nullptr);
 
+  // A packed-RC frame must contain all 22 channel bytes.  A CRC-valid frame
+  // with only type+CRC must not be accepted as fresh receiver data.
   const uint8_t data[] = {0xC8, 0x02, 0x16, 0xD3};
+
   for (size_t i = 0; i < sizeof(data); i++)
   {
     input.parse(frame, data[i]);
   }
 
-  for (size_t i = 0; i < sizeof(data); i++)
-  {
-    TEST_ASSERT_EQUAL_UINT8(data[i], frame_data[i]);
-  }
-
-  const uint8_t crc = Crsf::crc(frame);
-  TEST_ASSERT_EQUAL_UINT8(0xD3, crc);
-  TEST_ASSERT_EQUAL_UINT8(0xD3, frame.crc());
-
-  TEST_ASSERT_EQUAL_UINT8(CRSF_ADDRESS_FLIGHT_CONTROLLER, frame.addr);
-  TEST_ASSERT_EQUAL_UINT8(0x02, frame.size);
-  TEST_ASSERT_EQUAL_UINT8(CRSF_FRAMETYPE_RC_CHANNELS_PACKED, frame.type);
+  TEST_ASSERT_EQUAL_UINT16(0, input.get(0));
+  TEST_ASSERT_EQUAL_UINT16(0, input.get(15));
 }
 
 void test_input_crsf_rc_prefix()
@@ -686,13 +681,27 @@ void test_input_ibus_rc_valid()
   TEST_ASSERT_EQUAL_UINT16(1500, input.get(11));
   TEST_ASSERT_EQUAL_UINT16(1500, input.get(12));
   TEST_ASSERT_EQUAL_UINT16(1500, input.get(13));
+
+  // Public receiver accessors must never read past their fixed channel
+  // storage even if a caller supplies a bad index or oversized length.
+  TEST_ASSERT_EQUAL_UINT16(0, input.get(14));
+  TEST_ASSERT_EQUAL_UINT16(0, input.get(255));
+
+  uint16_t copied[16];
+  std::fill_n(copied, 16, 0xA55A);
+
+  input.get(copied, 16);
+
+  TEST_ASSERT_EQUAL_UINT16(1500, copied[13]);
+  TEST_ASSERT_EQUAL_HEX16(0xA55A, copied[14]);
+  TEST_ASSERT_EQUAL_HEX16(0xA55A, copied[15]);
 }
 
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
   RUN_TEST(test_input_crsf_rc_valid);
-  RUN_TEST(test_input_crsf_rc_valid_no_payload);
+  RUN_TEST(test_input_crsf_rejects_short_rc_frame);
   RUN_TEST(test_input_crsf_rc_prefix);
   RUN_TEST(test_crsf_encode_rc);
   RUN_TEST(test_crsf_decode_rc_struct);

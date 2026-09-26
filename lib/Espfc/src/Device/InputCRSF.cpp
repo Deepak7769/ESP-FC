@@ -36,10 +36,20 @@ InputStatus FAST_CODE_ATTR InputCRSF::update()
     }
   }
 
-  if(_telemetry && micros() > _telemetry_next)
+  const uint32_t now = micros();
+
+  // Signed subtraction keeps the deadline check correct across the 32-bit
+  // micros() wrap-around.
+  if (_telemetry &&
+      static_cast<int32_t>(
+          now - _telemetry_next) >= 0)
   {
-    _telemetry_next = micros() + TELEMETRY_INTERVAL;
-    _telemetry->process(*_serial, TELEMETRY_PROTOCOL_CRSF);
+    _telemetry_next =
+        now + TELEMETRY_INTERVAL;
+
+    _telemetry->process(
+        *_serial,
+        TELEMETRY_PROTOCOL_CRSF);
   }
 
   if(_new_data)
@@ -53,15 +63,32 @@ InputStatus FAST_CODE_ATTR InputCRSF::update()
 
 uint16_t FAST_CODE_ATTR InputCRSF::get(uint8_t i) const
 {
-  return _channels[i];
+  return
+      i < CHANNELS
+          ? _channels[i]
+          : 0;
 }
 
-void FAST_CODE_ATTR InputCRSF::get(uint16_t * data, size_t len) const
+void FAST_CODE_ATTR InputCRSF::get(
+    uint16_t* data,
+    size_t len) const
 {
-  const uint16_t * src = _channels;
-  while(len--)
+  if (!data)
   {
-    *data++ = *src++;
+    return;
+  }
+
+  len =
+      std::min(
+          len,
+          CHANNELS);
+
+  for (size_t i = 0;
+       i < len;
+       ++i)
+  {
+    data[i] =
+        _channels[i];
   }
 }
 
@@ -92,33 +119,78 @@ void FAST_CODE_ATTR InputCRSF::parse(CrsfMessage& msg, int d)
       }
       break;
     case CRSF_TYPE:
-      if(c == CRSF_FRAMETYPE_RC_CHANNELS_PACKED || c == CRSF_FRAMETYPE_LINK_STATISTICS || c == CRSF_FRAMETYPE_MSP_REQ || c == CRSF_FRAMETYPE_MSP_WRITE)
+    {
+      const bool validRc =
+          c == CRSF_FRAMETYPE_RC_CHANNELS_PACKED &&
+          msg.size == sizeof(CrsfData) + 2;
+
+      const bool validLinkStats =
+          c == CRSF_FRAMETYPE_LINK_STATISTICS &&
+          msg.size == sizeof(CrsfLinkStats) + 2;
+
+      const bool validMsp =
+          (c == CRSF_FRAMETYPE_MSP_REQ ||
+           c == CRSF_FRAMETYPE_MSP_WRITE) &&
+          msg.size >= 5;
+
+      if (!(validRc ||
+            validLinkStats ||
+            validMsp))
       {
-        data[_idx++] = c;
-        if (msg.size > 2) {
-          _state = CRSF_DATA;
-        } else {
-          _state = CRSF_CRC; // no payload, next byte is crc
-        }
-      } else {
         reset();
+        break;
       }
-      break;
-    case CRSF_DATA:
+
+      if (_idx >= sizeof(CrsfMessage))
+      {
+        reset();
+        break;
+      }
+
       data[_idx++] = c;
-      if(_idx > msg.size) // _idx is incremented here and operator > accounts as size - 2
+      _state =
+          msg.size > 2
+              ? CRSF_DATA
+              : CRSF_CRC;
+      break;
+    }
+
+    case CRSF_DATA:
+      if (_idx >= sizeof(CrsfMessage))
+      {
+        reset();
+        break;
+      }
+
+      data[_idx++] = c;
+
+      if (_idx > msg.size) // operator > accounts for address/length bytes
       {
         _state = CRSF_CRC;
       }
       break;
+
     case CRSF_CRC:
+    {
+      if (_idx >= sizeof(CrsfMessage))
+      {
+        reset();
+        break;
+      }
+
       data[_idx++] = c;
+
+      const uint8_t crc =
+          msg.crc();
+
       reset();
-      uint8_t crc = msg.crc();
-      if(c == crc) {
+
+      if (c == crc)
+      {
         apply(msg);
       }
       break;
+    }
     }
 }
 
