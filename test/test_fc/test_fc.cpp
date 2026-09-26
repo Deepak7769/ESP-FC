@@ -1631,6 +1631,480 @@ void test_controller_althold_v2_shadow_does_not_drive_thrust()
       model.state.output.ch[
           AXIS_THRUST]);
 }
+
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST)
+
+void test_controller_althold_v2_active_path_is_bumpless_and_corrective()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      1000000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  model.state.gyro.clock =
+      1000;
+
+  model.config.gyro.dlpf =
+      GYRO_DLPF_256;
+
+  model.config.loopSync =
+      1;
+
+  model.config.mixerSync =
+      1;
+
+  model.config.mixer.type =
+      FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(
+      model);
+
+  controller.begin();
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.height =
+      2.0f;
+
+  model.state.altitude.vario =
+      0.0f;
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  model.state.input.ch[
+      AXIS_THRUST] =
+      0.0f;
+
+  constexpr float ENTRY_THRUST =
+      0.25f;
+
+  model.state.output.ch[
+      AXIS_THRUST] =
+      ENTRY_THRUST;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ALTHOLD);
+
+  controller.update();
+
+  TEST_ASSERT_TRUE(
+      model.state.assistedShadow
+          .altitudeActive);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      model.state.assistedShadow
+          .verticalRateTarget,
+      model.state.setpoint.rate[
+          AXIS_THRUST]);
+
+  // Entry target and measured vario are both zero, so the
+  // V2 PID should reproduce the pre-existing thrust.
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.002f,
+      ENTRY_THRUST,
+      model.state.output.ch[
+          AXIS_THRUST]);
+
+  // Simulate being 0.5 m below the captured altitude.
+  // Repeated controller cycles should ask for a positive
+  // vertical rate and increase thrust.
+  model.state.altitude.height =
+      1.5f;
+
+  for (int i = 0;
+       i < 100;
+       ++i)
+  {
+    controller.update();
+  }
+
+  TEST_ASSERT_TRUE(
+      model.state.assistedShadow
+          .verticalRateCorrection >
+      0.0f);
+
+  TEST_ASSERT_TRUE(
+      model.state.assistedShadow
+          .verticalRateTarget >
+      0.0f);
+
+  TEST_ASSERT_TRUE(
+      model.state.output.ch[
+          AXIS_THRUST] >
+      ENTRY_THRUST);
+}
+
+#endif
+
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+
+void test_controller_land_v2_levels_and_requests_descent()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      2000000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  model.state.gyro.clock =
+      1000;
+
+  model.config.gyro.dlpf =
+      GYRO_DLPF_256;
+
+  model.config.loopSync =
+      1;
+
+  model.config.mixerSync =
+      1;
+
+  model.config.mixer.type =
+      FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(
+      model);
+
+  controller.begin();
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.attitude.euler.set(
+      AXIS_ROLL,
+      Utils::toRad(
+          10.0f));
+
+  model.state.attitude.euler.set(
+      AXIS_PITCH,
+      Utils::toRad(
+          -6.0f));
+
+  model.state.altitude.height =
+      3.0f;
+
+  model.state.altitude.vario =
+      0.0f;
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  model.state.output.ch[
+      AXIS_THRUST] =
+      0.30f;
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.failsafe.landingRequested =
+      true;
+
+  model.state.failsafe.phase =
+      FC_FAILSAFE_LANDING;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  controller.update();
+
+  TEST_ASSERT_TRUE(
+      model.state.assistedShadow
+          .angleActive);
+
+  TEST_ASSERT_TRUE(
+      model.state.assistedShadow
+          .altitudeActive);
+
+  // LAND owns the reference: zero attitude and a fixed
+  // gentle descent, independent of stale failsafe sticks.
+  TEST_ASSERT_TRUE(
+      model.state.assistedShadow
+          .rollRateTarget <
+      0.0f);
+
+  TEST_ASSERT_TRUE(
+      model.state.assistedShadow
+          .pitchRateTarget >
+      0.0f);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      -0.50f,
+      model.state.assistedShadow
+          .verticalRatePilot);
+
+  TEST_ASSERT_TRUE(
+      model.state.assistedShadow
+          .verticalRateTarget <
+      0.0f);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      0.0f,
+      model.state.setpoint.rate[
+          AXIS_YAW]);
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          model.state.output.ch[
+              AXIS_THRUST]));
+}
+
+void test_failsafe_land_v2_bad_estimator_falls_back_to_disarm()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      3000000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.healthy =
+      false;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.failsafe.landingRequested =
+      true;
+
+  model.state.failsafe.landingRequestedUs =
+      NOW_US;
+
+  model.state.failsafe.phase =
+      FC_FAILSAFE_LANDING;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  Actuator actuator(
+      model);
+
+  actuator.updateFailsafeLandShadow();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_LANDED,
+      model.state.failsafe.phase);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowFault);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowOutputBlocked);
+}
+
+void test_failsafe_land_v2_touchdown_dwell_disarms()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      5000000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  model.state.altitude.height =
+      1.0f;
+
+  model.state.altitude.vario =
+      0.05f;
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.failsafe.landingRequested =
+      true;
+
+  model.state.failsafe.landingRequestedUs =
+      NOW_US -
+      3000000u;
+
+  model.state.failsafe.landingEntryHeight =
+      2.0f;
+
+  model.state.failsafe.landingEntryVario =
+      -0.5f;
+
+  model.state.failsafe.landingTouchdownCandidate =
+      true;
+
+  model.state.failsafe.landingTouchdownStartedUs =
+      NOW_US -
+      1000000u;
+
+  model.state.failsafe.phase =
+      FC_FAILSAFE_LANDING;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  Actuator actuator(
+      model);
+
+  actuator.updateFailsafeLandShadow();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_LANDED,
+      model.state.failsafe.phase);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingRequested);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowOutputBlocked);
+}
+
+void test_failsafe_land_v2_rx_recovery_requires_full_qualification()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      7000000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  TelemetryManager telemetry(
+      model);
+
+  Input input(
+      model,
+      telemetry);
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.failsafe.landingRequested =
+      true;
+
+  model.state.failsafe.phase =
+      FC_FAILSAFE_LANDING;
+
+  model.state.failsafe.recoveryActive =
+      true;
+
+  model.state.failsafe.recoveryStartedUs =
+      NOW_US -
+      600000u;
+
+  model.state.input.channelsValid =
+      true;
+
+  model.state.input.rxLoss =
+      true;
+
+  model.state.input.rxFailSafe =
+      true;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  TEST_ASSERT_FALSE(
+      input.failsafe(
+          INPUT_RECEIVED));
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingRequested);
+
+  TEST_ASSERT_FALSE(
+      model.state.input.rxLoss);
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_IDLE,
+      model.state.failsafe.phase);
+}
+
+#endif
+
 void test_baro_bias_seeds_first_absolute_altitude_sample()
 {
   When(
@@ -3611,9 +4085,21 @@ TEST_ASSERT_TRUE(
       model.state.failsafe
           .landingEntryVario);
 
-  // Critical regression:
-  // the unfinished LAND controller must not leave the
-  // aircraft armed.
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+  // The dedicated active-validation build deliberately
+  // retains logical arming so Controller/Actuator can run
+  // the LAND state machine. Physical ESC attachment is
+  // still blocked by ESPFC_SAFE_BENCH_BUILD.
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_LANDING,
+      model.state.failsafe.phase);
+#else
+  // Ordinary builds preserve the existing conservative
+  // fallback: unfinished LAND never leaves motors armed.
   TEST_ASSERT_FALSE(
       model.isModeActive(
           MODE_ARMED));
@@ -3621,6 +4107,7 @@ TEST_ASSERT_TRUE(
   TEST_ASSERT_EQUAL(
       FC_FAILSAFE_LANDED,
       model.state.failsafe.phase);
+#endif
 }
 
 void test_failsafe_auto_land_shadow_rejects_bad_estimator()
@@ -3952,6 +4439,12 @@ void test_new_arm_clears_previous_land_latch()
   model.state.failsafe.landingShadowLastUpdateUs =
       123500;
 
+  model.state.failsafe.landingTouchdownCandidate =
+      true;
+
+  model.state.failsafe.landingTouchdownStartedUs =
+      123400;
+
   model.state.failsafe.landingEntryHeight =
       4.0f;
 
@@ -4007,6 +4500,15 @@ void test_new_arm_clears_previous_land_latch()
       0,
       model.state.failsafe
           .landingShadowLastUpdateUs);
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingTouchdownCandidate);
+
+  TEST_ASSERT_EQUAL_UINT32(
+      0,
+      model.state.failsafe
+          .landingTouchdownStartedUs);
 
   TEST_ASSERT_FLOAT_WITHIN(
       0.0001f,
@@ -4183,8 +4685,29 @@ RUN_TEST(
 
 #endif
   // Final assisted-mode architecture regression tests
+#if !defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST)
 RUN_TEST(
     test_controller_althold_v2_shadow_does_not_drive_thrust);
+#endif
+
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST)
+RUN_TEST(
+    test_controller_althold_v2_active_path_is_bumpless_and_corrective);
+#endif
+
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+RUN_TEST(
+    test_controller_land_v2_levels_and_requests_descent);
+
+RUN_TEST(
+    test_failsafe_land_v2_bad_estimator_falls_back_to_disarm);
+
+RUN_TEST(
+    test_failsafe_land_v2_touchdown_dwell_disarms);
+
+RUN_TEST(
+    test_failsafe_land_v2_rx_recovery_requires_full_qualification);
+#endif
 
 RUN_TEST(
     test_baro_bias_seeds_first_absolute_altitude_sample);
