@@ -1974,7 +1974,7 @@ void test_failsafe_land_v2_touchdown_dwell_disarms()
       NOW_US;
 
   model.state.altitude.height =
-      1.0f;
+      0.10f;
 
   model.state.altitude.vario =
       0.05f;
