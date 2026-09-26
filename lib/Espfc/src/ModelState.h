@@ -54,8 +54,21 @@ class BuzzerState
 
     void push(BuzzerEvent e) // play once
     {
-      if(full()) return;
-      if(beeperMask & (1 << (e - 1)))
+      if (full()) return;
+
+      // BUZZER_SILENCE has no mask bit (e - 1 would be a negative shift),
+      // and an invalid enum value would later index past the scheme table.
+      if (e <= BUZZER_SILENCE ||
+          e > BUZZER_PREFERENCE)
+      {
+        return;
+      }
+
+      const uint32_t mask =
+          uint32_t{1} <<
+          static_cast<uint32_t>(e - 1);
+
+      if (static_cast<uint32_t>(beeperMask) & mask)
       {
         events[idx++] = e;
       }
@@ -210,13 +223,16 @@ struct OutputTelemetryState
   float rpm[OUTPUT_CHANNELS];
   float freq[OUTPUT_CHANNELS];
 
-  int8_t temperature[OUTPUT_CHANNELS];
-  int8_t voltage[OUTPUT_CHANNELS];
-  int8_t current[OUTPUT_CHANNELS];
-  int8_t debug1[OUTPUT_CHANNELS];
-  int8_t debug2[OUTPUT_CHANNELS];
-  int8_t debug3[OUTPUT_CHANNELS];
-  int8_t events[OUTPUT_CHANNELS];
+  // Extended DShot telemetry fields are unsigned 8-bit quantities.
+  // Keeping them signed corrupts values above 127 (for example voltage,
+  // current and event/debug payloads).
+  uint8_t temperature[OUTPUT_CHANNELS];
+  uint8_t voltage[OUTPUT_CHANNELS];
+  uint8_t current[OUTPUT_CHANNELS];
+  uint8_t debug1[OUTPUT_CHANNELS];
+  uint8_t debug2[OUTPUT_CHANNELS];
+  uint8_t debug3[OUTPUT_CHANNELS];
+  uint8_t events[OUTPUT_CHANNELS];
 };
 
 struct OutputState

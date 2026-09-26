@@ -482,8 +482,18 @@ void FAST_CODE_ATTR Mixer::readTelemetry()
 
   for (size_t i = 0; i < OUTPUT_CHANNELS; i++)
   {
+    const float rawFreq =
+        erpmToHz(
+            _model.state.output.telemetry.erpm[i]);
+
+    // RPM filtering is intentionally limited to the motors supported by the
+    // gyro RPM-notch bank.  Some targets expose more output channels than
+    // RPM_FILTER_MOTOR_MAX, so indexing rpmFreqFilter with OUTPUT_CHANNELS
+    // would read past the fixed filter array.
     _model.state.output.telemetry.freq[i] =
-        _model.state.gyro.rpmFreqFilter[i].update(erpmToHz(_model.state.output.telemetry.erpm[i]));
+        i < RPM_FILTER_MOTOR_MAX
+            ? _model.state.gyro.rpmFreqFilter[i].update(rawFreq)
+            : rawFreq;
   }
 
   _statsCounter++;
