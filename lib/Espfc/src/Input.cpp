@@ -82,6 +82,12 @@ int Input::begin()
   _model.state.failsafe.landingShadowLastUpdateUs =
       0;
 
+  _model.state.failsafe.landingTouchdownCandidate =
+      false;
+
+  _model.state.failsafe.landingTouchdownStartedUs =
+      0;
+
   _model.state.input.rxLoss =
       true;
 
@@ -494,6 +500,92 @@ bool FAST_CODE_ATTR Input::failsafe(
         input.rxLoss ||
         input.rxFailSafe)
     {
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+      // -------------------------------------------------
+      // RX RECOVERY DURING ACTIVE LAND
+      //
+      // Keep LAND authoritative until the receiver has
+      // remained continuously healthy for the normal
+      // qualification interval. Then cancel LAND and hand
+      // control back deliberately instead of switching on
+      // the first recovered packet.
+      // -------------------------------------------------
+      if (failsafe.phase ==
+              FC_FAILSAFE_LANDING &&
+          failsafe.landingRequested)
+      {
+        input.rxLoss =
+            true;
+
+        input.rxFailSafe =
+            false;
+
+        if (healthyForUs <
+            RX_RECOVERY_US)
+        {
+          return true;
+        }
+
+        failsafe.recoveryActive =
+            false;
+
+        failsafe.phase =
+            FC_FAILSAFE_RX_LOSS_RECOVERED;
+
+        input.rxLoss =
+            false;
+
+        input.rxFailSafe =
+            false;
+
+        failsafe.landingRequested =
+            false;
+
+        failsafe.landingShadowEstimatorHealthy =
+            false;
+
+        failsafe.landingShadowEligible =
+            false;
+
+        failsafe.landingShadowActive =
+            false;
+
+        failsafe.landingShadowLevelRequested =
+            false;
+
+        failsafe.landingShadowDescentRequested =
+            false;
+
+        failsafe.landingShadowFault =
+            false;
+
+        failsafe.landingShadowOutputBlocked =
+            true;
+
+        failsafe.landingShadowLastUpdateUs =
+            0;
+
+        failsafe.landingTouchdownCandidate =
+            false;
+
+        failsafe.landingTouchdownStartedUs =
+            0;
+
+        failsafe.landingRequestedUs =
+            0;
+
+        failsafe.landingEntryHeight =
+            0.0f;
+
+        failsafe.landingEntryVario =
+            0.0f;
+
+        failsafeIdle();
+
+        return false;
+      }
+#endif
+
       failsafe.phase =
           FC_FAILSAFE_RX_LOSS_MONITORING;
 
@@ -522,8 +614,6 @@ bool FAST_CODE_ATTR Input::failsafe(
       input.rxFailSafe =
           false;
 
-      // For now recovery returns to the normal receiver
-      // state. Later LAND will add its own recovery policy.
       failsafeIdle();
 
       return false;
@@ -684,6 +774,15 @@ if (failsafe.phase ==
   return true;
 }
 
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+if (failsafe.phase ==
+        FC_FAILSAFE_LANDING &&
+    failsafe.landingRequested)
+{
+  return true;
+}
+#endif
+
 return false;
 }
 
@@ -758,8 +857,8 @@ void FAST_CODE_ATTR Input::failsafeStage2()
   if (_model.config.failsafe.procedure ==
       FAILSAFE_PROCEDURE_AUTO_LAND)
   {
-    // Edge-trigger the LAND request.
-    // Do not keep replacing the entry timestamp/altitude.
+    // Edge-trigger the LAND request. Repeated Stage-2
+    // processing must not erase supervisor state.
     if (!failsafe.landingRequested)
     {
       failsafe.landingRequested =
@@ -773,35 +872,37 @@ void FAST_CODE_ATTR Input::failsafeStage2()
 
       failsafe.landingEntryVario =
           _model.state.altitude.vario;
+
+      failsafe.landingShadowEstimatorHealthy =
+          false;
+
+      failsafe.landingShadowEligible =
+          false;
+
+      failsafe.landingShadowActive =
+          false;
+
+      failsafe.landingShadowLevelRequested =
+          false;
+
+      failsafe.landingShadowDescentRequested =
+          false;
+
+      failsafe.landingShadowFault =
+          false;
+
+      failsafe.landingShadowOutputBlocked =
+          true;
+
+      failsafe.landingShadowLastUpdateUs =
+          0;
+
+      failsafe.landingTouchdownCandidate =
+          false;
+
+      failsafe.landingTouchdownStartedUs =
+          0;
     }
-
-    // Estimator eligibility is evaluated continuously by
-    // Actuator::updateFailsafeLandShadow().
-    //
-    // Do not make a one-shot decision here.
-    failsafe.landingShadowEstimatorHealthy =
-        false;
-
-    failsafe.landingShadowEligible =
-        false;
-
-    failsafe.landingShadowActive =
-        false;
-
-    failsafe.landingShadowLevelRequested =
-        false;
-
-    failsafe.landingShadowDescentRequested =
-        false;
-
-    failsafe.landingShadowFault =
-        false;
-
-    failsafe.landingShadowOutputBlocked =
-        true;
-
-    failsafe.landingShadowLastUpdateUs =
-        0;
 
     failsafe.phase =
         FC_FAILSAFE_LANDING;
@@ -842,6 +943,12 @@ void FAST_CODE_ATTR Input::failsafeStage2()
     failsafe.landingShadowLastUpdateUs =
         0;
 
+    failsafe.landingTouchdownCandidate =
+        false;
+
+    failsafe.landingTouchdownStartedUs =
+        0;
+
     failsafe.landingEntryHeight =
         0.0f;
 
@@ -849,12 +956,23 @@ void FAST_CODE_ATTR Input::failsafeStage2()
         0.0f;
   }
 
+#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+  if (_model.config.failsafe.procedure ==
+      FAILSAFE_PROCEDURE_AUTO_LAND)
+  {
+    // The dedicated validation build keeps the aircraft
+    // logically armed so Controller/Actuator can exercise
+    // the LAND path. ESPFC_SAFE_BENCH_BUILD guarantees
+    // that no physical motor driver is attached.
+    return;
+  }
+#endif
+
   // =====================================================
-  // CURRENT OPERATIONAL FALLBACK
+  // OPERATIONAL FALLBACK
   //
-  // LAND remains a dry-run feature until the V2 vertical
-  // controller has an independently validated actuator
-  // interface.
+  // Ordinary builds, and DROP in every build, disarm
+  // immediately.
   // =====================================================
 
   failsafe.phase =
