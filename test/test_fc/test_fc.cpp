@@ -5938,7 +5938,6 @@ void test_ppm_only_publishes_complete_stable_frames()
           33500u,
           35000u,
           36500u,
-          38000u,
           42000u);
 
   ppm.begin(
@@ -5986,8 +5985,8 @@ void test_ppm_only_publishes_complete_stable_frames()
       4u,
       ppm.getChannelCount());
 
-  // A truncated/corrupt frame must not be published as a fresh receiver frame.
-  ppm.handle();
+  // A truncated/corrupt frame with only three channels must not be
+  // published as a fresh receiver frame.
   ppm.handle();
   ppm.handle();
   ppm.handle();
