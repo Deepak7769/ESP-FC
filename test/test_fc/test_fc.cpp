@@ -592,15 +592,15 @@ void test_controller_angle_v2_active_path_is_bumpless_and_negative_feedback()
 
   // Begin already tilted:
   // positive Roll and negative Pitch.
-  model.state.attitude.euler[
-      AXIS_ROLL] =
-      Utils::toRad(
-          10.0f);
+model.state.attitude.euler.set(
+    AXIS_ROLL,
+    Utils::toRad(
+        10.0f));
 
-  model.state.attitude.euler[
-      AXIS_PITCH] =
-      Utils::toRad(
-          -8.0f);
+model.state.attitude.euler.set(
+    AXIS_PITCH,
+    Utils::toRad(
+        -8.0f));
 
   // Centered sticks request level attitude.
   model.state.input.ch[
