@@ -2700,6 +2700,89 @@ void test_failsafe_land_v2_touchdown_dwell_disarms()
           .landingShadowOutputBlocked);
 }
 
+void test_failsafe_land_v2_touchdown_candidate_has_hysteresis()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      6500000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  // Slightly outside the strict entry thresholds, but inside the relaxed
+  // hold band. A candidate started on the previous cycle must survive this.
+  model.state.altitude.height =
+      0.35f;
+
+  model.state.altitude.vario =
+      0.20f;
+
+  model.state.output.ch[
+      AXIS_THRUST] =
+      -0.10f;
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.failsafe.landingRequested =
+      true;
+
+  model.state.failsafe.landingRequestedUs =
+      NOW_US -
+      3000000u;
+
+  model.state.failsafe.landingEntryHeight =
+      2.0f;
+
+  model.state.failsafe.landingTouchdownCandidate =
+      true;
+
+  model.state.failsafe.landingTouchdownStartedUs =
+      NOW_US -
+      500000u;
+
+  model.state.failsafe.phase =
+      FC_FAILSAFE_LANDING;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  Actuator actuator(
+      model);
+
+  actuator.updateFailsafeLandShadow();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingTouchdownCandidate);
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_LANDING,
+      model.state.failsafe.phase);
+}
+
 void test_failsafe_land_v2_near_ground_hover_does_not_disarm()
 {
   ArduinoFakeReset();
@@ -6234,6 +6317,9 @@ RUN_TEST(
 
 RUN_TEST(
     test_failsafe_land_v2_touchdown_dwell_disarms);
+
+RUN_TEST(
+    test_failsafe_land_v2_touchdown_candidate_has_hysteresis);
 
 RUN_TEST(
     test_failsafe_land_v2_near_ground_hover_does_not_disarm);

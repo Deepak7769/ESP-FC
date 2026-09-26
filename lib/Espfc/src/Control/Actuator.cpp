@@ -966,6 +966,37 @@ void Actuator::updateFailsafeLandShadow()
             descentEvidence &&
             lowLandingThrust;
 
+        // Once strict ground-contact evidence has started the dwell timer,
+        // allow a slightly wider hold band. This mirrors staged/hysteretic
+        // landing detectors and prevents normal barometer noise from resetting
+        // a valid contact candidate every few cycles.
+        constexpr float
+            TOUCHDOWN_HOLD_VARIO_MS =
+                0.25f;
+
+        constexpr float
+            TOUCHDOWN_HOLD_HEIGHT_M =
+                0.40f;
+
+        constexpr float
+            TOUCHDOWN_HOLD_THRUST_MARGIN =
+                0.02f;
+
+        const bool touchdownHoldEvidence =
+            landingElapsedUs >=
+                MIN_LANDING_TIME_US &&
+            std::fabs(
+                altitude.vario) <=
+                TOUCHDOWN_HOLD_VARIO_MS &&
+            altitude.height <=
+                TOUCHDOWN_HOLD_HEIGHT_M &&
+            descentEvidence &&
+            std::isfinite(
+                commandedThrust) &&
+            commandedThrust <=
+                configuredHoverThrust -
+                    TOUCHDOWN_HOLD_THRUST_MARGIN;
+
         if (landingTimedOut)
         {
           failsafe.landingShadowFault =
@@ -998,9 +1029,9 @@ void Actuator::updateFailsafeLandShadow()
           _model.disarm(
               DISARM_REASON_FAILSAFE);
         }
-        else if (touchdownEvidence)
+        else if (!failsafe.landingTouchdownCandidate)
         {
-          if (!failsafe.landingTouchdownCandidate)
+          if (touchdownEvidence)
           {
             failsafe.landingTouchdownCandidate =
                 true;
@@ -1008,38 +1039,38 @@ void Actuator::updateFailsafeLandShadow()
             failsafe.landingTouchdownStartedUs =
                 now;
           }
-          else
+        }
+        else if (touchdownHoldEvidence)
+        {
+          const uint32_t touchdownDwellUs =
+              static_cast<uint32_t>(
+                  now -
+                  failsafe
+                      .landingTouchdownStartedUs);
+
+          if (touchdownDwellUs >=
+              TOUCHDOWN_DWELL_US)
           {
-            const uint32_t touchdownDwellUs =
-                static_cast<uint32_t>(
-                    now -
-                    failsafe
-                        .landingTouchdownStartedUs);
+            failsafe.landingRequested =
+                false;
 
-            if (touchdownDwellUs >=
-                TOUCHDOWN_DWELL_US)
-            {
-              failsafe.landingRequested =
-                  false;
+            failsafe.landingShadowActive =
+                false;
 
-              failsafe.landingShadowActive =
-                  false;
+            failsafe.landingShadowLevelRequested =
+                false;
 
-              failsafe.landingShadowLevelRequested =
-                  false;
+            failsafe.landingShadowDescentRequested =
+                false;
 
-              failsafe.landingShadowDescentRequested =
-                  false;
+            failsafe.landingShadowOutputBlocked =
+                true;
 
-              failsafe.landingShadowOutputBlocked =
-                  true;
+            failsafe.phase =
+                FC_FAILSAFE_LANDED;
 
-              failsafe.phase =
-                  FC_FAILSAFE_LANDED;
-
-              _model.disarm(
-                  DISARM_REASON_FAILSAFE);
-            }
+            _model.disarm(
+                DISARM_REASON_FAILSAFE);
           }
         }
         else
