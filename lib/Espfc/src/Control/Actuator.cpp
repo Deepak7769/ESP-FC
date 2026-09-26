@@ -1,4 +1,5 @@
 #include "Control/Actuator.h"
+#include "Control/AssistedModeV2.h"
 #include "Hal/Time.hpp"
 #include "Utils/Math.hpp"
 
@@ -254,6 +255,33 @@ if (val > min &&
 const bool altHoldHealthy =
     altitudeEstimateHealthy();
 
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE) || \
+    defined(ESPFC_LAND_V2_ACTIVE)
+  // If the pilot explicitly requests AltHold, do not allow an ARM transition
+  // without a trustworthy vertical estimate. Likewise, an AUTO_LAND
+  // failsafe configuration is only meaningful when the aircraft is armed
+  // with a healthy altitude estimator.
+  const bool assistedAltitudeRequired =
+      altHoldRequested
+#if defined(ESPFC_LAND_V2_ACTIVE)
+      ||
+      (_model.config.failsafe.procedure ==
+           FAILSAFE_PROCEDURE_AUTO_LAND &&
+       (newMask &
+        (uint32_t{1} << MODE_ARMED)))
+#endif
+      ;
+
+  _model.setArmingDisabled(
+      ARMING_DISABLED_ALTHOLD,
+      assistedAltitudeRequired &&
+          !altHoldHealthy);
+#else
+  _model.setArmingDisabled(
+      ARMING_DISABLED_ALTHOLD,
+      false);
+#endif
+
 
   // -----------------------------------------------------
   // ANGLE fault latch
@@ -449,7 +477,7 @@ void Actuator::updateFailsafeLandShadow()
   const uint32_t now =
       micros();
 
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+#if defined(ESPFC_LAND_V2_ACTIVE)
   const bool activeLandRequest =
       failsafe.landingRequested &&
       failsafe.phase ==
@@ -461,11 +489,9 @@ void Actuator::updateFailsafeLandShadow()
       false;
 #endif
 
-  // The logical LAND controller starts blocked. In the
-  // dedicated V2 validation build this flag is cleared
-  // only while a healthy LAND request owns the controller.
-  // ESPFC_SAFE_BENCH_BUILD separately prevents a physical
-  // ESC driver from being attached.
+  // The logical LAND controller starts blocked. It is cleared only while a
+  // healthy active LAND request owns the controller. Safe-bench builds still
+  // block physical ESC attachment independently in Mixer.cpp.
   failsafe.landingShadowOutputBlocked =
       true;
 
@@ -536,7 +562,7 @@ void Actuator::updateFailsafeLandShadow()
     failsafe.landingShadowLastUpdateUs =
         now;
 
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+#if defined(ESPFC_LAND_V2_ACTIVE)
     if (activeLandRequest)
     {
       if (!failsafe.landingShadowEligible)
@@ -573,9 +599,8 @@ void Actuator::updateFailsafeLandShadow()
       }
       else
       {
-        // Logical controller authority is enabled. The
-        // safe-bench build still hard-blocks the physical
-        // ESC driver.
+        // Logical controller authority is enabled. Physical actuation still
+        // depends on the selected build policy and Mixer configuration.
         failsafe.landingShadowOutputBlocked =
             false;
 
@@ -619,6 +644,54 @@ void Actuator::updateFailsafeLandShadow()
                 now -
                 failsafe.landingRequestedUs);
 
+        // -------------------------------------------------
+        // LAND TERMINATION TIMEOUT
+        //
+        // Touchdown is primarily confirmed from near-ground height + low
+        // vertical speed. A bounded timeout prevents a failed/noisy ground
+        // detector from leaving the aircraft in LAND forever after RX loss.
+        // The timeout scales with the entry height at the commanded 0.5 m/s
+        // descent rate, then adds a generous ten-second margin.
+        // -------------------------------------------------
+
+        constexpr float
+            LAND_COMMAND_DESCENT_RATE_MS =
+                0.50f;
+
+        constexpr float
+            LAND_TIMEOUT_MARGIN_S =
+                10.0f;
+
+        constexpr float
+            LAND_TIMEOUT_MIN_S =
+                15.0f;
+
+        constexpr float
+            LAND_TIMEOUT_MAX_S =
+                60.0f;
+
+        const float nonNegativeEntryHeight =
+            std::max(
+                failsafe.landingEntryHeight,
+                0.0f);
+
+        const float landingTimeoutS =
+            std::clamp(
+                nonNegativeEntryHeight /
+                    LAND_COMMAND_DESCENT_RATE_MS +
+                    LAND_TIMEOUT_MARGIN_S,
+                LAND_TIMEOUT_MIN_S,
+                LAND_TIMEOUT_MAX_S);
+
+        const uint32_t landingTimeoutUs =
+            static_cast<uint32_t>(
+                landingTimeoutS *
+                1000000.0f);
+
+        const bool landingTimedOut =
+            landingElapsedUs >=
+            landingTimeoutUs;
+
         const float descendedM =
             failsafe.landingEntryHeight -
             altitude.height;
@@ -645,7 +718,39 @@ void Actuator::updateFailsafeLandShadow()
             nearGround &&
             descentEvidence;
 
-        if (touchdownEvidence)
+        if (landingTimedOut)
+        {
+          failsafe.landingShadowFault =
+              true;
+
+          failsafe.landingRequested =
+              false;
+
+          failsafe.landingShadowActive =
+              false;
+
+          failsafe.landingShadowLevelRequested =
+              false;
+
+          failsafe.landingShadowDescentRequested =
+              false;
+
+          failsafe.landingShadowOutputBlocked =
+              true;
+
+          failsafe.landingTouchdownCandidate =
+              false;
+
+          failsafe.landingTouchdownStartedUs =
+              0;
+
+          failsafe.phase =
+              FC_FAILSAFE_LANDED;
+
+          _model.disarm(
+              DISARM_REASON_FAILSAFE);
+        }
+        else if (touchdownEvidence)
         {
           if (!failsafe.landingTouchdownCandidate)
           {
