@@ -1762,6 +1762,100 @@ void test_controller_althold_v2_active_path_is_bumpless_and_corrective()
       ENTRY_THRUST);
 }
 
+#if ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL != 3
+
+void test_controller_althold_v2_uses_dedicated_centered_stick_channel()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      1500000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  model.state.gyro.clock =
+      1000;
+
+  model.config.gyro.dlpf =
+      GYRO_DLPF_256;
+
+  model.config.loopSync =
+      1;
+
+  model.config.mixerSync =
+      1;
+
+  model.config.mixer.type =
+      FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(
+      model);
+
+  controller.begin();
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.height =
+      2.0f;
+
+  model.state.altitude.vario =
+      0.0f;
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  // Simulate the project's stateful manual-throttle channel holding a high
+  // value while the dedicated raw spring-centered stick is released.
+  model.state.input.ch[
+      AXIS_THRUST] =
+      0.80f;
+
+  model.state.input.ch[
+      ALTHOLD_PILOT_CHANNEL] =
+      0.0f;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ALTHOLD);
+
+  controller.update();
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      0.0f,
+      model.state.assistedShadow
+          .verticalRatePilot);
+
+  // Moving only the raw centered channel must command climb even though the
+  // accumulated manual-throttle channel remains unchanged.
+  model.state.input.ch[
+      ALTHOLD_PILOT_CHANNEL] =
+      0.50f;
+
+  controller.update();
+
+  TEST_ASSERT_TRUE(
+      model.state.assistedShadow
+          .verticalRatePilot >
+      0.0f);
+}
+
+#endif
+
 #endif
 
 #if defined(ESPFC_LAND_V2_ACTIVE)
@@ -2040,7 +2134,142 @@ void test_failsafe_land_v2_touchdown_dwell_disarms()
           .landingShadowOutputBlocked);
 }
 
-void test_failsafe_land_v2_rx_recovery_requires_full_qualification()
+void test_failsafe_land_v2_timeout_disarms()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      20000000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  model.state.altitude.height =
+      0.80f;
+
+  model.state.altitude.vario =
+      -0.40f;
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.failsafe.landingRequested =
+      true;
+
+  // Entry height 1 m produces the minimum 15 s bounded timeout.
+  model.state.failsafe.landingRequestedUs =
+      NOW_US -
+      16000000u;
+
+  model.state.failsafe.landingEntryHeight =
+      1.0f;
+
+  model.state.failsafe.phase =
+      FC_FAILSAFE_LANDING;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  Actuator actuator(
+      model);
+
+  actuator.updateFailsafeLandShadow();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingRequested);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowFault);
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowOutputBlocked);
+
+  TEST_ASSERT_EQUAL(
+      FC_FAILSAFE_LANDED,
+      model.state.failsafe.phase);
+}
+
+void test_auto_land_arm_request_requires_healthy_altitude_estimator()
+{
+  ArduinoFakeReset();
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          9000000);
+
+  Model model;
+
+  model.config.failsafe.procedure =
+      FAILSAFE_PROCEDURE_AUTO_LAND;
+
+  auto& armCondition =
+      model.config.conditions[0];
+
+  armCondition.id =
+      MODE_ARMED;
+
+  armCondition.ch =
+      AXIS_AUX_1;
+
+  armCondition.min =
+      1700;
+
+  armCondition.max =
+      2100;
+
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1800;
+
+  model.state.input.us[
+      AXIS_THRUST] =
+      1000;
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+
+  // No valid barometer/altitude estimator has been established.
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.getArmingDisabled(
+          ARMING_DISABLED_ALTHOLD));
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ARMED));
+}
+
+void test_failsafe_land_v2_rx_recovery_stays_committed_to_land()
 {
   ArduinoFakeReset();
 
@@ -2092,7 +2321,10 @@ void test_failsafe_land_v2_rx_recovery_requires_full_qualification()
       uint32_t{1} <<
       MODE_ARMED);
 
-  TEST_ASSERT_FALSE(
+  // Receiver has now been healthy for longer than the 500 ms qualification
+  // period, but a failsafe LAND intentionally remains terminal for this
+  // armed flight. Pilot input stays gated until touchdown/disarm.
+  TEST_ASSERT_TRUE(
       input.failsafe(
           INPUT_RECEIVED));
 
@@ -2100,7 +2332,7 @@ void test_failsafe_land_v2_rx_recovery_requires_full_qualification()
       model.isModeActive(
           MODE_ARMED));
 
-  TEST_ASSERT_FALSE(
+  TEST_ASSERT_TRUE(
       model.state.failsafe
           .landingRequested);
 
@@ -2108,10 +2340,9 @@ void test_failsafe_land_v2_rx_recovery_requires_full_qualification()
       model.state.input.rxLoss);
 
   TEST_ASSERT_EQUAL(
-      FC_FAILSAFE_IDLE,
+      FC_FAILSAFE_LANDING,
       model.state.failsafe.phase);
 }
-
 #endif
 
 void test_baro_bias_seeds_first_absolute_altitude_sample()
