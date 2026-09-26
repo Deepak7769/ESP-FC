@@ -40,6 +40,10 @@ private:
   bool _shadowAngleWasActive = false;
   bool _shadowAltWasActive = false;
 
+  // Tracks ownership of the thrust output so the V2
+  // velocity controller can enter without a thrust step.
+  bool _altHoldV2OutputWasActive = false;
+
   float _shadowAngleTarget[AXIS_COUNT_RP] =
       {0.0f, 0.0f};
 
