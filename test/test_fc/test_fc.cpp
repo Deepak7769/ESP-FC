@@ -1,4 +1,5 @@
 #include "Control/Actuator.h"
+#include "Control/AssistedModeV2.h"
 #include "Control/Controller.h"
 #include "Control/Altitude.hpp"
 #include "Input.h"
@@ -23,6 +24,14 @@ using Espfc::Control::Actuator;
 using Espfc::Control::Controller;
 using Espfc::Control::Rates;
 using Espfc::Utils::Timer;
+
+static constexpr size_t ALTHOLD_PILOT_CHANNEL =
+    static_cast<size_t>(
+        ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL);
+
+static_assert(
+    ALTHOLD_PILOT_CHANNEL < AXIS_COUNT,
+    "test AltHold pilot channel exceeds input channel count");
 static void setHealthyAssistedEstimatorState(
     Model& model,
     uint32_t nowUs)
@@ -528,7 +537,7 @@ model.state.attitude.euler.set(
       shadow.rollAngleTarget <= 0.30f);
 }
 
-#if defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
+#if defined(ESPFC_ANGLE_V2_ACTIVE)
 
 void test_controller_angle_v2_active_path_is_bumpless_and_negative_feedback()
 {
@@ -720,7 +729,7 @@ void test_controller_shadow_althold_captures_current_altitude()
       true;
 
   // Centered throttle = zero climb request.
-  model.state.input.ch[AXIS_THRUST] =
+  model.state.input.ch[ALTHOLD_PILOT_CHANNEL] =
       0.0f;
 
   model.updateModes(
@@ -780,7 +789,7 @@ void test_controller_shadow_althold_center_stick_holds_target()
   model.state.altitude.healthy =
       true;
 
-  model.state.input.ch[AXIS_THRUST] =
+  model.state.input.ch[ALTHOLD_PILOT_CHANNEL] =
       0.0f;
 
   model.updateModes(
@@ -835,7 +844,7 @@ void test_controller_shadow_althold_climb_command_moves_target_up()
       true;
 
   // Positive centered-stick displacement.
-  model.state.input.ch[AXIS_THRUST] =
+  model.state.input.ch[ALTHOLD_PILOT_CHANNEL] =
       0.50f;
 
   model.updateModes(
@@ -891,7 +900,7 @@ void test_controller_shadow_althold_descent_command_moves_target_down()
   model.state.altitude.healthy =
       true;
 
-  model.state.input.ch[AXIS_THRUST] =
+  model.state.input.ch[ALTHOLD_PILOT_CHANNEL] =
       -0.50f;
 
   model.updateModes(
@@ -945,7 +954,7 @@ void test_controller_shadow_althold_stops_when_estimator_unhealthy()
   model.state.altitude.healthy =
       true;
 
-  model.state.input.ch[AXIS_THRUST] =
+  model.state.input.ch[ALTHOLD_PILOT_CHANNEL] =
       0.0f;
 
   model.updateModes(
@@ -1002,7 +1011,7 @@ void test_controller_shadow_althold_vertical_accel_limit()
   model.state.altitude.healthy =
       true;
 
-  model.state.input.ch[AXIS_THRUST] =
+  model.state.input.ch[ALTHOLD_PILOT_CHANNEL] =
       1.0f;
 
   model.updateModes(
@@ -1085,7 +1094,7 @@ void test_controller_shadow_althold_target_is_bounded()
   // --------------------------------------------------
 
   model.state.input.ch[
-      AXIS_THRUST] =
+      ALTHOLD_PILOT_CHANNEL] =
       -1.0f;
 
   model.updateModes(
@@ -1136,7 +1145,7 @@ void test_controller_shadow_althold_target_is_bounded()
   // --------------------------------------------------
 
   model.state.input.ch[
-      AXIS_THRUST] =
+      ALTHOLD_PILOT_CHANNEL] =
       1.0f;
 
   model.updateModes(
@@ -1248,7 +1257,7 @@ void test_controller_shadow_althold_full_climb_rate_scaling()
 
   // Full climb command.
   model.state.input.ch[
-      AXIS_THRUST] =
+      ALTHOLD_PILOT_CHANNEL] =
       1.0f;
 
   model.updateModes(
@@ -1632,7 +1641,7 @@ void test_controller_althold_v2_shadow_does_not_drive_thrust()
           AXIS_THRUST]);
 }
 
-#if defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST)
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
 
 void test_controller_althold_v2_active_path_is_bumpless_and_corrective()
 {
@@ -1689,7 +1698,7 @@ void test_controller_althold_v2_active_path_is_bumpless_and_corrective()
       NOW_US;
 
   model.state.input.ch[
-      AXIS_THRUST] =
+      ALTHOLD_PILOT_CHANNEL] =
       0.0f;
 
   constexpr float ENTRY_THRUST =
@@ -1755,7 +1764,7 @@ void test_controller_althold_v2_active_path_is_bumpless_and_corrective()
 
 #endif
 
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+#if defined(ESPFC_LAND_V2_ACTIVE)
 
 void test_controller_land_v2_levels_and_requests_descent()
 {
@@ -4085,7 +4094,7 @@ TEST_ASSERT_TRUE(
       model.state.failsafe
           .landingEntryVario);
 
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+#if defined(ESPFC_LAND_V2_ACTIVE)
   // The dedicated active-validation build deliberately
   // retains logical arming so Controller/Actuator can run
   // the LAND state machine. Physical ESC attachment is
@@ -4658,7 +4667,7 @@ RUN_TEST(test_controller_rates_limit);
 RUN_TEST(test_controller_shadow_angle_activates_and_slews);
 RUN_TEST(test_controller_shadow_angle_bumpless_entry);
 
-    #if defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
+    #if defined(ESPFC_ANGLE_V2_ACTIVE)
 
 RUN_TEST(
     test_controller_angle_v2_active_path_is_bumpless_and_negative_feedback);
@@ -4678,24 +4687,24 @@ RUN_TEST(
 RUN_TEST(test_controller_shadow_althold_full_climb_rate_scaling);
 RUN_TEST(test_actuator_althold_fault_requires_switch_cycle);
 RUN_TEST(test_actuator_angle_fault_requires_switch_cycle);
-#if defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
+#if defined(ESPFC_ANGLE_V2_ACTIVE)
 
 RUN_TEST(
     test_angle_v2_candidate_keeps_physical_motor_driver_blocked);
 
 #endif
   // Final assisted-mode architecture regression tests
-#if !defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST)
+#if !defined(ESPFC_ALTHOLD_V2_ACTIVE)
 RUN_TEST(
     test_controller_althold_v2_shadow_does_not_drive_thrust);
 #endif
 
-#if defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST)
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
 RUN_TEST(
     test_controller_althold_v2_active_path_is_bumpless_and_corrective);
 #endif
 
-#if defined(ESPFC_LAND_V2_ACTIVE_TEST)
+#if defined(ESPFC_LAND_V2_ACTIVE)
 RUN_TEST(
     test_controller_land_v2_levels_and_requests_descent);
 
