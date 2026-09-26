@@ -7,11 +7,9 @@
 namespace Espfc::Control {
 namespace {
 
-// Legacy AltHold must remain disconnected while the
-// V2 AltHold controller is being validated in shadow mode.
-//
-// Keep this FALSE until the new controller has completed
-// non-actuating SIL/HIL verification.
+// Legacy AltHold remains disconnected. Assisted V2 owns the active vertical
+// controller only in builds selected by AssistedModeV2.h; ordinary builds keep
+// the legacy output path disabled.
 constexpr bool ENABLE_LEGACY_ALTHOLD_OUTPUT =
     false;
 
@@ -415,17 +413,17 @@ void FAST_CODE_ATTR Controller::innerLoop()
 // THRUST OUTPUT
 // -----------------------------------------------------
 
-#if defined(ESPFC_LAND_V2_ACTIVE)
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
+  #if defined(ESPFC_LAND_V2_ACTIVE)
 const bool landingV2Requested =
     _model.state.failsafe.landingRequested &&
     _model.state.failsafe.phase ==
         FC_FAILSAFE_LANDING;
-#else
+  #else
 constexpr bool landingV2Requested =
     false;
-#endif
+  #endif
 
-#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
 const bool altHoldV2OutputActive =
     _model.state.assistedShadow.altitudeActive &&
     (_model.isModeActive(MODE_ALTHOLD) ||
@@ -664,10 +662,10 @@ void Controller::updateAssistedModesShadow()
   const auto& input =
       _model.state.input;
 
+#if defined(ESPFC_LAND_V2_ACTIVE)
   const auto& failsafe =
       _model.state.failsafe;
 
-#if defined(ESPFC_LAND_V2_ACTIVE)
   const bool landingV2Requested =
       failsafe.landingRequested &&
       failsafe.phase ==
