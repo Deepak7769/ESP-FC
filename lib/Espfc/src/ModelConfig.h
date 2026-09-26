@@ -56,7 +56,12 @@ struct FusionConfig
 
   static const char * getModeName(FusionMode mode)
   {
-    if(mode >= FUSION_MAX) return "?";
+    if (mode < FUSION_NONE ||
+        mode >= FUSION_MAX)
+    {
+      return "?";
+    }
+
     return getModeNames()[mode];
   }
 

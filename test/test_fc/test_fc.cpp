@@ -5595,6 +5595,106 @@ void test_input_frame_rate_ignores_startup_and_loss_gaps()
       model.state.input.frameRate);
 }
 
+void test_model_sanitize_preserves_rc_safety_invariants()
+{
+  Model model;
+
+  model.config.input.minCheck =
+      32767;
+
+  model.config.input.maxCheck =
+      -32768;
+
+  model.config.input.filterAutoFactor =
+      -20;
+
+  model.config.input.filterAutoThrottleFactor =
+      -20;
+
+  model.config.input.deadband =
+      -10;
+
+  model.config.input.airModeActivateThreshold =
+      -40;
+
+  model.config.input.rateType =
+      127;
+
+  model.config.input.ppmMode =
+      99;
+
+  model.config.input.serialRxProvider =
+      255;
+
+  model.config.level.angleLimit =
+      -40;
+
+  model.config.level.rateLimit =
+      -100;
+
+  model.config.arming.smallAngle =
+      255;
+
+  model.config.debug.mode =
+      -1;
+
+  model.sanitize();
+
+  TEST_ASSERT_EQUAL_INT16(
+      1050,
+      model.config.input.minCheck);
+
+  TEST_ASSERT_EQUAL_INT16(
+      1900,
+      model.config.input.maxCheck);
+
+  TEST_ASSERT_TRUE(
+      model.config.input.filterAutoFactor >= 0);
+
+  TEST_ASSERT_TRUE(
+      model.config.input.filterAutoThrottleFactor >= 0);
+
+  TEST_ASSERT_TRUE(
+      model.config.input.deadband >= 0);
+
+  TEST_ASSERT_TRUE(
+      model.config.input.airModeActivateThreshold >= 0);
+
+  TEST_ASSERT_TRUE(
+      model.config.input.rateType >= 0 &&
+      model.config.input.rateType <= 4);
+
+  TEST_ASSERT_EQUAL_INT(
+      PPM_MODE_NORMAL,
+      model.config.input.ppmMode);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      SERIALRX_SBUS,
+      model.config.input.serialRxProvider);
+
+  TEST_ASSERT_TRUE(
+      model.config.level.angleLimit >= 0);
+
+  TEST_ASSERT_TRUE(
+      model.config.level.rateLimit > 0);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      180,
+      model.config.arming.smallAngle);
+
+  TEST_ASSERT_EQUAL_INT(
+      DEBUG_NONE,
+      model.config.debug.mode);
+}
+
+void test_fusion_mode_name_rejects_negative_enum()
+{
+  TEST_ASSERT_EQUAL_STRING(
+      "?",
+      FusionConfig::getModeName(
+          static_cast<FusionMode>(-1)));
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -5745,6 +5845,8 @@ RUN_TEST(
   RUN_TEST(test_actuator_missing_aux_channel_cannot_activate_mode);
   RUN_TEST(test_actuator_missing_aux_channel_does_not_apply_scaler);
   RUN_TEST(test_input_frame_rate_ignores_startup_and_loss_gaps);
+  RUN_TEST(test_model_sanitize_preserves_rc_safety_invariants);
+  RUN_TEST(test_fusion_mode_name_rejects_negative_enum);
 RUN_TEST(
     test_failsafe_startup_without_rx_does_not_enter_stage2);
 

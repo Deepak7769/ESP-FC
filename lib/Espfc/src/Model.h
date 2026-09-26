@@ -699,6 +699,123 @@ config.controller.tpaBreakpoint =
         1000,
         1999);
 
+// Receiver/control settings are persisted and can be edited over MSP/CLI.
+// Keep them inside ranges that preserve the arming and smoothing invariants.
+if (config.input.ppmMode != PPM_MODE_NORMAL &&
+    config.input.ppmMode != PPM_MODE_INVERTED)
+{
+  config.input.ppmMode =
+      PPM_MODE_NORMAL;
+}
+
+switch (config.input.serialRxProvider)
+{
+  case SERIALRX_SBUS:
+  case SERIALRX_IBUS:
+  case SERIALRX_CRSF:
+    break;
+
+  default:
+    config.input.serialRxProvider =
+        SERIALRX_SBUS;
+    break;
+}
+
+config.input.minCheck =
+    std::clamp<int16_t>(
+        config.input.minCheck,
+        1000,
+        1500);
+
+config.input.maxCheck =
+    std::clamp<int16_t>(
+        config.input.maxCheck,
+        1500,
+        2000);
+
+if (config.input.minCheck >=
+    config.input.maxCheck)
+{
+  config.input.minCheck =
+      1050;
+
+  config.input.maxCheck =
+      1900;
+}
+
+config.input.minRc =
+    std::clamp<int16_t>(
+        config.input.minRc,
+        750,
+        1000);
+
+config.input.midRc =
+    std::clamp<int16_t>(
+        config.input.midRc,
+        1200,
+        1800);
+
+config.input.maxRc =
+    std::clamp<int16_t>(
+        config.input.maxRc,
+        2000,
+        2250);
+
+config.input.deadband =
+    std::clamp<int8_t>(
+        config.input.deadband,
+        0,
+        100);
+
+config.input.airModeActivateThreshold =
+    std::clamp<int8_t>(
+        config.input.airModeActivateThreshold,
+        0,
+        100);
+
+config.input.filterAutoFactor =
+    std::clamp<int8_t>(
+        config.input.filterAutoFactor,
+        0,
+        100);
+
+config.input.filterAutoThrottleFactor =
+    std::clamp<int8_t>(
+        config.input.filterAutoThrottleFactor,
+        0,
+        100);
+
+// RateType currently has five concrete algorithms: 0..4.
+config.input.rateType =
+    std::clamp<int8_t>(
+        config.input.rateType,
+        0,
+        4);
+
+config.level.angleLimit =
+    std::clamp<int8_t>(
+        config.level.angleLimit,
+        0,
+        90);
+
+config.level.rateLimit =
+    std::clamp<int16_t>(
+        config.level.rateLimit,
+        1,
+        1998);
+
+config.arming.smallAngle =
+    std::min<uint8_t>(
+        config.arming.smallAngle,
+        180);
+
+if (config.debug.mode < DEBUG_NONE ||
+    config.debug.mode >= DEBUG_COUNT)
+{
+  config.debug.mode =
+      DEBUG_NONE;
+}
+
 config.iterm.limit =
     std::clamp<int8_t>(
         config.iterm.limit,

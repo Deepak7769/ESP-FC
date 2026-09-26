@@ -19,8 +19,11 @@ int Input::begin()
     std::min<size_t>(
         _device
             ? _device->getChannelCount()
-            : INPUT_CHANNELS,
+            : 0u,
         INPUT_CHANNELS);
+
+  _model.state.input.channelsValid =
+      false;
   _model.state.input.frameTime =
       0;
 
