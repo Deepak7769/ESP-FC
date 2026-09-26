@@ -1392,6 +1392,18 @@ void test_actuator_althold_fault_requires_switch_cycle()
   model.state.input.us[AXIS_AUX_1] =
       1500;
 
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
+  model.state.input.channelCount =
+      ALTHOLD_PILOT_CHANNEL + 1;
+
+  model.state.input.channelsValid =
+      true;
+
+  model.state.input.ch[
+      ALTHOLD_PILOT_CHANNEL] =
+      0.0f;
+#endif
+
   Actuator actuator(
       model);
 
@@ -1965,6 +1977,12 @@ void test_actuator_althold_v2_rejects_missing_pilot_channel()
   setHealthyAssistedEstimatorState(
       model,
       NOW_US);
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
 
   auto& condition =
       model.config.conditions[0];
