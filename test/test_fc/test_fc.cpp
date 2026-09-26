@@ -3157,6 +3157,39 @@ void test_angle_fault_transition_rate_is_finite_and_bounded()
           rateBeforeFault));
 }
 
+void test_angle_v2_candidate_keeps_physical_motor_driver_blocked()
+{
+#if defined(ESPFC_SAFE_BENCH_BUILD)
+
+  Model model;
+
+  model.state.gyro.clock =
+      1000;
+
+  model.config.gyro.dlpf =
+      GYRO_DLPF_256;
+
+  model.config.loopSync =
+      1;
+
+  model.config.mixerSync =
+      1;
+
+  model.config.mixer.type =
+      FC_MIXER_QUADX;
+
+  model.begin();
+
+  Output::Mixer mixer(model);
+
+  mixer.begin();
+
+  TEST_ASSERT_NULL(
+      model.state.mixer.escMotor);
+
+#endif
+}
+
 void test_failsafe_startup_without_rx_does_not_enter_stage2()
 {
   ArduinoFakeReset();
@@ -4127,6 +4160,15 @@ RUN_TEST(
 RUN_TEST(test_controller_shadow_althold_full_climb_rate_scaling);
 RUN_TEST(test_actuator_althold_fault_requires_switch_cycle);
 RUN_TEST(test_actuator_angle_fault_requires_switch_cycle);
+#if defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
+
+RUN_TEST(
+    test_controller_angle_v2_active_path_is_bumpless_and_negative_feedback);
+
+RUN_TEST(
+    test_angle_v2_candidate_keeps_physical_motor_driver_blocked);
+
+#endif
   // Final assisted-mode architecture regression tests
 RUN_TEST(
     test_controller_althold_v2_shadow_does_not_drive_thrust);
