@@ -4099,6 +4099,13 @@ RUN_TEST(test_controller_angle_mode_does_not_latch_fterm_scale);
 RUN_TEST(test_controller_shadow_angle_activates_and_slews);
 RUN_TEST(test_controller_shadow_angle_bumpless_entry);
 
+    #if defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
+
+RUN_TEST(
+    test_controller_angle_v2_active_path_is_bumpless_and_negative_feedback);
+
+#endif
+
 RUN_TEST(test_controller_shadow_althold_captures_current_altitude);
 RUN_TEST(test_controller_shadow_althold_center_stick_holds_target);
 RUN_TEST(test_controller_shadow_althold_climb_command_moves_target_up);
