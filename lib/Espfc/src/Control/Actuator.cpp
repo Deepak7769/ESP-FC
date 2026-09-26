@@ -1,6 +1,7 @@
 #include "Control/Actuator.h"
 #include "Control/AssistedModeV2.h"
 #include "Hal/Time.hpp"
+#include "Input.h"
 #include "Utils/Math.hpp"
 
 #include <algorithm>
