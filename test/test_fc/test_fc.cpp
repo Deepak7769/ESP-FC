@@ -1854,6 +1854,7 @@ void test_controller_althold_v2_uses_dedicated_centered_stick_channel()
       0.0f);
 }
 
+#endif
 
 void test_actuator_althold_v2_requires_centered_pilot_stick_on_entry()
 {
@@ -1936,8 +1937,6 @@ void test_actuator_althold_v2_requires_centered_pilot_stick_on_entry()
       model.getArmingDisabled(
           ARMING_DISABLED_ALTHOLD));
 }
-
-#endif
 
 #endif
 
