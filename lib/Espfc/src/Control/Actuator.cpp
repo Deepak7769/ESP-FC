@@ -147,6 +147,13 @@ if (c.ch < AXIS_AUX_1 ||
   continue;
 }
 
+if (_model.state.input.channelCount > 0 &&
+    static_cast<size_t>(c.ch) >=
+        _model.state.input.channelCount)
+{
+  continue;
+}
+
 if (c.id >= MODE_COUNT)
 {
   continue;
@@ -199,10 +206,17 @@ void Actuator::updateScaler()
 
     short c = _model.config.scaler[i].channel;
     if (c < AXIS_AUX_1 ||
-    c >= AXIS_COUNT)
-{
-  continue;
-}
+        c >= AXIS_COUNT)
+    {
+      continue;
+    }
+
+    if (_model.state.input.channelCount > 0 &&
+        static_cast<size_t>(c) >=
+            _model.state.input.channelCount)
+    {
+      continue;
+    }
 
     float v = _model.state.input.ch[c];
     float min = _model.config.scaler[i].minScale * 0.01f;
@@ -331,6 +345,14 @@ size_t ch =
 if (ch < AXIS_AUX_1 ||
     ch >= AXIS_COUNT)
 {
+  continue;
+}
+
+if (_model.state.input.channelCount > 0 &&
+    ch >= _model.state.input.channelCount)
+{
+  // A configured AUX condition must never become active from the default
+  // 1500-us contents of a channel the receiver does not actually provide.
   continue;
 }
 

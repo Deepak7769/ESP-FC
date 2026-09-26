@@ -5425,6 +5425,89 @@ void test_failsafe_land_shadow_fault_latches()
           .landingShadowFault);
 }
 
+void test_actuator_missing_aux_channel_cannot_activate_mode()
+{
+  Model model;
+
+  // Receiver exposes only the four primary flight channels.
+  model.state.input.channelCount =
+      AXIS_AUX_1;
+
+  auto& condition =
+      model.config.conditions[0];
+
+  condition.id =
+      MODE_BUZZER;
+
+  condition.ch =
+      AXIS_AUX_1;
+
+  condition.min =
+      1200;
+
+  condition.max =
+      1800;
+
+  // The unused logical slot still contains a centered-looking value.  It must
+  // not be interpreted as a real switch when the receiver has no AUX1.
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1500;
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_BUZZER));
+}
+
+void test_actuator_missing_aux_channel_does_not_apply_scaler()
+{
+  Model model;
+
+  model.state.input.channelCount =
+      AXIS_AUX_1;
+
+  auto& scaler =
+      model.config.scaler[0];
+
+  scaler.dimension =
+      ACT_INNER_P |
+      ACT_AXIS_ROLL;
+
+  scaler.channel =
+      AXIS_AUX_1;
+
+  scaler.minScale =
+      20;
+
+  scaler.maxScale =
+      400;
+
+  model.state.input.ch[
+      AXIS_AUX_1] =
+      1.0f;
+
+  model.state.innerPid[
+      AXIS_ROLL].pScale =
+      1.0f;
+
+  Actuator actuator(
+      model);
+
+  actuator.updateScaler();
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      1.0f,
+      model.state.innerPid[
+          AXIS_ROLL].pScale);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -5570,6 +5653,8 @@ RUN_TEST(
   RUN_TEST(test_rates_kiss);
   RUN_TEST(test_rates_kiss_expo);
   RUN_TEST(test_actuator_arming_gyro_motor_calbration);
+  RUN_TEST(test_actuator_missing_aux_channel_cannot_activate_mode);
+  RUN_TEST(test_actuator_missing_aux_channel_does_not_apply_scaler);
 RUN_TEST(
     test_failsafe_startup_without_rx_does_not_enter_stage2);
 
