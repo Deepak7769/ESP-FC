@@ -2270,9 +2270,31 @@ void test_actuator_althold_v2_rejects_missing_pilot_channel()
       model.getArmingDisabled(
           ARMING_DISABLED_ALTHOLD));
 
-  // Once the channel really exists, the same centered command is eligible.
+  // Recovery while the switch remains ON must not silently re-enter:
+  // the dedicated vertical-channel fault is latched until an OFF -> ON cycle.
   model.state.input.channelCount =
       ALTHOLD_PILOT_CHANNEL + 1;
+
+  model.state.input.raw[
+      ALTHOLD_PILOT_CHANNEL] =
+      PWM_RANGE_MID;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  // Deliberate switch cycle clears the fault latch.
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1000;
+
+  actuator.updateModeMask();
+
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1500;
 
   actuator.updateModeMask();
 
@@ -2355,6 +2377,23 @@ void test_actuator_althold_v2_rejects_invalid_raw_pilot_channel()
   model.state.input.raw[
       ALTHOLD_PILOT_CHANNEL] =
       PWM_RANGE_MID;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ALTHOLD));
+
+  // Clear the latched channel fault with a deliberate mode switch cycle.
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1000;
+
+  actuator.updateModeMask();
+
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1500;
 
   actuator.updateModeMask();
 
