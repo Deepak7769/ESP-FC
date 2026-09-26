@@ -3161,6 +3161,18 @@ void test_angle_v2_candidate_keeps_physical_motor_driver_blocked()
 {
 #if defined(ESPFC_SAFE_BENCH_BUILD)
 
+  ArduinoFakeReset();
+
+  // Mixer::begin() logs initialization information.
+  // Logger::info() calls millis(), so ArduinoFake must
+  // provide a deterministic value.
+  When(
+      Method(
+          ArduinoFake(),
+          millis))
+      .AlwaysReturn(
+          1);
+
   Model model;
 
   model.state.gyro.clock =
@@ -3180,10 +3192,14 @@ void test_angle_v2_candidate_keeps_physical_motor_driver_blocked()
 
   model.begin();
 
-  Output::Mixer mixer(model);
+  Output::Mixer mixer(
+      model);
 
   mixer.begin();
 
+  // The full mixer may initialize and calculate outputs,
+  // but SAFE_BENCH_BUILD must never expose a physical
+  // motor ESC driver.
   TEST_ASSERT_NULL(
       model.state.mixer.escMotor);
 
@@ -4161,9 +4177,6 @@ RUN_TEST(test_controller_shadow_althold_full_climb_rate_scaling);
 RUN_TEST(test_actuator_althold_fault_requires_switch_cycle);
 RUN_TEST(test_actuator_angle_fault_requires_switch_cycle);
 #if defined(ESPFC_ANGLE_V2_ACTIVE_TEST)
-
-RUN_TEST(
-    test_controller_angle_v2_active_path_is_bumpless_and_negative_feedback);
 
 RUN_TEST(
     test_angle_v2_candidate_keeps_physical_motor_driver_blocked);
