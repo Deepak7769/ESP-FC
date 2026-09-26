@@ -141,10 +141,13 @@ public:
   uint32_t recoveryStartedUs{0};
 
   // -----------------------------------------------------
-  // FAILSAFE LAND SHADOW STATE
+  // FAILSAFE LAND V2 SUPERVISOR STATE
   //
-  // These values describe what the LAND supervisor would
-  // have requested. They DO NOT command motor output.
+  // Ordinary builds keep this state diagnostic-only.
+  // ESPFC_LAND_V2_ACTIVE_TEST may consume the requests,
+  // but that build is compile-time locked to
+  // ESPFC_SAFE_BENCH_BUILD so physical ESC attachment is
+  // still blocked.
   // -----------------------------------------------------
 
   bool landingRequested{false};
@@ -166,8 +169,10 @@ public:
   // estimator state is not healthy.
   bool landingShadowFault{false};
 
-  // Hard diagnostic interlock.
-  // LAND shadow must never own motor output.
+  // Logical controller-ownership interlock. This remains
+  // true in ordinary builds. The guarded active-validation
+  // build clears it only while LAND owns the controller;
+  // ESPFC_SAFE_BENCH_BUILD independently blocks the ESCs.
   bool landingShadowOutputBlocked{true};
 
   uint32_t landingRequestedUs{0};
@@ -418,6 +423,10 @@ struct AltitudeState
 };
 struct AssistedModeShadowState
 {
+  // Candidate assisted-mode state. It remains shadow-only
+  // in ordinary builds and becomes authoritative only in
+  // the compile-time guarded V2 validation environments.
+
   // ANGLE mode V2
   float rollAngleTarget{0.0f};
   float pitchAngleTarget{0.0f};
