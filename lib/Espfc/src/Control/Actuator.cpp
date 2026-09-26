@@ -9,6 +9,36 @@
 
 namespace Espfc::Control {
 
+namespace {
+
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
+bool altHoldPilotStickCentered(
+    const Model& model)
+{
+  constexpr size_t PILOT_CHANNEL =
+      static_cast<size_t>(
+          ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL);
+
+  static_assert(
+      PILOT_CHANNEL < AXIS_COUNT,
+      "AltHold V2 centered-stick channel exceeds input channel count");
+
+  constexpr float ENTRY_CENTER_WINDOW =
+      0.15f;
+
+  const float command =
+      model.state.input.ch[
+          PILOT_CHANNEL];
+
+  return
+      std::isfinite(command) &&
+      std::fabs(command) <=
+          ENTRY_CENTER_WINDOW;
+}
+#endif
+
+} // namespace
+
 Actuator::Actuator(Model& model): _model(model) {}
 
 int Actuator::begin()
@@ -272,10 +302,16 @@ const bool altHoldHealthy =
 #endif
       ;
 
+  const bool altHoldPilotUnsafe =
+      altHoldRequested &&
+      !altHoldPilotStickCentered(
+          _model);
+
   _model.setArmingDisabled(
       ARMING_DISABLED_ALTHOLD,
-      assistedAltitudeRequired &&
-          !altHoldHealthy);
+      (assistedAltitudeRequired &&
+       !altHoldHealthy) ||
+      altHoldPilotUnsafe);
 #else
   _model.setArmingDisabled(
       ARMING_DISABLED_ALTHOLD,
@@ -867,9 +903,17 @@ bool Actuator::canActivateMode(
           _model.state.mode.airmodeAllowed;
 
 case MODE_ALTHOLD:
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
+  return
+      altitudeEstimateHealthy() &&
+      !_altHoldFaultLatched &&
+      altHoldPilotStickCentered(
+          _model);
+#else
   return
       altitudeEstimateHealthy() &&
       !_altHoldFaultLatched;
+#endif
 
     default:
       return true;
