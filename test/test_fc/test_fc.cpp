@@ -2789,6 +2789,81 @@ void test_failsafe_land_v2_touchdown_candidate_has_hysteresis()
       model.state.failsafe.phase);
 }
 
+void test_failsafe_land_v2_low_entry_thrust_prevents_hover_false_touchdown()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      6750000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  model.state.altitude.height =
+      0.10f;
+
+  model.state.altitude.vario =
+      0.02f;
+
+  // This aircraft entered LAND while already hovering at a low normalized
+  // thrust. The same thrust level near the ground is not a touchdown signal.
+  model.state.failsafe.landingEntryThrust =
+      -0.90f;
+
+  model.state.output.ch[
+      AXIS_THRUST] =
+      -0.90f;
+
+  model.state.failsafe.rxEverValid =
+      true;
+
+  model.state.failsafe.landingRequested =
+      true;
+
+  model.state.failsafe.landingRequestedUs =
+      NOW_US -
+      3000000u;
+
+  model.state.failsafe.landingEntryHeight =
+      2.0f;
+
+  model.state.failsafe.phase =
+      FC_FAILSAFE_LANDING;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  Actuator actuator(
+      model);
+
+  actuator.updateFailsafeLandShadow();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_ARMED));
+
+  TEST_ASSERT_FALSE(
+      model.state.failsafe
+          .landingTouchdownCandidate);
+}
+
 void test_failsafe_land_v2_near_ground_hover_does_not_disarm()
 {
   ArduinoFakeReset();
@@ -5247,6 +5322,10 @@ void test_failsafe_auto_land_request_is_recorded_but_disarms()
   model.state.altitude.vario =
       -0.15f;
 
+  model.state.output.ch[
+      AXIS_THRUST] =
+      -0.65f;
+
   // Simulate an already armed aircraft.
   model.updateModes(
       uint32_t{1} <<
@@ -5291,6 +5370,12 @@ TEST_ASSERT_TRUE(
       -0.15f,
       model.state.failsafe
           .landingEntryVario);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      -0.65f,
+      model.state.failsafe
+          .landingEntryThrust);
 
 #if defined(ESPFC_LAND_V2_ACTIVE)
   // The dedicated active-validation build deliberately
@@ -5658,6 +5743,9 @@ void test_new_arm_clears_previous_land_latch()
   model.state.failsafe.landingEntryVario =
       -0.4f;
 
+  model.state.failsafe.landingEntryThrust =
+      -0.7f;
+
   // Initial state is disarmed.
   // This creates a real DISARMED -> ARMED transition.
   model.updateModes(
@@ -5728,6 +5816,12 @@ void test_new_arm_clears_previous_land_latch()
       0.0f,
       model.state.failsafe
           .landingEntryVario);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      0.0f,
+      model.state.failsafe
+          .landingEntryThrust);
 }
 
 void test_failsafe_repeated_stage2_preserves_landed_state()
@@ -6436,6 +6530,9 @@ RUN_TEST(
 
 RUN_TEST(
     test_failsafe_land_v2_touchdown_candidate_has_hysteresis);
+
+RUN_TEST(
+    test_failsafe_land_v2_low_entry_thrust_prevents_hover_false_touchdown);
 
 RUN_TEST(
     test_failsafe_land_v2_near_ground_hover_does_not_disarm);

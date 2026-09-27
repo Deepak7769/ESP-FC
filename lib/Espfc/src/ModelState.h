@@ -202,6 +202,11 @@ public:
   float landingEntryHeight{0.0f};
 
   float landingEntryVario{0.0f};
+
+  // Thrust command at LAND entry. This provides a conservative runtime
+  // reference for touchdown detection when the configured hover-thrust center
+  // does not exactly match the aircraft's real hover command.
+  float landingEntryThrust{0.0f};
 };
 
 constexpr float ACCEL_G = 9.80665f;

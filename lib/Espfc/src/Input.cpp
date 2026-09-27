@@ -79,6 +79,9 @@ int Input::begin()
   _model.state.failsafe.landingEntryVario =
       0.0f;
 
+  _model.state.failsafe.landingEntryThrust =
+      0.0f;
+
     _model.state.failsafe.landingShadowActive =
       false;
 
@@ -849,6 +852,10 @@ void FAST_CODE_ATTR Input::failsafeStage2()
       failsafe.landingEntryVario =
           _model.state.altitude.vario;
 
+      failsafe.landingEntryThrust =
+          _model.state.output.ch[
+              AXIS_THRUST];
+
       failsafe.landingShadowEstimatorHealthy =
           false;
 
@@ -929,6 +936,9 @@ void FAST_CODE_ATTR Input::failsafeStage2()
         0.0f;
 
     failsafe.landingEntryVario =
+        0.0f;
+
+    failsafe.landingEntryThrust =
         0.0f;
   }
 

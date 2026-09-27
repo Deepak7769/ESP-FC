@@ -971,6 +971,24 @@ void Actuator::updateFailsafeLandShadow()
                 -0.8f,
                 0.8f);
 
+        const float entryThrust =
+            std::isfinite(
+                failsafe.landingEntryThrust)
+                ? std::clamp(
+                      failsafe.landingEntryThrust,
+                      -1.0f,
+                      1.0f)
+                : configuredHoverThrust;
+
+        // Use the lower of configured hover thrust and the actual command at
+        // failsafe entry. This is conservative for aircraft whose real hover
+        // command is below the configured center: touchdown must still show a
+        // real thrust reduction before disarming.
+        const float touchdownReferenceThrust =
+            std::min(
+                configuredHoverThrust,
+                entryThrust);
+
         constexpr float
             TOUCHDOWN_THRUST_MARGIN =
                 0.05f;
@@ -983,7 +1001,7 @@ void Actuator::updateFailsafeLandShadow()
             std::isfinite(
                 commandedThrust) &&
             commandedThrust <=
-                configuredHoverThrust -
+                touchdownReferenceThrust -
                     TOUCHDOWN_THRUST_MARGIN;
 
         const bool touchdownEvidence =
@@ -1022,7 +1040,7 @@ void Actuator::updateFailsafeLandShadow()
             std::isfinite(
                 commandedThrust) &&
             commandedThrust <=
-                configuredHoverThrust -
+                touchdownReferenceThrust -
                     TOUCHDOWN_HOLD_THRUST_MARGIN;
 
         if (landingTimedOut)
@@ -1255,6 +1273,9 @@ void Actuator::updateArmed()
           0.0f;
 
       failsafe.landingEntryVario =
+          0.0f;
+
+      failsafe.landingEntryThrust =
           0.0f;
     }
     else if (!armed && _model.state.mode.disarmReason == DISARM_REASON_SYSTEM)
