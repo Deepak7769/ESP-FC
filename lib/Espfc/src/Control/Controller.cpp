@@ -251,39 +251,28 @@ void FAST_CODE_ATTR Controller::outerLoop()
   // -----------------------------------------------------
 
 
-  if (_model.isModeActive(MODE_ANGLE) ||
+if (_model.isModeActive(MODE_ANGLE) ||
     landingV2Requested)
 {
-const auto& angleV2 =
-    _model.state.angleV2;
+  const auto& angleV2 =
+      _model.state.angleV2;
 
-if (angleV2.active)
-{
-  _model.state.setpoint.rate[
-      AXIS_ROLL] =
-      angleV2.rateTarget[
-          AXIS_ROLL];
+  if (angleV2.active)
+  {
+    _model.state.setpoint.rate[
+        AXIS_ROLL] =
+        angleV2.rateTarget[
+            AXIS_ROLL];
 
-  _model.state.setpoint.rate[
-      AXIS_PITCH] =
-      angleV2.rateTarget[
-          AXIS_PITCH];
-}
-else
-{
-  _model.state.setpoint.rate[
-      AXIS_ROLL] =
-      0.0f;
-
-  _model.state.setpoint.rate[
-      AXIS_PITCH] =
-      0.0f;
-}
+    _model.state.setpoint.rate[
+        AXIS_PITCH] =
+        angleV2.rateTarget[
+            AXIS_PITCH];
+  }
   else
   {
-    // Angle V2 owns Roll/Pitch whenever Angle or LAND is requested.
-    // If the attitude estimator becomes unhealthy, command zero rate
-    // instead of reusing a stale V2 target.
+    // Angle/LAND was requested, but Angle V2 cannot
+    // provide a valid target. Do not reuse stale data.
     _model.state.setpoint.rate[
         AXIS_ROLL] =
         0.0f;
@@ -293,18 +282,18 @@ else
         0.0f;
   }
 }
-  else
+else
+{
+  for (size_t i = 0;
+       i < AXIS_COUNT_RP;
+       ++i)
   {
-    for (size_t i = 0;
-         i < AXIS_COUNT_RP;
-         ++i)
-    {
-      _model.state.setpoint.rate[i] =
-          calculateSetpointRate(
-              i,
-              _model.state.input.ch[i]);
-    }
+    _model.state.setpoint.rate[i] =
+        calculateSetpointRate(
+            i,
+            _model.state.input.ch[i]);
   }
+}
 
   // -----------------------------------------------------
   // YAW
