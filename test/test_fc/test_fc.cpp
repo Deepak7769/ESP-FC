@@ -399,7 +399,7 @@ void test_controller_angle_mode_does_not_latch_fterm_scale()
 // V2 ASSISTED MODE SHADOW TESTS
 // =========================================================
 
-void test_controller_shadow_angle_activates_and_slews()
+void test_controller_angle_v2_activates_and_slews()
 {
   When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
 
@@ -418,7 +418,7 @@ void test_controller_shadow_angle_activates_and_slews()
       {.P = 45u, .I = 0u, .D = 0u, .F = 0};
 
   model.begin();
-      // V2 Angle shadow requires a valid attitude estimate.
+      // Angle V2 requires a valid attitude estimate.
   model.state.attitude.healthy =
       true;
 
@@ -479,7 +479,7 @@ TEST_ASSERT_TRUE(
 }
 
 
-void test_controller_shadow_angle_bumpless_entry()
+void test_controller_angle_v2_bumpless_entry()
 {
   When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
 
@@ -540,7 +540,7 @@ model.state.attitude.euler.set(
       angleV2.angleTarget[AXIS_ROLL] <= 0.30f);
 }
 
-#if defined(ESPFC_ANGLE_V2_ACTIVE)
+
 
 void test_controller_angle_v2_active_path_is_bumpless_and_negative_feedback()
 {
@@ -698,7 +698,6 @@ const auto& v2 = model.state.angleV2;
           oldLegacyEquivalent));
 }
 
-#endif
 
 void test_controller_shadow_althold_captures_current_altitude()
 {
@@ -6544,16 +6543,15 @@ int main(int argc, char** argv)
   RUN_TEST(test_controller_rates);
 RUN_TEST(test_controller_rates_limit);
 
-// V2 assisted-mode shadow tests
-RUN_TEST(test_controller_shadow_angle_activates_and_slews);
-RUN_TEST(test_controller_shadow_angle_bumpless_entry);
+// Angle V2 controller regression tests
+RUN_TEST(
+    test_controller_angle_v2_activates_and_slews);
 
-    #if defined(ESPFC_ANGLE_V2_ACTIVE)
+RUN_TEST(
+    test_controller_angle_v2_bumpless_entry);
 
 RUN_TEST(
     test_controller_angle_v2_active_path_is_bumpless_and_negative_feedback);
-
-#endif
 
 RUN_TEST(test_controller_shadow_althold_captures_current_altitude);
 RUN_TEST(test_controller_shadow_althold_center_stick_holds_target);
@@ -6568,8 +6566,7 @@ RUN_TEST(
 RUN_TEST(test_controller_shadow_althold_full_climb_rate_scaling);
 RUN_TEST(test_actuator_althold_fault_requires_switch_cycle);
 RUN_TEST(test_actuator_angle_fault_requires_switch_cycle);
-#if defined(ESPFC_ANGLE_V2_ACTIVE) && \
-    defined(ESPFC_SAFE_BENCH_BUILD)
+#if defined(ESPFC_SAFE_BENCH_BUILD)
 
 RUN_TEST(
     test_angle_v2_candidate_keeps_physical_motor_driver_blocked);
