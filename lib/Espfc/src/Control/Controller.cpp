@@ -12,12 +12,11 @@ namespace {
 // the legacy output path disabled.
 constexpr bool ENABLE_LEGACY_ALTHOLD_OUTPUT =
     false;
-
+#if defined(ESPFC_LAND_V2_ACTIVE)
 
 bool landingV2OwnsControl(
     const Model& model)
 {
-#if defined(ESPFC_LAND_V2_ACTIVE)
   const auto& failsafe =
       model.state.failsafe;
 
@@ -30,8 +29,9 @@ bool landingV2OwnsControl(
 #else
   (void)model;
   return false;
-#endif
+
 }
+#endif 
 
 bool assistedVerticalControlOwnsThrust(
     const Model& model)
