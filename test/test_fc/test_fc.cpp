@@ -445,33 +445,33 @@ model.state.attitude.euler.set(
 
   controller.update();
 
-  const auto& shadow =
-      model.state.assistedShadow;
+ const auto& angleV2 =
+    model.state.angleV2;
 
   TEST_ASSERT_TRUE(
-      shadow.angleActive);
+      angleV2.active);
 
   // Target must start moving toward the requested angle.
   TEST_ASSERT_TRUE(
-      shadow.rollAngleTarget > 0.0f);
+      angleV2.angleTarget[AXIS_ROLL] > 0.0f);
 
   TEST_ASSERT_TRUE(
-      shadow.pitchAngleTarget > 0.0f);
+      angleV2.angleTarget[AXIS_PITCH] > 0.0f);
 
   // But slew limiting must prevent an instantaneous jump
   // to the full 45 degree command.
   TEST_ASSERT_TRUE(
-      shadow.rollAngleTarget < 0.7854f);
+     angleV2.rateTarget[AXIS_ROLL] < 0.7854f);
 
   TEST_ASSERT_TRUE(
-      shadow.pitchAngleTarget < 0.7854f);
+     angleV2.rateTarget[AXIS_PITCH] < 0.7854f);
 
   // Positive angle error should create positive rate targets.
   TEST_ASSERT_TRUE(
-      shadow.rollRateTarget > 0.0f);
+      angleV2.rateTarget[AXIS_ROLL] > 0.0f);
 
   TEST_ASSERT_TRUE(
-      shadow.pitchRateTarget > 0.0f);
+     angleV2.rateTarget[AXIS_PITCH] > 0.0f);
 }
 
 
@@ -2493,8 +2493,7 @@ void test_controller_land_v2_levels_and_requests_descent()
   controller.update();
 
   TEST_ASSERT_TRUE(
-      model.state.assistedShadow
-          .angleActive);
+     model.state.angleV2.active);
 
   TEST_ASSERT_TRUE(
       model.state.assistedShadow
@@ -2503,13 +2502,13 @@ void test_controller_land_v2_levels_and_requests_descent()
   // LAND owns the reference: zero attitude and a fixed
   // gentle descent, independent of stale failsafe sticks.
   TEST_ASSERT_TRUE(
-      model.state.assistedShadow
-          .rollRateTarget <
+     model.state.angleV2.rateTarget[
+    AXIS_ROLL] <
       0.0f);
 
   TEST_ASSERT_TRUE(
-      model.state.assistedShadow
-          .pitchRateTarget >
+      model.state.angleV2.rateTarget[
+    AXIS_PITCH] >
       0.0f);
 
   TEST_ASSERT_FLOAT_WITHIN(
