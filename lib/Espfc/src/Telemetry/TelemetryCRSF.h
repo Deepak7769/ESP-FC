@@ -80,20 +80,70 @@ public:
 
   int sendMsp(Stream::ReadWritable& s, Connect::MspResponse resp, uint8_t origin)
   {
-    size_t size = resp.serialize(_buff, sizeof(_buff));
-    const uint8_t* beg = _buff + 3;        // skip msp header
-    const uint8_t* end = _buff + size - 1; // skip crc
-    uint8_t version = resp.version == Connect::MSP_V1 ? 1 : 2;
+    const size_t size =
+        resp.serialize(
+            _buff,
+            sizeof(_buff));
+
+    // A failed/invalid MSP serialization returns zero. Never derive end from
+    // size - 1 in that case, and do not emit a CRSF frame with garbage data.
+    if (size == 0 ||
+        (resp.version != Connect::MSP_V1 &&
+         resp.version != Connect::MSP_V2))
+    {
+      return 0;
+    }
+
+    const uint8_t* beg =
+        _buff + 3;        // skip '$M>' / '$X>'
+
+    const uint8_t* end =
+        _buff + size - 1; // skip MSP crc
+
+    if (beg > end)
+    {
+      return 0;
+    }
+
+    const uint8_t version =
+        resp.version == Connect::MSP_V1
+            ? 1
+            : 2;
+
     size_t iter = 0;
     Rc::CrsfMessage frame;
+
+    // CRSF allocates four status bits to the MSP fragment sequence. The full
+    // local MSP response buffer can require more than four fragments, so use
+    // the entire 16-value sequence space instead of truncating large replies.
+    constexpr size_t MAX_MSP_FRAGMENTS =
+        16;
+
     do
     {
-      beg = Rc::Crsf::encodeMspData(frame, origin, version, _seq++, !iter, beg, end);
-      send(frame, s);
-      iter++;
-    } while(beg != end && iter < 4);
+      beg =
+          Rc::Crsf::encodeMspData(
+              frame,
+              origin,
+              version,
+              _seq++,
+              !iter,
+              beg,
+              end);
 
-    return iter;
+      send(
+          frame,
+          s);
+
+      iter++;
+    }
+    while (beg != end &&
+           iter < MAX_MSP_FRAGMENTS);
+
+    return
+        beg == end
+            ? static_cast<int>(iter)
+            : 0;
   }
 
   void send(const Rc::CrsfMessage& msg, Stream::ReadWritable& s) const

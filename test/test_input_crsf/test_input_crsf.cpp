@@ -1,11 +1,13 @@
 #include "Device/InputCRSF.h"
 #include "Device/InputIBUS.hpp"
+#include "Telemetry/TelemetryCRSF.h"
 #include "Device/InputSBUS.h"
 #include "msp/msp_protocol.h"
 #include <ArduinoFake.h>
 #include <Gps.hpp>
 #include <platform.h>
 #include <unity.h>
+#include <vector>
 
 using namespace Espfc;
 using namespace Espfc::Device;
@@ -721,6 +723,102 @@ void test_input_sbus_frame_lost_is_dropped_not_total_loss()
           SBUS_FLAG_FAILSAFE_ACTIVE));
 }
 
+class CaptureReadWritable : public Stream::ReadWritable
+{
+public:
+  void begin(const Hal::SerialDeviceConfig&) override {}
+  void updateBaudRate(int) override {}
+  int available() override { return 0; }
+  int read() override { return -1; }
+  size_t readMany(uint8_t*, size_t) override { return 0; }
+  int peek() override { return -1; }
+
+  size_t write(uint8_t c) override
+  {
+    data.push_back(c);
+    return 1;
+  }
+
+  size_t write(const uint8_t* src, size_t len) override
+  {
+    if (!src) return 0;
+    data.insert(data.end(), src, src + len);
+    writeCalls++;
+    return len;
+  }
+
+  int availableForWrite() override { return 4096; }
+  void flush() override {}
+  bool isTxFifoEmpty() override { return data.empty(); }
+
+  std::vector<uint8_t> data;
+  size_t writeCalls = 0;
+};
+
+void test_crsf_msp_invalid_version_emits_nothing()
+{
+  Model model;
+  Telemetry::TelemetryCRSF telemetry(model);
+  CaptureReadWritable stream;
+
+  Connect::MspResponse response;
+  response.version =
+      static_cast<Connect::MspVersion>(99);
+  response.cmd = 1;
+  response.result = 0;
+
+  TEST_ASSERT_EQUAL_INT(
+      0,
+      telemetry.sendMsp(
+          stream,
+          response,
+          Rc::CRSF_ADDRESS_RADIO_TRANSMITTER));
+
+  TEST_ASSERT_EQUAL_UINT32(
+      0u,
+      stream.writeCalls);
+
+  TEST_ASSERT_TRUE(
+      stream.data.empty());
+}
+
+void test_crsf_msp_large_response_is_not_truncated_at_four_fragments()
+{
+  Model model;
+  Telemetry::TelemetryCRSF telemetry(model);
+  CaptureReadWritable stream;
+
+  Connect::MspResponse response;
+  response.version =
+      Connect::MSP_V2;
+  response.cmd = 0x1234;
+  response.result = 0;
+
+  for (size_t i = 0;
+       i < Connect::MSP_BUF_OUT_SIZE;
+       ++i)
+  {
+    response.writeU8(
+        static_cast<uint8_t>(i));
+  }
+
+  const int fragments =
+      telemetry.sendMsp(
+          stream,
+          response,
+          Rc::CRSF_ADDRESS_RADIO_TRANSMITTER);
+
+  TEST_ASSERT_TRUE(
+      fragments > 4);
+
+  TEST_ASSERT_TRUE(
+      fragments <= 16);
+
+  TEST_ASSERT_EQUAL_UINT32(
+      static_cast<uint32_t>(fragments),
+      stream.writeCalls);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -738,6 +836,8 @@ int main(int argc, char** argv)
   RUN_TEST(test_crsf_decode_msp_v1);
   RUN_TEST(test_csrf_decode_msp_v1_fragmented);
   RUN_TEST(test_input_ibus_rc_valid);
+  RUN_TEST(test_crsf_msp_invalid_version_emits_nothing);
+  RUN_TEST(test_crsf_msp_large_response_is_not_truncated_at_four_fragments);
   RUN_TEST(test_input_sbus_frame_lost_is_dropped_not_total_loss);
 
   return UNITY_END();
