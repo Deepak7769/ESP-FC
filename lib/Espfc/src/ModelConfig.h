@@ -85,19 +85,29 @@ enum FlightMode {
 };
 
 enum ScalerDimension {
-  ACT_INNER_P     = 1 << 0,  // 1
-  ACT_INNER_I     = 1 << 1,  // 2
-  ACT_INNER_D     = 1 << 2,  // 4
-  ACT_INNER_F     = 1 << 3,  // 8
-  ACT_OUTER_P     = 1 << 4,  // 16
-  ACT_OUTER_I     = 1 << 5,  // 32
-  ACT_OUTER_D     = 1 << 6,  // 64
-  ACT_OUTER_F     = 1 << 7,  // 128
-  ACT_AXIS_ROLL   = 1 << 8,  // 256
-  ACT_AXIS_PITCH  = 1 << 9,  // 512
-  ACT_AXIS_YAW    = 1 << 10, // 1024
-  ACT_AXIS_THRUST = 1 << 11, // 2048
-  ACT_GYRO_THRUST = 1 << 12, // 4096
+  ACT_INNER_P     = 1 << 0,  // rate PID P
+  ACT_INNER_I     = 1 << 1,  // rate PID I
+  ACT_INNER_D     = 1 << 2,  // rate PID D
+  ACT_INNER_F     = 1 << 3,  // rate PID F
+
+  // Angle V2 outer-loop proportional gain.
+  //
+  // Uses the old bit-4 position intentionally so stored
+  // scaler configurations retain their numeric layout.
+  ACT_ANGLE_P     = 1 << 4,
+
+  // Bits 5..7 belonged to the removed legacy outer PID.
+  // Keep the bit positions reserved so stored configuration
+  // values do not change interpretation.
+  ACT_RESERVED_5  = 1 << 5,
+  ACT_RESERVED_6  = 1 << 6,
+  ACT_RESERVED_7  = 1 << 7,
+
+  ACT_AXIS_ROLL   = 1 << 8,
+  ACT_AXIS_PITCH  = 1 << 9,
+  ACT_AXIS_YAW    = 1 << 10,
+  ACT_AXIS_THRUST = 1 << 11,
+  ACT_GYRO_THRUST = 1 << 12,
 };
 
 constexpr size_t SCALER_COUNT = 3;
