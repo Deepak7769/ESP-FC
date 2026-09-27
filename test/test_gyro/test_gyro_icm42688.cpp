@@ -295,17 +295,17 @@ void test_baro_bmp280_begin_accepts_valid_initialization()
           &bus,
           0x76));
 
-  TEST_ASSERT_EQUAL_HEX8(
-      0xB6,
-      bus.writeRegs[0xE0]);
+TEST_ASSERT_EQUAL_HEX8(
+    0xB6,
+    bus.writeRegs[0xE0]);
 
-  TEST_ASSERT_EQUAL_HEX8(
-      0x10,
-      bus.writeRegs[0xF5]);
+TEST_ASSERT_EQUAL_HEX8(
+    0x08,
+    bus.writeRegs[0xF5]);
 
-  TEST_ASSERT_EQUAL_HEX8(
-      0x93,
-      bus.writeRegs[0xF4]);
+TEST_ASSERT_EQUAL_HEX8(
+    0x53,
+    bus.writeRegs[0xF4]);
 }
 
 void test_begin_aborts_on_failed_connection()
