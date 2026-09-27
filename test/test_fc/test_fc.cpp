@@ -460,11 +460,15 @@ model.state.attitude.euler.set(
 
   // But slew limiting must prevent an instantaneous jump
   // to the full 45 degree command.
-  TEST_ASSERT_TRUE(
-     angleV2.rateTarget[AXIS_ROLL] < 0.7854f);
+TEST_ASSERT_TRUE(
+    angleV2.angleTarget[
+        AXIS_ROLL] <
+    0.7854f);
 
-  TEST_ASSERT_TRUE(
-     angleV2.rateTarget[AXIS_PITCH] < 0.7854f);
+TEST_ASSERT_TRUE(
+    angleV2.angleTarget[
+        AXIS_PITCH] <
+    0.7854f);
 
   // Positive angle error should create positive rate targets.
   TEST_ASSERT_TRUE(
@@ -521,20 +525,19 @@ model.state.attitude.euler.set(
 
   controller.update();
 
-  const auto& shadow =
-      model.state.assistedShadow;
-
+ const auto& angleV2 = model.state.angleV2;
+    
   TEST_ASSERT_TRUE(
-      shadow.angleActive);
+      angleV2.active);
 
   // Bumpless entry means the target should begin close
   // to the current attitude instead of immediately
   // jumping to zero.
   TEST_ASSERT_TRUE(
-      shadow.rollAngleTarget > 0.20f);
+      angleV2.angleTarget[AXIS_ROLL] > 0.20f);
 
   TEST_ASSERT_TRUE(
-      shadow.rollAngleTarget <= 0.30f);
+      angleV2.angleTarget[AXIS_ROLL] <= 0.30f);
 }
 
 #if defined(ESPFC_ANGLE_V2_ACTIVE)
@@ -626,35 +629,34 @@ model.state.attitude.euler.set(
 
   controller.update();
 
-  const auto& v2 =
-      model.state.assistedShadow;
+const auto& v2 = model.state.angleV2;
 
   TEST_ASSERT_TRUE(
-      v2.angleActive);
+     v2.active);
 
   // Positive measured Roll must request a negative
   // Roll rate.
   TEST_ASSERT_TRUE(
-      v2.rollRateTarget <
+     v2.rateTarget[AXIS_ROLL] <
       0.0f);
 
   // Negative measured Pitch must request a positive
   // Pitch rate.
   TEST_ASSERT_TRUE(
-      v2.pitchRateTarget >
+     v2.rateTarget[AXIS_PITCH] >
       0.0f);
 
   // In this dedicated validation build, V2 must be
   // the authoritative Roll/Pitch rate target.
   TEST_ASSERT_FLOAT_WITHIN(
       0.0001f,
-      v2.rollRateTarget,
+     v2.rateTarget[AXIS_ROLL],
       model.state.setpoint.rate[
           AXIS_ROLL]);
 
   TEST_ASSERT_FLOAT_WITHIN(
       0.0001f,
-      v2.pitchRateTarget,
+      v2.rateTarget[AXIS_PITCH],
       model.state.setpoint.rate[
           AXIS_PITCH]);
 
@@ -2593,8 +2595,7 @@ void test_controller_land_v2_requires_supervisor_authorization()
   controller.update();
 
   TEST_ASSERT_FALSE(
-      model.state.assistedShadow
-          .angleActive);
+     model.state.angleV2.active);
 
   TEST_ASSERT_FALSE(
       model.state.assistedShadow
