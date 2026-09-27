@@ -12,7 +12,7 @@
 // authority through ESPFC_ASSISTED_V2_OUTPUT_ACK.
 // -----------------------------------------------------------------------------
 
-#define ESPFC_ANGLE_V2_ACTIVE 1
+
 
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE_TEST) && \
     !defined(ESPFC_SAFE_BENCH_BUILD)
