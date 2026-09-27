@@ -26,12 +26,9 @@ bool landingV2OwnsControl(
           FC_FAILSAFE_LANDING &&
       failsafe.landingShadowActive &&
       !failsafe.landingShadowOutputBlocked;
-#else
-  (void)model;
-  return false;
-
 }
-#endif 
+
+#endif
 
 bool assistedVerticalControlOwnsThrust(
     const Model& model)
