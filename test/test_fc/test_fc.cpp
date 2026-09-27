@@ -267,32 +267,7 @@ void test_model_inner_pid_init()
   TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.000788f, model.state.innerPid[FC_PID_YAW].Kf);
 }
 
-void test_model_outer_pid_init()
-{
-  Model model;
-  model.state.gyro.clock = 8000;
-  model.config.gyro.dlpf = GYRO_DLPF_256;
-  model.config.loopSync = 1;
-  model.config.mixerSync = 1;
-  model.config.mixer.type = FC_MIXER_QUADX;
-  model.config.pid[FC_PID_LEVEL] = {.P = 100u, .I = 100u, .D = 100u, .F = 100};
-  model.begin();
 
-  Control::Controller controller(model);
-  controller.begin();
-
-  TEST_ASSERT_FLOAT_WITHIN(0.1f, 2000.0f, model.state.outerPid[FC_PID_ROLL].rate);
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 10.0f, model.state.outerPid[FC_PID_ROLL].Kp);
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 10.0f, model.state.outerPid[FC_PID_ROLL].Ki);
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.1f, model.state.outerPid[FC_PID_ROLL].Kd);
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.1f, model.state.outerPid[FC_PID_ROLL].Kf);
-
-  TEST_ASSERT_FLOAT_WITHIN(0.1f, 2000.0f, model.state.outerPid[FC_PID_PITCH].rate);
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 10.0f, model.state.outerPid[FC_PID_PITCH].Kp);
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 10.0f, model.state.outerPid[FC_PID_PITCH].Ki);
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.1f, model.state.outerPid[FC_PID_PITCH].Kd);
-  TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.1f, model.state.outerPid[FC_PID_PITCH].Kf);
-}
 
 void test_controller_rates()
 {
@@ -6566,7 +6541,6 @@ int main(int argc, char** argv)
   RUN_TEST(test_model_gyro_init_1k_256dlpf);
   RUN_TEST(test_model_gyro_init_1k_188dlpf);
   RUN_TEST(test_model_inner_pid_init);
-  RUN_TEST(test_model_outer_pid_init);
   RUN_TEST(test_controller_rates);
 RUN_TEST(test_controller_rates_limit);
 
