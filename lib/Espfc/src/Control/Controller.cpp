@@ -181,18 +181,16 @@ void Controller::outerLoopRobot()
   const float gyroScale = 0.1f;
   const float speed = _speedFilter.update(_model.state.output.ch[AXIS_PITCH] * speedScale +
                                           _model.state.gyro.adc[AXIS_PITCH] * gyroScale);
-  float angle = 0;
-  const auto& input = _model.state.input;
-  const auto& levelConf = _model.config.level;
+const auto& input =
+    _model.state.input;
 
-  if (true || _model.isModeActive(MODE_ANGLE))
-  {
-    angle = input.ch[AXIS_PITCH] * Utils::toRad(levelConf.angleLimit);
-  }
-  else
-  {
-    angle = _model.state.outerPid[AXIS_PITCH].update(input.ch[AXIS_PITCH], speed) * Utils::toRad(levelConf.rateLimit);
-  }
+const auto& levelConf =
+    _model.config.level;
+
+const float angle =
+    input.ch[AXIS_PITCH] *
+    Utils::toRad(
+        levelConf.angleLimit);
   _model.state.setpoint.angle.set(AXIS_PITCH, angle);
   _model.state.setpoint.rate[AXIS_YAW] = input.ch[AXIS_YAW] * Utils::toRad(levelConf.rateLimit);
 
@@ -1232,7 +1230,7 @@ void Controller::resetIterm()
     for (size_t i = 0; i < AXIS_COUNT_RPY; i++)
     {
       _model.state.innerPid[i].resetIterm();
-      _model.state.outerPid[i].resetIterm();
+    
     }
   }
   if (!_model.isModeActive(MODE_ARMED))
@@ -1285,25 +1283,6 @@ void Controller::reloadPid()
     pid.begin();
   }
 
-  // outer loop
-  for (size_t axis = 0; axis < AXIS_COUNT_RP; axis++)
-  {
-    const auto& pc = _model.config.pid[FC_PID_LEVEL];
-
-    auto& pid = _model.state.outerPid[axis];
-    pid.Kp = (float)pc.P * LEVEL_PTERM_SCALE;
-    pid.Ki = (float)pc.I * LEVEL_ITERM_SCALE;
-    pid.Kd = (float)pc.D * LEVEL_DTERM_SCALE;
-    pid.Kf = (float)pc.F * LEVEL_FTERM_SCALE;
-    pid.iLimitHigh = Utils::toRad(_model.config.level.rateLimit * 0.1f);
-    pid.iLimitLow = -pid.iLimitHigh;
-    pid.oLimitHigh = Utils::toRad(_model.config.level.rateLimit);
-    pid.oLimitLow = -pid.oLimitHigh;
-    pid.rate = pidFilterRate;
-    // pid.iLimit = 0.3f; // ROBOT
-    // pid.oLimit = 1.f;  // ROBOT
-    pid.begin();
-  }
 
   // alt hold pid
   float itermCenter = std::clamp((int)_model.config.altHold.itermCenter, 10, 60) * 0.01f;
@@ -1354,14 +1333,6 @@ void Controller::reloadFilter()
     pid.begin();
   }
 
-  // outer loop
-  for (size_t axis = 0; axis < AXIS_COUNT_RP; axis++)
-  {
-    auto& pid = _model.state.outerPid[axis];
-    pid.rate = pidFilterRate;
-    pid.ptermFilter.begin(_model.config.level.ptermFilter, pidFilterRate);
-    pid.begin();
-  }
 
   // alt hold pid
   auto& pid = _model.state.innerPid[AXIS_THRUST];
