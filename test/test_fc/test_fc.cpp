@@ -6132,6 +6132,75 @@ void test_actuator_missing_aux_channel_does_not_apply_scaler()
           AXIS_ROLL].pScale);
 }
 
+void test_actuator_angle_v2_scaler_updates_selected_axis()
+{
+  Model model;
+
+  auto& scaler =
+      model.config.scaler[0];
+
+  scaler.dimension =
+      ACT_ANGLE_P |
+      ACT_AXIS_ROLL;
+
+  scaler.channel =
+      AXIS_AUX_1;
+
+  scaler.minScale =
+      20;
+
+  scaler.maxScale =
+      400;
+
+  // Make AUX1 a real receiver channel.
+  model.state.input.channelCount =
+      AXIS_AUX_1 + 1;
+
+  // Full positive AUX command maps to maxScale = 4.0.
+  model.state.input.ch[
+      AXIS_AUX_1] =
+      1.0f;
+
+  Actuator actuator(
+      model);
+
+  actuator.updateScaler();
+
+  // Angle V2 Roll P scaling must receive the configured scale.
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      4.0f,
+      model.state.angleV2
+          .pScale[AXIS_ROLL]);
+
+  // Pitch was not selected.
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      1.0f,
+      model.state.angleV2
+          .pScale[AXIS_PITCH]);
+
+  // ACT_ANGLE_P must not modify the inner rate-P scaler.
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      1.0f,
+      model.state.innerPid[
+          AXIS_ROLL].pScale);
+
+  // If the AUX channel disappears, transient scaling
+  // must return to neutral instead of remaining latched.
+  model.state.input.channelCount =
+      AXIS_AUX_1;
+
+  actuator.updateScaler();
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      1.0f,
+      model.state.angleV2
+          .pScale[AXIS_ROLL]);
+}
+
 void test_actuator_no_receiver_cannot_activate_aux_mode()
 {
   Model model;
@@ -6689,6 +6758,8 @@ RUN_TEST(
   RUN_TEST(test_actuator_arming_gyro_motor_calbration);
   RUN_TEST(test_actuator_missing_aux_channel_cannot_activate_mode);
   RUN_TEST(test_actuator_missing_aux_channel_does_not_apply_scaler);
+  RUN_TEST(
+    test_actuator_angle_v2_scaler_updates_selected_axis);
   RUN_TEST(test_actuator_no_receiver_cannot_activate_aux_mode);
   RUN_TEST(test_actuator_gps_arming_block_clears_when_feature_disabled);
   RUN_TEST(test_ppm_only_publishes_complete_stable_frames);
