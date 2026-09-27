@@ -637,17 +637,17 @@ struct ModelState
   RotationMatrixFloat boardAlignment;
   RotationMatrixFloat trimRotation;
 
-AltitudeState altitude;
+  AltitudeState altitude;
 
-AngleV2State angleV2;
-AssistedModeShadowState assistedShadow;
+  AngleV2State angleV2;
+  AssistedModeShadowState assistedShadow;
 
-SetpointState setpoint;
+  SetpointState setpoint;
 
-// Roll/Pitch/Yaw rate controllers + vertical velocity controller.
-Control::Pid innerPid[AXIS_COUNT_RPYT];
+  // Roll/Pitch/Yaw rate controllers + vertical velocity controller.
+  Control::Pid innerPid[AXIS_COUNT_RPYT];
 
-MixerState mixer;
+  MixerState mixer;
   OutputState output;
   VtxState vtx;
 
