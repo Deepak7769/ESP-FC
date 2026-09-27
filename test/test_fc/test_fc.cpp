@@ -2502,6 +2502,12 @@ void test_controller_land_v2_levels_and_requests_descent()
   model.state.failsafe.landingRequested =
       true;
 
+  model.state.failsafe.landingShadowActive =
+      true;
+
+  model.state.failsafe.landingShadowOutputBlocked =
+      false;
+
   model.state.failsafe.phase =
       FC_FAILSAFE_LANDING;
 
@@ -2552,6 +2558,79 @@ void test_controller_land_v2_levels_and_requests_descent()
       std::isfinite(
           model.state.output.ch[
               AXIS_THRUST]));
+}
+
+void test_controller_land_v2_requires_supervisor_authorization()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      2950000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  model.config.mixer.type =
+      FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(
+      model);
+
+  controller.begin();
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  model.state.failsafe.landingRequested =
+      true;
+
+  model.state.failsafe.landingShadowActive =
+      false;
+
+  model.state.failsafe.landingShadowOutputBlocked =
+      true;
+
+  model.state.failsafe.phase =
+      FC_FAILSAFE_LANDING;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ARMED);
+
+  model.state.input.ch[
+      AXIS_ROLL] =
+      0.25f;
+
+  controller.update();
+
+  TEST_ASSERT_FALSE(
+      model.state.assistedShadow
+          .angleActive);
+
+  TEST_ASSERT_FALSE(
+      model.state.assistedShadow
+          .altitudeActive);
+
+  TEST_ASSERT_TRUE(
+      std::fabs(
+          model.state.setpoint.rate[
+              AXIS_ROLL]) >
+      0.0001f);
 }
 
 void test_failsafe_land_v2_bad_estimator_falls_back_to_disarm()
@@ -6521,6 +6600,9 @@ RUN_TEST(
 #if defined(ESPFC_LAND_V2_ACTIVE)
 RUN_TEST(
     test_controller_land_v2_levels_and_requests_descent);
+
+RUN_TEST(
+    test_controller_land_v2_requires_supervisor_authorization);
 
 RUN_TEST(
     test_failsafe_land_v2_bad_estimator_falls_back_to_disarm);

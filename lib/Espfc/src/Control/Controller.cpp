@@ -13,6 +13,25 @@ namespace {
 constexpr bool ENABLE_LEGACY_ALTHOLD_OUTPUT =
     false;
 
+bool landingV2OwnsControl(
+    const Model& model)
+{
+#if defined(ESPFC_LAND_V2_ACTIVE)
+  const auto& failsafe =
+      model.state.failsafe;
+
+  return
+      failsafe.landingRequested &&
+      failsafe.phase ==
+          FC_FAILSAFE_LANDING &&
+      failsafe.landingShadowActive &&
+      !failsafe.landingShadowOutputBlocked;
+#else
+  (void)model;
+  return false;
+#endif
+}
+
 bool assistedVerticalControlOwnsThrust(
     const Model& model)
 {
@@ -23,9 +42,8 @@ bool assistedVerticalControlOwnsThrust(
 
   #if defined(ESPFC_LAND_V2_ACTIVE)
   const bool land =
-      model.state.failsafe.landingRequested &&
-      model.state.failsafe.phase ==
-          FC_FAILSAFE_LANDING;
+      landingV2OwnsControl(
+          model);
   #else
   constexpr bool land =
       false;
@@ -222,9 +240,8 @@ void FAST_CODE_ATTR Controller::outerLoop()
 {
 #if defined(ESPFC_LAND_V2_ACTIVE)
   const bool landingV2Requested =
-      _model.state.failsafe.landingRequested &&
-      _model.state.failsafe.phase ==
-          FC_FAILSAFE_LANDING;
+      landingV2OwnsControl(
+          _model);
 #else
   constexpr bool landingV2Requested =
       false;
@@ -443,9 +460,8 @@ void FAST_CODE_ATTR Controller::innerLoop()
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
   #if defined(ESPFC_LAND_V2_ACTIVE)
 const bool landingV2Requested =
-    _model.state.failsafe.landingRequested &&
-    _model.state.failsafe.phase ==
-        FC_FAILSAFE_LANDING;
+      landingV2OwnsControl(
+          _model);
   #else
 constexpr bool landingV2Requested =
     false;
@@ -694,9 +710,8 @@ void Controller::updateAssistedModesShadow()
       _model.state.failsafe;
 
   const bool landingV2Requested =
-      failsafe.landingRequested &&
-      failsafe.phase ==
-          FC_FAILSAFE_LANDING;
+      landingV2OwnsControl(
+          _model);
 #else
   constexpr bool landingV2Requested =
       false;
