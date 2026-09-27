@@ -5602,16 +5602,16 @@ void test_box_failsafe_with_valid_rx_still_runs_stage2()
       model.isModeActive(
           MODE_ARMED));
 
-  const bool realRxFailure =
+  const bool pilotInputBlocked =
       input.failsafe(
           INPUT_RECEIVED);
 
-  // BOXFAILSAFE is manually requested;
-  // physical RX itself is still valid.
-  TEST_ASSERT_FALSE(
-      realRxFailure);
+  // BOXFAILSAFE is manually requested while physical RX may still be valid,
+  // but Stage 2 must own the control path and block pilot-input hand-through.
+  TEST_ASSERT_TRUE(
+      pilotInputBlocked);
 
-  // But Stage 2 must still execute.
+  // Stage 2 must still execute.
   TEST_ASSERT_FALSE(
       model.isModeActive(
           MODE_ARMED));

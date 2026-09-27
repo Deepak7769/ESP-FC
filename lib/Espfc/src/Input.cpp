@@ -440,9 +440,10 @@ bool FAST_CODE_ATTR Input::failsafe(
 
     failsafeStage2();
 
-    // This is a manually requested failsafe while the
-    // physical receiver link itself may still be valid.
-    return false;
+    // A BOXFAILSAFE request is authoritative even when the RF link itself is
+    // still healthy. Do not continue filtering pilot sticks into the control
+    // path after Stage 2 has taken ownership (especially AUTO_LAND).
+    return true;
   }
 
   const bool validFrame =
