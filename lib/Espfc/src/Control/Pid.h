@@ -17,10 +17,8 @@ constexpr float ITERM_SCALE = ITERM_SCALE_BETAFLIGHT * Utils::toDeg(1.0f) * 0.00
 constexpr float DTERM_SCALE = DTERM_SCALE_BETAFLIGHT * Utils::toDeg(1.0f) * 0.001f; // ~ 0.0000303f
 constexpr float FTERM_SCALE = FTERM_SCALE_BETAFLIGHT * Utils::toDeg(1.0f) * 0.001f; // ~ 0.00000788f
 
-constexpr float LEVEL_PTERM_SCALE = 0.1f;   // 1/10
-constexpr float LEVEL_ITERM_SCALE = 0.1f;   // 1/10
-constexpr float LEVEL_DTERM_SCALE = 0.001f; // 1/1000
-constexpr float LEVEL_FTERM_SCALE = 0.001f; // 1/1000
+// Angle V2 uses FC_PID_LEVEL.P as its attitude-to-rate gain.
+constexpr float LEVEL_PTERM_SCALE = 0.1f;
 
 constexpr float VEL_PTERM_SCALE = 0.001f;
 constexpr float VEL_ITERM_SCALE = 0.0025f;
