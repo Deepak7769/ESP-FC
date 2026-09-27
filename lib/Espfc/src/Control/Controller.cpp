@@ -256,37 +256,28 @@ void FAST_CODE_ATTR Controller::outerLoop()
   // This keeps one authoritative attitude path.
   // -----------------------------------------------------
 
+
   if (_model.isModeActive(MODE_ANGLE) ||
-      landingV2Requested)
+    landingV2Requested)
+{
+  const auto& angleV2 =
+      _model.state.assistedShadow;
+
+  if (angleV2.angleActive)
   {
-#if defined(ESPFC_ANGLE_V2_ACTIVE)
-    const auto& angleV2 =
-        _model.state.assistedShadow;
+    _model.state.setpoint.rate[
+        AXIS_ROLL] =
+        angleV2.rollRateTarget;
 
-    if (angleV2.angleActive)
-    {
-      _model.state.setpoint.rate[
-          AXIS_ROLL] =
-          angleV2.rollRateTarget;
-
-      _model.state.setpoint.rate[
-          AXIS_PITCH] =
-          angleV2.pitchRateTarget;
-    }
-    else
-    {
-      // A requested assisted mode with an unhealthy
-      // estimator must never reuse stale rate targets.
-      _model.state.setpoint.rate[
-          AXIS_ROLL] =
-          0.0f;
-
-      _model.state.setpoint.rate[
-          AXIS_PITCH] =
-          0.0f;
-    }
-#else
-    // Angle/LAND V2 is unavailable in an ordinary build.
+    _model.state.setpoint.rate[
+        AXIS_PITCH] =
+        angleV2.pitchRateTarget;
+  }
+  else
+  {
+    // Angle V2 owns Roll/Pitch whenever Angle or LAND is requested.
+    // If the attitude estimator becomes unhealthy, command zero rate
+    // instead of reusing a stale V2 target.
     _model.state.setpoint.rate[
         AXIS_ROLL] =
         0.0f;
@@ -294,8 +285,8 @@ void FAST_CODE_ATTR Controller::outerLoop()
     _model.state.setpoint.rate[
         AXIS_PITCH] =
         0.0f;
-#endif
   }
+}
   else
   {
     for (size_t i = 0;
@@ -425,13 +416,8 @@ void FAST_CODE_ATTR Controller::innerLoop()
   const float fScale =
       pid.fScale;
 
-#if defined(ESPFC_ANGLE_V2_ACTIVE)
-  const bool assistedAttitudeRateOwned =
-      _model.state.assistedShadow.angleActive;
-#else
-  const bool assistedAttitudeRateOwned =
-      _model.isModeActive(MODE_ANGLE);
-#endif
+const bool assistedAttitudeRateOwned =
+    _model.state.assistedShadow.angleActive;
 
   if (assistedAttitudeRateOwned &&
       i < AXIS_COUNT_RP)
