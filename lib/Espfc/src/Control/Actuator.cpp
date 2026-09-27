@@ -223,9 +223,10 @@ int Actuator::update()
 
 void Actuator::updateScaler()
 {
-  // Scalers are transient modifiers. Rebuild them from neutral every actuator
-  // cycle so a removed/invalid AUX channel or disabled scaler cannot leave a
-  // stale gain multiplier behind.
+  // -----------------------------------------------------
+  // RESET TRANSIENT RUNTIME SCALERS
+  // -----------------------------------------------------
+
   for (size_t axis = 0;
        axis < AXIS_COUNT_RPYT;
        ++axis)
@@ -233,58 +234,137 @@ void Actuator::updateScaler()
     auto& inner =
         _model.state.innerPid[axis];
 
-    auto& outer =
-        _model.state.outerPid[axis];
-
     inner.pScale = 1.0f;
     inner.iScale = 1.0f;
     inner.dScale = 1.0f;
     inner.fScale = 1.0f;
-
-    outer.pScale = 1.0f;
-    outer.iScale = 1.0f;
-    outer.dScale = 1.0f;
-    outer.fScale = 1.0f;
   }
 
-  for (size_t i = 0; i < SCALER_COUNT; i++)
+  for (size_t axis = 0;
+       axis < AXIS_COUNT_RP;
+       ++axis)
   {
-    uint32_t mode = _model.config.scaler[i].dimension;
-    if (!mode) continue;
+    _model.state.angleV2
+        .pScale[axis] =
+        1.0f;
+  }
 
-    short c = _model.config.scaler[i].channel;
-    if (c < AXIS_AUX_1 ||
-        c >= AXIS_COUNT)
+  // -----------------------------------------------------
+  // APPLY CONFIGURED AUX SCALERS
+  // -----------------------------------------------------
+
+  for (size_t i = 0;
+       i < SCALER_COUNT;
+       ++i)
+  {
+    const uint32_t mode =
+        _model.config.scaler[i]
+            .dimension;
+
+    if (!mode)
+    {
+      continue;
+    }
+
+    const short channel =
+        _model.config.scaler[i]
+            .channel;
+
+    if (channel < AXIS_AUX_1 ||
+        channel >= AXIS_COUNT)
     {
       continue;
     }
 
     if (!inputChannelAvailable(
             _model,
-            static_cast<size_t>(c)))
+            static_cast<size_t>(
+                channel)))
     {
       continue;
     }
 
-    float v = _model.state.input.ch[c];
-    float min = _model.config.scaler[i].minScale * 0.01f;
-    float max = _model.config.scaler[i].maxScale * 0.01f;
-    float scale = Utils::map3(v, -1.f, 0.f, 1.f, min, min < 0 ? 0.f : 1.f, max);
-    for (size_t x = 0; x < AXIS_COUNT_RPYT; x++)
+    const float input =
+        _model.state.input.ch[
+            channel];
+
+    const float minScale =
+        _model.config.scaler[i]
+            .minScale *
+        0.01f;
+
+    const float maxScale =
+        _model.config.scaler[i]
+            .maxScale *
+        0.01f;
+
+    const float scale =
+        Utils::map3(
+            input,
+            -1.0f,
+            0.0f,
+            1.0f,
+            minScale,
+            minScale < 0.0f
+                ? 0.0f
+                : 1.0f,
+            maxScale);
+
+    for (size_t axis = 0;
+         axis < AXIS_COUNT_RPYT;
+         ++axis)
     {
-      if ((x == AXIS_ROLL && (mode & ACT_AXIS_ROLL)) || (x == AXIS_PITCH && (mode & ACT_AXIS_PITCH)) ||
-          (x == AXIS_YAW && (mode & ACT_AXIS_YAW)) || (x == AXIS_THRUST && (mode & ACT_AXIS_THRUST)))
+      const bool selected =
+          (axis == AXIS_ROLL &&
+           (mode & ACT_AXIS_ROLL)) ||
+          (axis == AXIS_PITCH &&
+           (mode & ACT_AXIS_PITCH)) ||
+          (axis == AXIS_YAW &&
+           (mode & ACT_AXIS_YAW)) ||
+          (axis == AXIS_THRUST &&
+           (mode & ACT_AXIS_THRUST));
+
+      if (!selected)
       {
+        continue;
+      }
 
-        if (mode & ACT_INNER_P) _model.state.innerPid[x].pScale = scale;
-        if (mode & ACT_INNER_I) _model.state.innerPid[x].iScale = scale;
-        if (mode & ACT_INNER_D) _model.state.innerPid[x].dScale = scale;
-        if (mode & ACT_INNER_F) _model.state.innerPid[x].fScale = scale;
+      // Existing rate/vertical PID scaling.
+      if (mode & ACT_INNER_P)
+      {
+        _model.state.innerPid[
+            axis].pScale =
+            scale;
+      }
 
-        if (mode & ACT_OUTER_P) _model.state.outerPid[x].pScale = scale;
-        if (mode & ACT_OUTER_I) _model.state.outerPid[x].iScale = scale;
-        if (mode & ACT_OUTER_D) _model.state.outerPid[x].dScale = scale;
-        if (mode & ACT_OUTER_F) _model.state.outerPid[x].fScale = scale;
+      if (mode & ACT_INNER_I)
+      {
+        _model.state.innerPid[
+            axis].iScale =
+            scale;
+      }
+
+      if (mode & ACT_INNER_D)
+      {
+        _model.state.innerPid[
+            axis].dScale =
+            scale;
+      }
+
+      if (mode & ACT_INNER_F)
+      {
+        _model.state.innerPid[
+            axis].fScale =
+            scale;
+      }
+
+      // Angle V2 has its own outer-loop gain.
+      if (axis < AXIS_COUNT_RP &&
+          (mode & ACT_ANGLE_P))
+      {
+        _model.state.angleV2
+            .pScale[axis] =
+            scale;
       }
     }
   }
