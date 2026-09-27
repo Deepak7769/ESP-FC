@@ -70,33 +70,29 @@ int Controller::begin()
   reload(MODEL_CHANGE_FILTER);
   reload(MODEL_CHANGE_PID);
 
-  // Deterministic V2 shadow-controller reset.
-  _shadowAngleWasActive =
-      false;
+_angleV2WasActive =
+    false;
 
-  _shadowAltWasActive =
-      false;
+_shadowAltWasActive =
+    false;
 
-  _altHoldV2OutputWasActive =
-      false;
+_altHoldV2OutputWasActive =
+    false;
 
-  _shadowAngleTarget[AXIS_ROLL] =
-      0.0f;
+_shadowAltitudeTarget =
+    0.0f;
 
-  _shadowAngleTarget[AXIS_PITCH] =
-      0.0f;
+_shadowVzTarget =
+    0.0f;
 
-  _shadowAltitudeTarget =
-      0.0f;
+_assistedLastUpdateUs =
+    0;
 
-  _shadowVzTarget =
-      0.0f;
+_model.state.angleV2 =
+    AngleV2State{};
 
-  _shadowLastUpdateUs =
-      0;
-
-  _model.state.assistedShadow =
-      AssistedModeShadowState{};
+_model.state.assistedShadow =
+    AssistedModeShadowState{};
 
   return 1;
 }
@@ -139,7 +135,7 @@ int FAST_CODE_ATTR Controller::update()
 // Update the shared Assisted V2 controller state.
 // Depending on the build policy in AssistedModeV2.h, the same state can be
 // shadow-only, safe-bench authoritative, or production-authoritative.
-updateAssistedModesShadow();
+updateAssistedModes();
 
   switch (_model.config.mixer.type)
     {
@@ -258,19 +254,31 @@ void FAST_CODE_ATTR Controller::outerLoop()
   if (_model.isModeActive(MODE_ANGLE) ||
     landingV2Requested)
 {
-  const auto& angleV2 =
-      _model.state.assistedShadow;
+const auto& angleV2 =
+    _model.state.angleV2;
 
-  if (angleV2.angleActive)
-  {
-    _model.state.setpoint.rate[
-        AXIS_ROLL] =
-        angleV2.rollRateTarget;
+if (angleV2.active)
+{
+  _model.state.setpoint.rate[
+      AXIS_ROLL] =
+      angleV2.rateTarget[
+          AXIS_ROLL];
 
-    _model.state.setpoint.rate[
-        AXIS_PITCH] =
-        angleV2.pitchRateTarget;
-  }
+  _model.state.setpoint.rate[
+      AXIS_PITCH] =
+      angleV2.rateTarget[
+          AXIS_PITCH];
+}
+else
+{
+  _model.state.setpoint.rate[
+      AXIS_ROLL] =
+      0.0f;
+
+  _model.state.setpoint.rate[
+      AXIS_PITCH] =
+      0.0f;
+}
   else
   {
     // Angle V2 owns Roll/Pitch whenever Angle or LAND is requested.
@@ -415,7 +423,7 @@ void FAST_CODE_ATTR Controller::innerLoop()
       pid.fScale;
 
 const bool assistedAttitudeRateOwned =
-    _model.state.assistedShadow.angleActive;
+    _model.state.angleV2.active;
 
   if (assistedAttitudeRateOwned &&
       i < AXIS_COUNT_RP)
@@ -675,10 +683,13 @@ float Controller::calculatePilotClimbRateShadow() const
 // In ordinary builds this state is diagnostic/shadow data.
 // In Assisted V2 active builds it is the authoritative outer-loop source for
 // Angle, AltHold, and failsafe LAND.
-void Controller::updateAssistedModesShadow()
+void Controller::updateAssistedModes()
 {
-  auto& shadow =
-      _model.state.assistedShadow;
+auto& angleV2 =
+    _model.state.angleV2;
+
+auto& shadow =
+    _model.state.assistedShadow;
 
   const auto& attitude =
       _model.state.attitude;
@@ -739,12 +750,12 @@ const bool shadowBaroFresh =
 float dt =
     nominalDt;
 
-if (_shadowLastUpdateUs != 0)
+if (_assistedLastUpdateUs != 0)
 {
   const uint32_t elapsedUs =
       static_cast<uint32_t>(
           now -
-          _shadowLastUpdateUs);
+          _assistedLastUpdateUs);
 
   if (elapsedUs > 0)
   {
@@ -763,120 +774,123 @@ if (_shadowLastUpdateUs != 0)
   }
 }
 
-_shadowLastUpdateUs =
+_assistedLastUpdateUs =
     now;
 
-  // =====================================================
-  // ANGLE MODE V2
-  // =====================================================
+// =====================================================
+// ANGLE MODE V2
+// =====================================================
 
 const bool angleActive =
-    (_model.isModeActive(MODE_ANGLE) ||
+    (_model.isModeActive(
+         MODE_ANGLE) ||
      landingV2Requested) &&
     shadowAttitudeFresh;
 
-  if (angleActive &&
-      !_shadowAngleWasActive)
+if (angleActive &&
+    !_angleV2WasActive)
+{
+  // Bumpless transfer: begin from measured attitude.
+  angleV2.angleTarget[
+      AXIS_ROLL] =
+      attitude.euler[
+          AXIS_ROLL];
+
+  angleV2.angleTarget[
+      AXIS_PITCH] =
+      attitude.euler[
+          AXIS_PITCH];
+}
+
+if (angleActive)
+{
+  constexpr float ANGLE_SLEW_DPS =
+      120.0f;
+
+  const float maxAngleStep =
+      Utils::toRad(
+          ANGLE_SLEW_DPS) *
+      dt;
+
+  const float maxRate =
+      Utils::toRad(
+          _model.config.level
+              .rateLimit);
+
+  const float baseLevelKp =
+      static_cast<float>(
+          _model.config.pid[
+              FC_PID_LEVEL].P) *
+      LEVEL_PTERM_SCALE;
+
+  for (size_t axis = 0;
+       axis < AXIS_COUNT_RP;
+       ++axis)
   {
-    // Bumpless entry: start from current attitude.
-    _shadowAngleTarget[AXIS_ROLL] =
-        attitude.euler[AXIS_ROLL];
+    const float requestedAngle =
+        landingV2Requested
+            ? 0.0f
+            : Utils::toRad(
+                  _model.config.level
+                      .angleLimit) *
+                  input.ch[axis];
 
-    _shadowAngleTarget[AXIS_PITCH] =
-        attitude.euler[AXIS_PITCH];
-  }
+    const float change =
+        std::clamp(
+            requestedAngle -
+                angleV2.angleTarget[
+                    axis],
+            -maxAngleStep,
+            maxAngleStep);
 
-    // The V2 outer controller intentionally starts from the
-// measured attitude instead of immediately commanding
-// stick-derived level.
-//
-// This is the attitude equivalent of bumpless transfer:
-// the controller begins with approximately zero attitude
-// error and then moves the reference toward the pilot
-// request through the target slew limiter.
+    angleV2.angleTarget[
+        axis] +=
+        change;
 
-  if (angleActive)
-  {
-    constexpr float ANGLE_SLEW_DPS =
-        120.0f;
-
-    const float maxAngleStep =
-        Utils::toRad(ANGLE_SLEW_DPS) *
-        dt;
-
-    const float maxRate =
-        Utils::toRad(
-            _model.config.level.rateLimit);
+    const float angleError =
+        angleV2.angleTarget[
+            axis] -
+        attitude.euler[
+            axis];
 
     const float levelKp =
-        static_cast<float>(
-            _model.config.pid[FC_PID_LEVEL].P) *
-        LEVEL_PTERM_SCALE;
+        baseLevelKp *
+        angleV2.pScale[
+            axis];
 
-    for (size_t axis = 0;
-         axis < AXIS_COUNT_RP;
-         ++axis)
-    {
-      const float requestedAngle =
-          landingV2Requested
-              ? 0.0f
-              : Utils::toRad(
-                    _model.config.level.angleLimit) *
-                    input.ch[axis];
-
-      const float change =
-          std::clamp(
-              requestedAngle -
-                  _shadowAngleTarget[axis],
-              -maxAngleStep,
-              maxAngleStep);
-
-      _shadowAngleTarget[axis] +=
-          change;
-
-      const float angleError =
-          _shadowAngleTarget[axis] -
-          attitude.euler[axis];
-
-      const float rateTarget =
-          std::clamp(
-              levelKp *
-                  angleError,
-              -maxRate,
-              maxRate);
-
-      if (axis == AXIS_ROLL)
-      {
-        shadow.rollAngleTarget =
-            _shadowAngleTarget[axis];
-
-        shadow.rollRateTarget =
-            rateTarget;
-      }
-      else
-      {
-        shadow.pitchAngleTarget =
-            _shadowAngleTarget[axis];
-
-        shadow.pitchRateTarget =
-            rateTarget;
-      }
-    }
+    angleV2.rateTarget[
+        axis] =
+        std::clamp(
+            levelKp *
+                angleError,
+            -maxRate,
+            maxRate);
   }
-  else
+}
+else
+{
+  // Keep targets synchronized while Angle V2 is inactive.
+  // This preserves bumpless re-entry.
+  for (size_t axis = 0;
+       axis < AXIS_COUNT_RP;
+       ++axis)
   {
-    _shadowAngleTarget[AXIS_ROLL] =
-        attitude.euler[AXIS_ROLL];
+    angleV2.angleTarget[
+        axis] =
+        attitude.euler[
+            axis];
 
-    _shadowAngleTarget[AXIS_PITCH] =
-        attitude.euler[AXIS_PITCH];
+    angleV2.rateTarget[
+        axis] =
+        0.0f;
   }
+}
 
-  shadow.angleActive =
-      angleActive;
+angleV2.active =
+    angleActive;
 
-  _shadowAngleWasActive =
-      angleActive;
+_angleV2WasActive =
+    angleActive;
 
 
   // =====================================================
@@ -1107,43 +1121,49 @@ const bool altActive =
   // ANGLE DEBUG
   // =====================================================
 
-  if (_model.config.debug.mode ==
-      DEBUG_ANGLE_TARGET)
-  {
-    _model.state.debug[0] =
-        lrintf(
-            Utils::toDeg(
-                shadow.rollAngleTarget) *
-            10.0f);
+if (_model.config.debug.mode ==
+    DEBUG_ANGLE_TARGET)
+{
+  _model.state.debug[0] =
+      lrintf(
+          Utils::toDeg(
+              angleV2.angleTarget[
+                  AXIS_ROLL]) *
+          10.0f);
 
-    _model.state.debug[1] =
-        lrintf(
-            Utils::toDeg(
-                attitude.euler[AXIS_ROLL]) *
-            10.0f);
+  _model.state.debug[1] =
+      lrintf(
+          Utils::toDeg(
+              attitude.euler[
+                  AXIS_ROLL]) *
+          10.0f);
 
-    _model.state.debug[2] =
-        lrintf(
-            Utils::toDeg(
-                shadow.rollRateTarget));
+  _model.state.debug[2] =
+      lrintf(
+          Utils::toDeg(
+              angleV2.rateTarget[
+                  AXIS_ROLL]));
 
-    _model.state.debug[3] =
-        lrintf(
-            Utils::toDeg(
-                shadow.pitchAngleTarget) *
-            10.0f);
+  _model.state.debug[3] =
+      lrintf(
+          Utils::toDeg(
+              angleV2.angleTarget[
+                  AXIS_PITCH]) *
+          10.0f);
 
-    _model.state.debug[4] =
-        lrintf(
-            Utils::toDeg(
-                attitude.euler[AXIS_PITCH]) *
-            10.0f);
+  _model.state.debug[4] =
+      lrintf(
+          Utils::toDeg(
+              attitude.euler[
+                  AXIS_PITCH]) *
+          10.0f);
 
-    _model.state.debug[5] =
-        lrintf(
-            Utils::toDeg(
-                shadow.pitchRateTarget));
-  }
+  _model.state.debug[5] =
+      lrintf(
+          Utils::toDeg(
+              angleV2.rateTarget[
+                  AXIS_PITCH]));
+}
 }
 float Controller::calcualteAltHoldSetpoint() const
 {
