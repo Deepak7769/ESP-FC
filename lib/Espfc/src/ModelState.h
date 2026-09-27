@@ -626,11 +626,18 @@ struct ModelState
   AltitudeState altitude;
   AssistedModeShadowState assistedShadow;
 
-  SetpointState setpoint;
-  Control::Pid innerPid[AXIS_COUNT_RPYT];
-  
+SetpointState setpoint;
+Control::Pid innerPid[AXIS_COUNT_RPYT];
 
-  MixerState mixer;
+// Temporary compatibility storage for legacy ACT_OUTER_*
+// scaler dimensions. Angle V2 does NOT use this PID as an
+// attitude controller.
+//
+// Remove this array only after the scaler subsystem has
+// been migrated away from outerPid.
+Control::Pid outerPid[AXIS_COUNT_RPYT];
+
+MixerState mixer;
   OutputState output;
   VtxState vtx;
 
