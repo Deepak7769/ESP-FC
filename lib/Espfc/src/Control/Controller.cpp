@@ -133,9 +133,8 @@ int FAST_CODE_ATTR Controller::update()
 
   resetIterm();
 
-// Update the shared Assisted V2 controller state.
-// Depending on the build policy in AssistedModeV2.h, the same state can be
-// shadow-only, safe-bench authoritative, or production-authoritative.
+// Update authoritative Angle V2 state plus the
+// feature-gated AltHold/LAND assisted-controller state.
 updateAssistedModes();
 
   switch (_model.config.mixer.type)
@@ -668,11 +667,11 @@ float Controller::calculatePilotClimbRateShadow() const
       MAX_DESCENT_MS;
 }
 
-// Shared Assisted V2 state generator.
+// Shared assisted-controller update.
 //
-// In ordinary builds this state is diagnostic/shadow data.
-// In Assisted V2 active builds it is the authoritative outer-loop source for
-// Angle, AltHold, and failsafe LAND.
+// Angle V2 is always authoritative for MODE_ANGLE.
+// AltHold and failsafe LAND remain feature-gated by
+// AssistedModeV2.h.
 void Controller::updateAssistedModes()
 {
 auto& angleV2 =
@@ -720,7 +719,7 @@ constexpr uint32_t
     BARO_STALE_US =
         350000;
 
-const bool shadowAttitudeFresh =
+const bool attitudeFresh =
     attitude.healthy &&
     static_cast<uint32_t>(
         now -
@@ -775,7 +774,7 @@ const bool angleActive =
     (_model.isModeActive(
          MODE_ANGLE) ||
      landingV2Requested) &&
-    shadowAttitudeFresh;
+        attitudeFresh;
 
 if (angleActive &&
     !_angleV2WasActive)
@@ -891,7 +890,7 @@ const bool altActive =
     (_model.isModeActive(MODE_ALTHOLD) ||
      landingV2Requested) &&
     altitude.healthy &&
-    shadowAttitudeFresh &&
+    attitudeFresh &&
     shadowBaroFresh;
 
   constexpr float LAND_DESCENT_RATE_MS =
