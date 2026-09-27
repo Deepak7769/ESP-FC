@@ -13,6 +13,7 @@ namespace {
 constexpr bool ENABLE_LEGACY_ALTHOLD_OUTPUT =
     false;
 
+
 bool landingV2OwnsControl(
     const Model& model)
 {
