@@ -6435,6 +6435,12 @@ void test_model_sanitize_preserves_rc_safety_invariants()
   model.config.debug.mode =
       -1;
 
+  model.config.altHold.itermCenter =
+      255;
+
+  model.config.altHold.itermRange =
+      0;
+
   model.config.output.minCommand =
       2200;
 
@@ -6503,6 +6509,14 @@ void test_model_sanitize_preserves_rc_safety_invariants()
   TEST_ASSERT_EQUAL_INT(
       DEBUG_NONE,
       model.config.debug.mode);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      60,
+      model.config.altHold.itermCenter);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      10,
+      model.config.altHold.itermRange);
 
   TEST_ASSERT_EQUAL_INT16(
       1000,

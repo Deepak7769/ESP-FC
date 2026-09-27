@@ -804,6 +804,21 @@ config.level.rateLimit =
         1,
         1998);
 
+// Keep the persisted AltHold thrust-center contract identical to the range
+// used by Controller::reloadPid(). This also keeps the LAND touchdown thrust
+// reference from being derived from an impossible hover-center value.
+config.altHold.itermCenter =
+    std::clamp<uint8_t>(
+        config.altHold.itermCenter,
+        10,
+        60);
+
+config.altHold.itermRange =
+    std::clamp<uint8_t>(
+        config.altHold.itermRange,
+        10,
+        60);
+
 config.arming.smallAngle =
     std::min<uint8_t>(
         config.arming.smallAngle,

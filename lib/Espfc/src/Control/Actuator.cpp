@@ -965,8 +965,11 @@ void Actuator::updateFailsafeLandShadow()
                 -1.0f +
                     2.0f *
                         (static_cast<float>(
-                             _model.config.altHold
-                                 .itermCenter) *
+                             std::clamp<int>(
+                                 _model.config.altHold
+                                     .itermCenter,
+                                 10,
+                                 60)) *
                          0.01f),
                 -0.8f,
                 0.8f);
