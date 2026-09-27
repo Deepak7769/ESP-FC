@@ -5954,6 +5954,15 @@ void test_failsafe_repeated_stage2_preserves_landed_state()
 
 void test_failsafe_land_fault_survives_request_termination()
 {
+  ArduinoFakeReset();
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          6000000u);
+
   Model model;
 
   model.state.failsafe.landingRequested =
