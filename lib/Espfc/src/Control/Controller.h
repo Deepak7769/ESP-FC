@@ -30,27 +30,29 @@ private:
 
   // V2 assisted-mode controller.
   // Initially runs in shadow mode for verification.
-  void updateAssistedModesShadow();
-  float calculatePilotClimbRateShadow() const;
+void updateAssistedModes();
 
-  Model& _model;
-  Rates _rates;
-  Utils::Filter _speedFilter;
+float calculatePilotClimbRateShadow() const;
 
-  bool _shadowAngleWasActive = false;
-  bool _shadowAltWasActive = false;
+bool _angleV2WasActive =
+    false;
 
-  // Tracks ownership of the thrust output so the V2
-  // velocity controller can enter without a thrust step.
-  bool _altHoldV2OutputWasActive = false;
+bool _shadowAltWasActive =
+    false;
 
-  float _shadowAngleTarget[AXIS_COUNT_RP] =
-      {0.0f, 0.0f};
+// Tracks ownership of the thrust output so AltHold V2
+// can enter without a thrust discontinuity.
+bool _altHoldV2OutputWasActive =
+    false;
 
-  float _shadowAltitudeTarget = 0.0f;
-  float _shadowVzTarget = 0.0f;
+float _shadowAltitudeTarget =
+    0.0f;
 
-uint32_t _shadowLastUpdateUs = 0;
+float _shadowVzTarget =
+    0.0f;
+
+uint32_t _assistedLastUpdateUs =
+    0;
 };
 
 } // namespace Espfc::Control
