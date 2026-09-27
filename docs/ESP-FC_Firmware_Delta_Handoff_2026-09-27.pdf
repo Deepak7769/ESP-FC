@@ -1,0 +1,768 @@
+%PDF-1.4
+%PDFGEN
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R 19 0 R 21 0 R 23 0 R 25 0 R 27 0 R] /Count 11 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+6 0 obj
+<< /Length 3794 >>
+stream
+1 1 1 rg 0.00 0.00 595.28 841.89 re f
+0.055 0.11 0.2 rg 0.00 611.89 595.28 230.00 re f
+BT /F2 9 Tf 0.08 0.55 0.68 rg 1 0 0 1 42.00 769.89 Tm (ENGINEERING HANDOFF SUPPLEMENT) Tj ET
+BT /F2 27 Tf 1 1 1 rg 1 0 0 1 42.00 729.89 Tm (ESP-FC Firmware Delta Handoff) Tj ET
+BT /F1 13 Tf 1 1 1 rg 1 0 0 1 42.00 698.89 Tm (Post-baseline firmware changes only) Tj ET
+BT /F3 9.5 Tf 1 1 1 rg 1 0 0 1 42.00 673.89 Tm (Repository: Deepak7769/ESP-FC) Tj ET
+BT /F3 9.5 Tf 1 1 1 rg 1 0 0 1 42.00 657.89 Tm (Current master: cf4c237baa24eb401d969aa13c39a656e03ffc48) Tj ET
+BT /F3 9.5 Tf 1 1 1 rg 1 0 0 1 42.00 641.89 Tm (Date: 27 September 2026) Tj ET
+BT /F2 14 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 571.89 Tm (Scope) Tj ET
+BT /F1 10 Tf 0.12 0.14 0.18 rg 1 0 0 1 42.00 549.89 Tm (This document intentionally excludes the hardware, airframe, dual-ESP32, LoRa/iBUS,) Tj ET
+BT /F1 10 Tf 0.12 0.14 0.18 rg 1 0 0 1 42.00 535.89 Tm (powertrain, perfboard, old GPS and general project background already documented in the) Tj ET
+BT /F1 10 Tf 0.12 0.14 0.18 rg 1 0 0 1 42.00 521.89 Tm (previous technical handoff. It records only the firmware work completed after that baseline.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.8 w 42.00 382.89 511.28 115.00 re B
+BT /F2 11 Tf 0.08 0.32 0.58 rg 1 0 0 1 56.00 473.89 Tm (Executive delta) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 56.00 453.89 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 69.00 453.89 Tm (Angle V2 is now the only authoritative Angle-mode outer controller and is always) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 69.00 441.79 Tm (compiled.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 56.00 428.69 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 69.00 428.69 Tm (AltHold V2 and LAND V2 are implemented in the shared Assisted V2 architecture, with) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 69.00 416.59 Tm (guarded compile-time activation policy.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 56.00 403.49 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 69.00 403.49 Tm (Estimator freshness, receiver validation, arming, failsafe, mixer/output and sensor) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 69.00 391.39 Tm (failure handling were hardened.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 56.00 378.29 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 69.00 378.29 Tm (Dedicated native and ESP32 validation environments were added; current GitHub CI is) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 69.00 366.19 Tm (green across every configured target.) Tj ET
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 355.89 Tm (Version anchors) Tj ET
+BT /F2 8.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 337.89 Tm (Current repo HEAD) Tj ET
+BT /F3 8.6 Tf 0.12 0.14 0.18 rg 1 0 0 1 172.00 337.89 Tm (cf4c237b...e03ffc48) Tj ET
+BT /F2 8.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 322.89 Tm (GitHub Actions run) Tj ET
+BT /F3 8.6 Tf 0.1 0.46 0.26 rg 1 0 0 1 172.00 322.89 Tm (36306884990 - SUCCESS) Tj ET
+BT /F2 8.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 307.89 Tm (Runtime config reference) Tj ET
+BT /F3 8.6 Tf 0.12 0.14 0.18 rg 1 0 0 1 172.00 307.89 Tm (final CLI.txt - build 7bf8293 \(25 Sep 2026\)) Tj ET
+BT /F1 8.2 Tf 0.68 0.15 0.16 rg 1 0 0 1 42.00 283.89 Tm (Important: the CLI snapshot is older than current master and is not proof that cf4c237b is the binary presently flashed on hardware.) Tj ET
+0.055 0.11 0.2 rg 0.00 813.89 595.28 28.00 re f
+BT /F2 8.5 Tf 1 1 1 rg 1 0 0 1 42.00 822.89 Tm (ESP-FC FIRMWARE DELTA HANDOFF) Tj ET
+BT /F1 8.2 Tf 1 1 1 rg 1 0 0 1 433.28 822.89 Tm (SCOPE + EXECUTIVE DELTA) Tj ET
+0.82 0.85 0.89 RG 0.6 w 42.00 30.00 m 553.28 30.00 l S
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 17.00 Tm (Post-baseline firmware changes only | 27 Sep 2026) Tj ET
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 518.28 17.00 Tm (Page 1) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 6282 >>
+stream
+0.055 0.11 0.2 rg 0.00 813.89 595.28 28.00 re f
+BT /F2 8.5 Tf 1 1 1 rg 1 0 0 1 42.00 822.89 Tm (ESP-FC FIRMWARE DELTA HANDOFF) Tj ET
+BT /F1 8.2 Tf 1 1 1 rg 1 0 0 1 433.28 822.89 Tm (ASSISTED V2 ARCHITECTURE) Tj ET
+0.82 0.85 0.89 RG 0.6 w 42.00 30.00 m 553.28 30.00 l S
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 17.00 Tm (Post-baseline firmware changes only | 27 Sep 2026) Tj ET
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 518.28 17.00 Tm (Page 2) Tj ET
+BT /F2 8.5 Tf 0.08 0.55 0.68 rg 1 0 0 1 42.00 779.89 Tm (ARCHITECTURE) Tj ET
+BT /F2 20.5 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 753.89 Tm (Shared Assisted V2 control policy) Tj ET
+BT /F1 9.5 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 733.89 Tm (Angle is authoritative; AltHold/LAND remain guarded.) Tj ET
+0.08 0.32 0.58 RG 1.1 w 42.00 721.89 m 553.28 721.89 l S
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 696.89 Tm (Feature-selection contract) Tj ET
+0.055 0.11 0.2 rg 42.00 652.89 511.00 24.00 re f
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 48.00 660.89 Tm (Path) Tj ET
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 153.00 660.89 Tm (Policy) Tj ET
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 273.00 660.89 Tm (Meaning) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 614.89 511.00 38.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 640.89 Tm (Angle V2) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 640.89 Tm (Always compiled) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 273.00 640.89 Tm (Only Angle outer controller; no legacy Angle fallback.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 576.89 511.00 38.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 602.89 Tm (AltHold V2) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 602.89 Tm (Feature-gated) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 273.00 602.89 Tm (Enabled through Assisted V2 policy/test macros.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 538.89 511.00 38.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 564.89 Tm (LAND V2) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 564.89 Tm (Feature-gated) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 273.00 564.89 Tm (Requires AltHold V2 and reuses Angle V2 leveling.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 500.89 511.00 38.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 526.89 Tm (Production policy) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 526.89 Tm (Explicit acknowledgement) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 273.00 526.89 Tm (ESPFC_ASSISTED_V2_ACTIVE outside safe bench requires) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 273.00 517.89 Tm (ESPFC_ASSISTED_V2_OUTPUT_ACK.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 462.89 511.00 38.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 488.89 Tm (Centered stick) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 488.89 Tm (Configurable channel) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 273.00 488.89 Tm (Candidate integration uses input index 6 \(AUX3\).) Tj ET
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 438.89 Tm (High-level control topology) Tj ET
+0.94 0.96 0.98 rg 0.08 0.32 0.58 RG 1 w 42.00 368.89 104.00 45.00 re B
+BT /F2 8.4 Tf 0.055 0.11 0.2 rg 1 0 0 1 50.00 396.89 Tm (Pilot Roll/Pitch) Tj ET
+BT /F1 7.3 Tf 0.36 0.4 0.46 rg 1 0 0 1 50.00 382.89 Tm (input.ch[]) Tj ET
+0.94 0.96 0.98 rg 0.08 0.32 0.58 RG 1 w 164.00 368.89 104.00 45.00 re B
+BT /F2 8.4 Tf 0.055 0.11 0.2 rg 1 0 0 1 172.00 396.89 Tm (Angle V2) Tj ET
+BT /F1 7.3 Tf 0.36 0.4 0.46 rg 1 0 0 1 172.00 382.89 Tm (angleTarget) Tj ET
+0.94 0.96 0.98 rg 0.08 0.32 0.58 RG 1 w 286.00 368.89 104.00 45.00 re B
+BT /F2 8.4 Tf 0.055 0.11 0.2 rg 1 0 0 1 294.00 396.89 Tm (rateTarget) Tj ET
+BT /F1 7.3 Tf 0.36 0.4 0.46 rg 1 0 0 1 294.00 382.89 Tm (clamped) Tj ET
+0.94 0.96 0.98 rg 0.08 0.32 0.58 RG 1 w 408.00 368.89 104.00 45.00 re B
+BT /F2 8.4 Tf 0.055 0.11 0.2 rg 1 0 0 1 416.00 396.89 Tm (Inner rate PID) Tj ET
+BT /F1 7.3 Tf 0.36 0.4 0.46 rg 1 0 0 1 416.00 382.89 Tm (existing loop) Tj ET
+0.08 0.32 0.58 RG 1.4 w 146.00 390.89 m 164.00 390.89 l S
+0.08 0.32 0.58 rg 164 390.89 m 159 393.89 l 159 387.89 l h f
+0.08 0.32 0.58 RG 1.4 w 268.00 390.89 m 286.00 390.89 l S
+0.08 0.32 0.58 rg 286 390.89 m 281 393.89 l 281 387.89 l h f
+0.08 0.32 0.58 RG 1.4 w 390.00 390.89 m 408.00 390.89 l S
+0.08 0.32 0.58 rg 408 390.89 m 403 393.89 l 403 387.89 l h f
+BT /F2 9 Tf 0.08 0.55 0.68 rg 1 0 0 1 42.00 326.89 Tm (Guarded vertical path) Tj ET
+0.94 0.96 0.98 rg 0.08 0.55 0.68 RG 1 w 42.00 271.89 150.00 45.00 re B
+BT /F2 8.4 Tf 0.055 0.11 0.2 rg 1 0 0 1 50.00 299.89 Tm (AltHold / LAND supervisor) Tj ET
+BT /F1 7.3 Tf 0.36 0.4 0.46 rg 1 0 0 1 50.00 285.89 Tm (health + eligibility) Tj ET
+0.94 0.96 0.98 rg 0.08 0.55 0.68 RG 1 w 227.00 271.89 150.00 45.00 re B
+BT /F2 8.4 Tf 0.055 0.11 0.2 rg 1 0 0 1 235.00 299.89 Tm (Altitude / vertical target) Tj ET
+BT /F1 7.3 Tf 0.36 0.4 0.46 rg 1 0 0 1 235.00 285.89 Tm (position + vario) Tj ET
+0.94 0.96 0.98 rg 0.08 0.55 0.68 RG 1 w 412.00 271.89 140.00 45.00 re B
+BT /F2 8.4 Tf 0.055 0.11 0.2 rg 1 0 0 1 420.00 299.89 Tm (Vertical PID / thrust) Tj ET
+BT /F1 7.3 Tf 0.36 0.4 0.46 rg 1 0 0 1 420.00 285.89 Tm (existing infrastructure) Tj ET
+0.08 0.55 0.68 RG 1.4 w 192.00 293.89 m 227.00 293.89 l S
+0.08 0.55 0.68 rg 227 293.89 m 222 296.89 l 222 290.89 l h f
+0.08 0.55 0.68 RG 1.4 w 377.00 293.89 m 412.00 293.89 l S
+0.08 0.55 0.68 rg 412 293.89 m 407 296.89 l 407 290.89 l h f
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 196.89 Tm (State model split) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 178.89 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 178.89 Tm (AngleV2State now owns Roll/Pitch angleTarget, rateTarget, pScale and active state.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 165.79 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 165.79 Tm (AssistedModeShadowState now carries AltHold/LAND vertical state only; Angle state was separated) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 153.69 Tm (from the old shadow structure.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 140.59 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 140.59 Tm (Controller transition state is explicit: Angle entry, AltHold entry and Assisted update timing) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 128.49 Tm (are tracked independently.) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 5266 >>
+stream
+0.055 0.11 0.2 rg 0.00 813.89 595.28 28.00 re f
+BT /F2 8.5 Tf 1 1 1 rg 1 0 0 1 42.00 822.89 Tm (ESP-FC FIRMWARE DELTA HANDOFF) Tj ET
+BT /F1 8.2 Tf 1 1 1 rg 1 0 0 1 433.28 822.89 Tm (ANGLE V2) Tj ET
+0.82 0.85 0.89 RG 0.6 w 42.00 30.00 m 553.28 30.00 l S
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 17.00 Tm (Post-baseline firmware changes only | 27 Sep 2026) Tj ET
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 518.28 17.00 Tm (Page 3) Tj ET
+BT /F2 8.5 Tf 0.08 0.55 0.68 rg 1 0 0 1 42.00 779.89 Tm (CONTROLLER DELTA) Tj ET
+BT /F2 20.5 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 753.89 Tm (Angle V2 is now authoritative) Tj ET
+BT /F1 9.5 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 733.89 Tm (One attitude outer loop feeding the existing rate PID.) Tj ET
+0.08 0.32 0.58 RG 1.1 w 42.00 721.89 m 553.28 721.89 l S
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 696.89 Tm (Control law and transition behavior) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 676.89 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 676.89 Tm (On Angle entry, the target is initialized from the measured Roll/Pitch attitude. This prevents) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 664.79 Tm (an instantaneous jump to level.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 651.69 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 651.69 Tm (Requested angle is derived from the existing level angle-limit configuration and pilot) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 639.59 Tm (Roll/Pitch input.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 626.49 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 626.49 Tm (angleTarget moves toward requested angle with a 120 deg/s slew limit.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 613.39 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 613.39 Tm (Outer-loop gain is LEVEL P multiplied by angleV2.pScale; the generated rateTarget is clamped to) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 601.29 Tm (the configured level rate limit.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 588.19 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 588.19 Tm (After the first nominal cycle, Assisted dt is measured and clamped to 0.00025..0.050 s to) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 576.09 Tm (prevent a stalled/debugged cycle creating a large one-shot target jump.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 562.99 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 562.99 Tm (When Angle V2 is inactive, targets track measured attitude and its Roll/Pitch rateTarget is) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 550.89 Tm (cleared.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.8 w 42.00 460.79 511.28 70.00 re B
+BT /F2 9.2 Tf 0.08 0.32 0.58 rg 1 0 0 1 54.00 510.79 Tm (Authoritative path) Tj ET
+BT /F3 8.5 Tf 0.12 0.14 0.18 rg 1 0 0 1 54.00 491.79 Tm (pilot -> requested angle -> slew-limited angleTarget -> angle error -> LEVEL P x pScale) Tj ET
+BT /F3 8.5 Tf 0.12 0.14 0.18 rg 1 0 0 1 54.00 475.79 Tm (-> rateTarget -> rate clamp -> setpoint.rate -> existing inner rate PID -> mixer) Tj ET
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 435.79 Tm (Health and failure semantics) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 415.79 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 415.79 Tm (Attitude freshness threshold is 100000 us. Actuator health also requires active gyro + accel,) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 403.69 Tm (healthy attitude state, finite Euler/quaternion values and a plausible quaternion norm.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 390.59 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 390.59 Tm (If the Angle switch remains ON and the estimator fails, an Angle fault latch removes the mode.) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 378.49 Tm (Re-entry requires a deliberate OFF->ON switch cycle.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 365.39 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 365.39 Tm (If Angle is requested but Angle V2 cannot provide a valid active target, Roll/Pitch setpoint) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 353.29 Tm (rates are zeroed. The removed legacy Angle outer controller is not used as fallback.) Tj ET
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 334.19 Tm (Scaler and configuration migration) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 314.19 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 314.19 Tm (Legacy outerPid scaling was removed. ACT_ANGLE_P now occupies bit 4. Bits 5..7 remain reserved) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 302.09 Tm (so persisted scaler numeric layout does not shift.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 288.99 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 288.99 Tm (CLI names remain pid_level_p, pid_level_angle_limit and pid_level_rate_limit. No separate) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 276.89 Tm (angle_v2_* CLI namespace was added.) Tj ET
+BT /F1 8.3 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 256.79 Tm (Reference config only: level P=200, angle limit=30 deg, rate limit=200 deg/s; Roll 35/45/15/45, Pitch 35/45/15/50, Yaw 35/45/0/40.) Tj ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 5639 >>
+stream
+0.055 0.11 0.2 rg 0.00 813.89 595.28 28.00 re f
+BT /F2 8.5 Tf 1 1 1 rg 1 0 0 1 42.00 822.89 Tm (ESP-FC FIRMWARE DELTA HANDOFF) Tj ET
+BT /F1 8.2 Tf 1 1 1 rg 1 0 0 1 433.28 822.89 Tm (ALTHOLD V2) Tj ET
+0.82 0.85 0.89 RG 0.6 w 42.00 30.00 m 553.28 30.00 l S
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 17.00 Tm (Post-baseline firmware changes only | 27 Sep 2026) Tj ET
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 518.28 17.00 Tm (Page 4) Tj ET
+BT /F2 8.5 Tf 0.08 0.55 0.68 rg 1 0 0 1 42.00 779.89 Tm (VERTICAL CONTROL) Tj ET
+BT /F2 20.5 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 753.89 Tm (AltHold V2 rework) Tj ET
+BT /F1 9.5 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 733.89 Tm (Guarded controller path with independent estimator freshness.) Tj ET
+0.08 0.32 0.58 RG 1.1 w 42.00 721.89 m 553.28 721.89 l S
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 696.89 Tm (Entry, state and ownership) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 676.89 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 676.89 Tm (AltitudeState now has its own healthy flag and lastUpdateUs, independent of attitude/barometer) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 664.79 Tm (freshness.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 651.69 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 651.69 Tm (AltHold becomes active only with healthy altitude estimation, fresh attitude and a fresh valid) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 639.59 Tm (barometer sample.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 626.49 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 626.49 Tm (On entry it captures current estimated altitude and current vertical speed for bumpless) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 614.39 Tm (transfer.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 601.29 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 601.29 Tm (The configured centered-stick channel must exist, be valid and be centered for entry. Once) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 589.19 Tm (active, stick deflection is a normal climb/descent command rather than a fault.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 576.09 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 576.09 Tm (Estimator/channel failure latches AltHold fault state and requires OFF->ON before re-entry.) Tj ET
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 554.99 Tm (Current implementation constants) Tj ET
+BT /F1 8.1 Tf 0.72 0.43 0.06 rg 1 0 0 1 42.00 536.99 Tm (These are code constants in current HEAD, not universal tuning recommendations.) Tj ET
+0.055 0.11 0.2 rg 42.00 495.99 511.00 24.00 re f
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 48.00 503.99 Tm (Quantity) Tj ET
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 178.00 503.99 Tm (Current value) Tj ET
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 273.00 503.99 Tm (Role) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 460.99 511.00 35.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 483.99 Tm (Altitude position Kp) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 178.00 483.99 Tm (0.50) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 273.00 483.99 Tm (Converts altitude error to vertical-rate correction.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 425.99 511.00 35.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 448.99 Tm (Target error window) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 178.00 448.99 Tm (+/- 2.0 m) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 273.00 448.99 Tm (Prevents unreachable target backlog / position windup.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 390.99 511.00 35.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 413.99 Tm (Position correction) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 178.00 413.99 Tm (+/- 1.0 m/s) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 273.00 413.99 Tm (Bounds position-loop contribution.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 355.99 511.00 35.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 378.99 Tm (Descent cap) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 178.00 378.99 Tm (-1.0 m/s) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 273.00 378.99 Tm (Vertical request lower bound.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 320.99 511.00 35.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 343.99 Tm (Climb cap) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 178.00 343.99 Tm (+1.5 m/s) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 273.00 343.99 Tm (Vertical request upper bound.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 285.99 511.00 35.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 308.99 Tm (Vertical acceleration) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 178.00 308.99 Tm (1.0 m/s^2) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 273.00 308.99 Tm (Slew-limits vertical-rate target.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 250.99 511.00 35.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 273.99 Tm (LAND descent request) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 178.00 273.99 Tm (-0.50 m/s) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 273.00 273.99 Tm (Used when LAND owns vertical command.) Tj ET
+BT /F2 9 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 232.99 Tm (Repository policy status) Tj ET
+BT /F1 8.8 Tf 0.12 0.14 0.18 rg 1 0 0 1 42.00 216.99 Tm (AltHold V2 exists and is exercised by dedicated safe-bench/native environments, but it is still) Tj ET
+BT /F1 8.8 Tf 0.12 0.14 0.18 rg 1 0 0 1 42.00 204.99 Tm (controlled by the Assisted V2 compile-time activation policy rather than being an unconditional) Tj ET
+BT /F1 8.8 Tf 0.12 0.14 0.18 rg 1 0 0 1 42.00 192.99 Tm (production path.) Tj ET
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 12 0 R >>
+endobj
+14 0 obj
+<< /Length 4719 >>
+stream
+0.055 0.11 0.2 rg 0.00 813.89 595.28 28.00 re f
+BT /F2 8.5 Tf 1 1 1 rg 1 0 0 1 42.00 822.89 Tm (ESP-FC FIRMWARE DELTA HANDOFF) Tj ET
+BT /F1 8.2 Tf 1 1 1 rg 1 0 0 1 433.28 822.89 Tm (LAND V2 + FAILSAFE) Tj ET
+0.82 0.85 0.89 RG 0.6 w 42.00 30.00 m 553.28 30.00 l S
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 17.00 Tm (Post-baseline firmware changes only | 27 Sep 2026) Tj ET
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 518.28 17.00 Tm (Page 5) Tj ET
+BT /F2 8.5 Tf 0.08 0.55 0.68 rg 1 0 0 1 42.00 779.89 Tm (FAILSAFE SUPERVISOR) Tj ET
+BT /F2 20.5 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 753.89 Tm (LAND V2 and termination hardening) Tj ET
+BT /F1 9.5 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 733.89 Tm (Shared leveling and vertical-control infrastructure.) Tj ET
+0.08 0.32 0.58 RG 1.1 w 42.00 721.89 m 553.28 721.89 l S
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 696.89 Tm (LAND architecture) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 676.89 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 676.89 Tm (LAND reuses the same Angle V2 leveling controller; it does not create a second competing) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 664.79 Tm (attitude loop.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 651.69 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 651.69 Tm (LAND shares the AltHold V2 altitude/vertical-rate infrastructure for descent control.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 638.59 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 638.59 Tm (The logical LAND output starts blocked. Eligibility requires an active LAND request, a) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 626.49 Tm (previously valid receiver state and healthy assisted estimators.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 613.39 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 613.39 Tm (If estimator eligibility is lost during active LAND, assisted output is blocked/terminated) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 601.29 Tm (rather than continuing from stale state.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 588.19 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 588.19 Tm (LAND fault diagnostics remain latched across request termination, so the failure reason is not) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 576.09 Tm (erased immediately.) Tj ET
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 554.99 Tm (Touchdown and recovery changes) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 534.99 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 534.99 Tm (Touchdown qualification was hardened with ground-relative altitude, low-thrust qualification and) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 522.89 Tm (confirmation hysteresis/timing.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 509.79 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 509.79 Tm (LAND-entry thrust is retained as a touchdown reference.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 496.69 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 496.69 Tm (Recovery/termination was made terminal and bumpless; a new arm clears the previous LAND latch.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 483.59 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 483.59 Tm (Switch-triggered failsafe pilot-input handling and receiver-recovery qualification were) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 471.49 Tm (hardened.) Tj ET
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 448.39 Tm (Supervisor flow) Tj ET
+0.94 0.96 0.98 rg 0.08 0.55 0.68 RG 1 w 42.00 386.39 120.00 45.00 re B
+BT /F2 8.4 Tf 0.055 0.11 0.2 rg 1 0 0 1 50.00 414.39 Tm (LAND requested) Tj ET
+BT /F1 7.3 Tf 0.36 0.4 0.46 rg 1 0 0 1 50.00 400.39 Tm (failsafe state) Tj ET
+0.94 0.96 0.98 rg 0.08 0.55 0.68 RG 1 w 192.00 386.39 120.00 45.00 re B
+BT /F2 8.4 Tf 0.055 0.11 0.2 rg 1 0 0 1 200.00 414.39 Tm (Eligibility) Tj ET
+BT /F1 7.3 Tf 0.36 0.4 0.46 rg 1 0 0 1 200.00 400.39 Tm (RX + estimators) Tj ET
+0.94 0.96 0.98 rg 0.08 0.55 0.68 RG 1 w 342.00 386.39 120.00 45.00 re B
+BT /F2 8.4 Tf 0.055 0.11 0.2 rg 1 0 0 1 350.00 414.39 Tm (Shared control) Tj ET
+BT /F1 7.3 Tf 0.36 0.4 0.46 rg 1 0 0 1 350.00 400.39 Tm (Angle + AltHold) Tj ET
+0.08 0.55 0.68 RG 1.4 w 162.00 408.39 m 192.00 408.39 l S
+0.08 0.55 0.68 rg 192 408.38999999999965 m 187 411.38999999999965 l 187 405.38999999999965 l h f
+0.08 0.55 0.68 RG 1.4 w 312.00 408.39 m 342.00 408.39 l S
+0.08 0.55 0.68 rg 342 408.38999999999965 m 337 411.38999999999965 l 337 405.38999999999965 l h f
+BT /F2 7.8 Tf 0.68 0.15 0.16 rg 1 0 0 1 60.00 368.39 Tm (Eligibility lost -> block / terminate assisted LAND; preserve diagnostic latch.) Tj ET
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 14 0 R >>
+endobj
+16 0 obj
+<< /Length 5927 >>
+stream
+0.055 0.11 0.2 rg 0.00 813.89 595.28 28.00 re f
+BT /F2 8.5 Tf 1 1 1 rg 1 0 0 1 42.00 822.89 Tm (ESP-FC FIRMWARE DELTA HANDOFF) Tj ET
+BT /F1 8.2 Tf 1 1 1 rg 1 0 0 1 433.28 822.89 Tm (SYSTEM HARDENING) Tj ET
+0.82 0.85 0.89 RG 0.6 w 42.00 30.00 m 553.28 30.00 l S
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 17.00 Tm (Post-baseline firmware changes only | 27 Sep 2026) Tj ET
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 518.28 17.00 Tm (Page 6) Tj ET
+BT /F2 8.5 Tf 0.08 0.55 0.68 rg 1 0 0 1 42.00 779.89 Tm (CROSS-CUTTING DELTA) Tj ET
+BT /F2 20.5 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 753.89 Tm (Receiver, arming, output and sensor hardening) Tj ET
+0.08 0.32 0.58 RG 1.1 w 42.00 721.89 m 553.28 721.89 l S
+0.055 0.11 0.2 rg 42.00 672.89 511.00 24.00 re f
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 48.00 680.89 Tm (Area) Tj ET
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 153.00 680.89 Tm (Change) Tj ET
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 413.00 680.89 Tm (Why it matters) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 602.89 511.00 70.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 660.89 Tm (Receiver / input) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 660.89 Tm (Reject unavailable AUX channels; complete/stable PPM) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 651.89 Tm (frames; distinguish SBUS dropped frames from link loss;) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 642.89 Tm (harden timing/frame-rate recovery.) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 660.89 Tm (Prevents default/stale) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 651.89 Tm (channel contents from) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 642.89 Tm (becoming control intent.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 532.89 511.00 70.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 590.89 Tm (Arming / failsafe) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 590.89 Tm (Stale gyro blocks arm and disarms; invalid/non-finite) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 581.89 Tm (attitude fails small-angle check; GPS arming flag) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 572.89 Tm (clears when feature disabled; startup/recovery failsafe) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 563.89 Tm (logic qualified.) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 590.89 Tm (Arming and recovery now) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 581.89 Tm (depend on current valid) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 572.89 Tm (state.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 462.89 511.00 70.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 520.89 Tm (Mixer / output) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 520.89 Tm (Disarm output propagation decoupled from normal control) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 511.89 Tm (cycle; invalid mixer entries/counts fail closed;) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 502.89 Tm (persisted output pulse ranges sanitized; stale RPM) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 493.89 Tm (telemetry expires.) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 520.89 Tm (Reduces stale command / stale) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 511.89 Tm (telemetry retention.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 392.89 511.00 70.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 450.89 Tm (Estimator / sensors) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 450.89 Tm (Independent altitude freshness; rejected fusion does) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 441.89 Tm (not reintegrate stale world acceleration; baro) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 432.89 Tm (correction independent of IMU rate; reload preserves) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 423.89 Tm (history; first pressure sample primed; rejected height) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 414.89 Tm (does not corrupt vario.) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 450.89 Tm (Fixes the major estimator) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 441.89 Tm (defects reported in the) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 432.89 Tm (earlier comparison.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 322.89 511.00 70.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 380.89 Tm (Sensor fail-closed) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 380.89 Tm (BMP280 initialization errors and HMC5883L) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 371.89 Tm (configuration/overflow paths fail closed.) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 380.89 Tm (Device failures no longer) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 371.89 Tm (masquerade as valid data.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 252.89 511.00 70.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 310.89 Tm (Protocol / other) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 310.89 Tm (CRSF MSP response truncation/underflow fixed; telemetry) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 153.00 301.89 Tm (bounds and buzzer-event handling hardened.) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 310.89 Tm (Removes parser/state edge) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 413.00 301.89 Tm (cases.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.8 w 42.00 164.89 511.28 72.00 re B
+BT /F2 9.4 Tf 0.08 0.32 0.58 rg 1 0 0 1 54.00 216.89 Tm (Failure-handling pattern) Tj ET
+BT /F1 8.6 Tf 0.12 0.14 0.18 rg 1 0 0 1 54.00 198.89 Tm (Unavailable, stale, invalid or out-of-range state is rejected or expired; control-mode entry) Tj ET
+BT /F1 8.6 Tf 0.12 0.14 0.18 rg 1 0 0 1 54.00 187.89 Tm (is qualified; output paths fail closed; recovery requires validated conditions rather than) Tj ET
+BT /F1 8.6 Tf 0.12 0.14 0.18 rg 1 0 0 1 54.00 176.89 Tm (zero-initialized/default values.) Tj ET
+endstream
+endobj
+17 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 16 0 R >>
+endobj
+18 0 obj
+<< /Length 4601 >>
+stream
+0.055 0.11 0.2 rg 0.00 813.89 595.28 28.00 re f
+BT /F2 8.5 Tf 1 1 1 rg 1 0 0 1 42.00 822.89 Tm (ESP-FC FIRMWARE DELTA HANDOFF) Tj ET
+BT /F1 8.2 Tf 1 1 1 rg 1 0 0 1 433.28 822.89 Tm (BEFORE -> NOW) Tj ET
+0.82 0.85 0.89 RG 0.6 w 42.00 30.00 m 553.28 30.00 l S
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 17.00 Tm (Post-baseline firmware changes only | 27 Sep 2026) Tj ET
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 518.28 17.00 Tm (Page 7) Tj ET
+BT /F2 8.5 Tf 0.08 0.55 0.68 rg 1 0 0 1 42.00 779.89 Tm (GAP CLOSURE) Tj ET
+BT /F2 20.5 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 753.89 Tm (Earlier review findings versus current HEAD) Tj ET
+BT /F1 9.5 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 733.89 Tm (Based on Firmware comparison.txt versus cf4c237b.) Tj ET
+0.08 0.32 0.58 RG 1.1 w 42.00 721.89 m 553.28 721.89 l S
+0.055 0.11 0.2 rg 42.00 672.89 511.00 24.00 re f
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 48.00 680.89 Tm (Earlier gap) Tj ET
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 288.00 680.89 Tm (Current state) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 624.89 511.00 48.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 660.89 Tm (Angle V2 was shadow-only) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 288.00 660.89 Tm (Angle V2 is the authoritative Roll/Pitch outer loop.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 576.89 511.00 48.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 612.89 Tm (AltHold V2 had no thrust authority) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 288.00 612.89 Tm (Guarded active AltHold V2 path is implemented and tested.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 528.89 511.00 48.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 564.89 Tm (No independent altitude freshness) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 288.00 564.89 Tm (AltitudeState has independent health/timestamp; freshness) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 288.00 555.89 Tm (regression passes.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 480.89 511.00 48.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 516.89 Tm (Rejected fusion could reuse stale acceleration) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 288.00 516.89 Tm (Rejected-fusion regression now verifies no reintegration.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 432.89 511.00 48.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 468.89 Tm (Estimator reload reset history) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 288.00 468.89 Tm (Reload-preserves-history regression now passes.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 384.89 511.00 48.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 420.89 Tm (Pressure filter started from zero) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 288.00 420.89 Tm (First-sample priming regression now passes.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 336.89 511.00 48.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 372.89 Tm (Baro correction depended on IMU rate) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 288.00 372.89 Tm (Variable-dt and correction-independence regressions now) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 288.00 363.89 Tm (pass.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 288.89 511.00 48.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 324.89 Tm (Changed disarm could wait behind control cycle) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 288.00 324.89 Tm (Disarm-output propagation regression now passes.) Tj ET
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 266.89 Tm (Representative regression coverage now present) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 246.89 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 246.89 Tm (fusion rejects invalid accel without poisoning state; rejected fusion does not reintegrate world) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 234.79 Tm (acceleration.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 221.69 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 221.69 Tm (barometer vario used only once per sample; rejected height sample does not correct vario.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 208.59 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 208.59 Tm (complementary variable-dt behavior and altitude correction independence from IMU rate.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 195.49 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 195.49 Tm (altitude reload history preservation, pressure-filter priming, independent altitude freshness) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 183.39 Tm (and disarm-output propagation.) Tj ET
+endstream
+endobj
+19 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 18 0 R >>
+endobj
+20 0 obj
+<< /Length 4747 >>
+stream
+0.055 0.11 0.2 rg 0.00 813.89 595.28 28.00 re f
+BT /F2 8.5 Tf 1 1 1 rg 1 0 0 1 42.00 822.89 Tm (ESP-FC FIRMWARE DELTA HANDOFF) Tj ET
+BT /F1 8.2 Tf 1 1 1 rg 1 0 0 1 433.28 822.89 Tm (BUILD + VALIDATION) Tj ET
+0.82 0.85 0.89 RG 0.6 w 42.00 30.00 m 553.28 30.00 l S
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 17.00 Tm (Post-baseline firmware changes only | 27 Sep 2026) Tj ET
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 518.28 17.00 Tm (Page 8) Tj ET
+BT /F2 8.5 Tf 0.08 0.55 0.68 rg 1 0 0 1 42.00 779.89 Tm (VALIDATION) Tj ET
+BT /F2 20.5 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 753.89 Tm (Dedicated environments and current results) Tj ET
+0.08 0.32 0.58 RG 1.1 w 42.00 721.89 m 553.28 721.89 l S
+0.055 0.11 0.2 rg 42.00 672.89 511.00 24.00 re f
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 48.00 680.89 Tm (Environment) Tj ET
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 188.00 680.89 Tm (Key flags / role) Tj ET
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 403.00 680.89 Tm (Purpose) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 622.89 511.00 50.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 660.89 Tm (native_angle_v2) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 188.00 660.89 Tm (Native C++17, UNIT_TEST, SAFE_BENCH) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 403.00 660.89 Tm (Angle V2 regression suite.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 572.89 511.00 50.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 610.89 Tm (esp32_angle_v2_bench) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 188.00 610.89 Tm (ESP32 + SAFE_BENCH) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 403.00 610.89 Tm (Target compile; physical ESC) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 403.00 601.89 Tm (driver not initialized/attached.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 522.89 511.00 50.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 560.89 Tm (native_assisted_v2) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 188.00 560.89 Tm (Native + SAFE_BENCH + AltHold/LAND test) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 188.00 551.89 Tm (macros) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 403.00 560.89 Tm (Guarded assisted controller) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 403.00 551.89 Tm (regression.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 472.89 511.00 50.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 510.89 Tm (esp32_assisted_v2_bench) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 188.00 510.89 Tm (ESP32 + SAFE_BENCH + AltHold/LAND test macros) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 403.00 510.89 Tm (Target-side guarded assisted) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 403.00 501.89 Tm (build.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 422.89 511.00 50.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 460.89 Tm (esp32_assisted_v2_candidate) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 188.00 460.89 Tm (ESP32 SAFE_BENCH + generic Assisted V2 +) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 188.00 451.89 Tm (channel 6) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 403.00 460.89 Tm (Compiles production-policy) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 403.00 451.89 Tm (candidate without physical motor) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 403.00 442.89 Tm (attach.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 372.89 511.00 50.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 410.89 Tm (native_assisted_v2_active) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 188.00 410.89 Tm (Native UNIT_TEST + Assisted active +) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 188.00 401.89 Tm (OUTPUT_ACK + channel 6) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 403.00 410.89 Tm (Validates production activation) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 403.00 401.89 Tm (policy without hardware.) Tj ET
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 354.89 Tm (Observed validation results) Tj ET
+0.1 0.46 0.26 rg 42.00 324.89 118.60 18.00 re f
+BT /F2 8 Tf 1 1 1 rg 1 0 0 1 50.00 329.89 Tm (LOCAL: 79 / 79 PASS) Tj ET
+0.1 0.46 0.26 rg 167.60 324.89 156.40 18.00 re f
+BT /F2 8 Tf 1 1 1 rg 1 0 0 1 175.60 329.89 Tm (ESP32 BENCH BUILD: SUCCESS) Tj ET
+BT /F2 8.8 Tf 0.1 0.46 0.26 rg 1 0 0 1 42.00 302.89 Tm (GitHub Actions run 36306884990 on cf4c237b: SUCCESS) Tj ET
+BT /F1 8.6 Tf 0.12 0.14 0.18 rg 1 0 0 1 42.00 284.89 Tm (Jobs passed: test, esp32, esp32s2, esp32s3, esp32c3, esp8266, rp2040 and rp2350.) Tj ET
+BT /F2 9 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 263.89 Tm (Migration note) Tj ET
+BT /F1 8.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 42.00 247.89 Tm (A temporary preprocessor error around landingV2OwnsControl was introduced during warning cleanup) Tj ET
+BT /F1 8.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 42.00 236.89 Tm (and immediately corrected. It is not present in current HEAD.) Tj ET
+endstream
+endobj
+21 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 20 0 R >>
+endobj
+22 0 obj
+<< /Length 4537 >>
+stream
+0.055 0.11 0.2 rg 0.00 813.89 595.28 28.00 re f
+BT /F2 8.5 Tf 1 1 1 rg 1 0 0 1 42.00 822.89 Tm (ESP-FC FIRMWARE DELTA HANDOFF) Tj ET
+BT /F1 8.2 Tf 1 1 1 rg 1 0 0 1 433.28 822.89 Tm (RUNTIME REFERENCE) Tj ET
+0.82 0.85 0.89 RG 0.6 w 42.00 30.00 m 553.28 30.00 l S
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 17.00 Tm (Post-baseline firmware changes only | 27 Sep 2026) Tj ET
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 518.28 17.00 Tm (Page 9) Tj ET
+BT /F2 8.5 Tf 0.08 0.55 0.68 rg 1 0 0 1 42.00 779.89 Tm (CONFIGURATION SNAPSHOT) Tj ET
+BT /F2 20.5 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 753.89 Tm (Older CLI/runtime reference - not current HEAD identity) Tj ET
+BT /F1 9.5 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 733.89 Tm (Source snapshot reports build 7bf8293, 25 Sep 2026.) Tj ET
+0.08 0.32 0.58 RG 1.1 w 42.00 721.89 m 553.28 721.89 l S
+1 0.97 0.9 rg 0.72 0.43 0.06 RG 0.8 w 42.00 634.89 511.28 62.00 re B
+BT /F2 9.2 Tf 0.72 0.43 0.06 rg 1 0 0 1 54.00 676.89 Tm (Do not use this snapshot as proof that cf4c237b is flashed.) Tj ET
+BT /F1 8.3 Tf 0.12 0.14 0.18 rg 1 0 0 1 54.00 658.89 Tm (It is included only to give a new developer the last supplied runtime/config context.) Tj ET
+BT /F1 8.3 Tf 0.12 0.14 0.18 rg 1 0 0 1 54.00 648.39 Tm (Version/status should be checked before comparing hardware logs to the current repository.) Tj ET
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 614.89 Tm (Observed runtime snapshot) Tj ET
+0.055 0.11 0.2 rg 42.00 572.89 511.00 24.00 re f
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 48.00 580.89 Tm (Item) Tj ET
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 228.00 580.89 Tm (Snapshot value) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 541.89 511.00 31.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 560.89 Tm (Gyro clock) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 228.00 560.89 Tm (8000 Hz) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 510.89 511.00 31.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 529.89 Tm (Gyro rate) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 228.00 529.89 Tm (4000 Hz) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 479.89 511.00 31.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 498.89 Tm (Control loop) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 228.00 498.89 Tm (4000 Hz) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 448.89 511.00 31.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 467.89 Tm (Mixer rate) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 228.00 467.89 Tm (4000 Hz) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 417.89 511.00 31.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 436.89 Tm (Accel) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 228.00 436.89 Tm (500 Hz) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 386.89 511.00 31.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 405.89 Tm (Barometer) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 228.00 405.89 Tm (50 Hz) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 355.89 511.00 31.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 374.89 Tm (Magnetometer) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 228.00 374.89 Tm (100 Hz) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 324.89 511.00 31.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 343.89 Tm (Detected devices) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 228.00 343.89 Tm (MPU6500/SPI, BMP280/I2C, QMC5883P/I2C) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 293.89 511.00 31.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 312.89 Tm (Fusion) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 228.00 312.89 Tm (Mahony; P=50, I=5; magnetometer fusion disabled) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 262.89 511.00 31.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 281.89 Tm (Output config) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 228.00 281.89 Tm (PWM async, 400 Hz) Tj ET
+BT /F2 10 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 242.89 Tm (Important delta from old handoff) Tj ET
+BT /F1 8.7 Tf 0.12 0.14 0.18 rg 1 0 0 1 42.00 224.89 Tm (The older handoff assumed an approximately 125 Hz processing loop. This later runtime snapshot) Tj ET
+BT /F1 8.7 Tf 0.12 0.14 0.18 rg 1 0 0 1 42.00 212.89 Tm (reports a 4 kHz control/mixer loop. Treat this as an observed build/config result, not a) Tj ET
+BT /F1 8.7 Tf 0.12 0.14 0.18 rg 1 0 0 1 42.00 200.89 Tm (guarantee for every target or future configuration.) Tj ET
+BT /F1 8.4 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 178.89 Tm (Snapshot mode map: MODE_ARMED on input index 4 high range; MODE_AIRMODE and MODE_ANGLE on input index 5 high range.) Tj ET
+endstream
+endobj
+23 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 22 0 R >>
+endobj
+24 0 obj
+<< /Length 5841 >>
+stream
+0.055 0.11 0.2 rg 0.00 813.89 595.28 28.00 re f
+BT /F2 8.5 Tf 1 1 1 rg 1 0 0 1 42.00 822.89 Tm (ESP-FC FIRMWARE DELTA HANDOFF) Tj ET
+BT /F1 8.2 Tf 1 1 1 rg 1 0 0 1 433.28 822.89 Tm (FILE MAP + STATUS) Tj ET
+0.82 0.85 0.89 RG 0.6 w 42.00 30.00 m 553.28 30.00 l S
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 17.00 Tm (Post-baseline firmware changes only | 27 Sep 2026) Tj ET
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 518.28 17.00 Tm (Page 10) Tj ET
+BT /F2 8.5 Tf 0.08 0.55 0.68 rg 1 0 0 1 42.00 779.89 Tm (HANDOFF MAP) Tj ET
+BT /F2 20.5 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 753.89 Tm (Where a new developer should look first) Tj ET
+0.08 0.32 0.58 RG 1.1 w 42.00 721.89 m 553.28 721.89 l S
+0.055 0.11 0.2 rg 42.00 672.89 511.00 24.00 re f
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 48.00 680.89 Tm (File / area) Tj ET
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 258.00 680.89 Tm (What changed / why it matters) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 638.89 511.00 34.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 660.89 Tm (Control/AssistedModeV2.h) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 258.00 660.89 Tm (Feature selection and activation policy.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 604.89 511.00 34.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 626.89 Tm (ModelState.h) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 258.00 626.89 Tm (AngleV2State, estimator freshness and assisted/failsafe state.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 570.89 511.00 34.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 592.89 Tm (ModelConfig.h) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 258.00 592.89 Tm (Flight modes, scaler bit layout, ACT_ANGLE_P.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 536.89 511.00 34.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 558.89 Tm (Control/Controller.h/.cpp) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 258.00 558.89 Tm (Angle authority; AltHold/LAND control; transition state.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 502.89 511.00 34.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 524.89 Tm (Control/Actuator.cpp) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 258.00 524.89 Tm (Mode qualification, fault latches, scaler routing, LAND) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 258.00 515.89 Tm (supervisor, arming safety.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 468.89 511.00 34.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 490.89 Tm (Output/Mixer.cpp) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 258.00 490.89 Tm (SAFE_BENCH physical driver interlock and output handling.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 434.89 511.00 34.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 456.89 Tm (Control/Altitude.hpp + AHRS) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 258.00 456.89 Tm (Estimator timing/history corrections.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 400.89 511.00 34.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 422.89 Tm (SensorManager.cpp + BaroSensor.cpp) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 258.00 422.89 Tm (Fusion rejection and pressure handling.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 366.89 511.00 34.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 388.89 Tm (Input parsers) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 258.00 388.89 Tm (PPM/SBUS/CRSF and channel-validation hardening.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 332.89 511.00 34.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 354.89 Tm (platformio.ini + CI workflow) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 258.00 354.89 Tm (Dedicated validation environments and target matrix.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 298.89 511.00 34.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 320.89 Tm (test/test_fc/test_fc.cpp) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 258.00 320.89 Tm (Angle, AltHold, LAND, estimator, receiver, failsafe and mixer) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 258.00 311.89 Tm (regressions.) Tj ET
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 276.89 Tm (Current status) Tj ET
+0.1 0.46 0.26 rg 42.00 246.89 97.00 18.00 re f
+BT /F2 8 Tf 1 1 1 rg 1 0 0 1 50.00 251.89 Tm (GREEN: ANGLE V2) Tj ET
+0.1 0.46 0.26 rg 146.00 246.89 64.60 18.00 re f
+BT /F2 8 Tf 1 1 1 rg 1 0 0 1 154.00 251.89 Tm (GREEN: CI) Tj ET
+0.72 0.43 0.06 rg 217.60 246.89 129.40 18.00 re f
+BT /F2 8 Tf 1 1 1 rg 1 0 0 1 225.60 251.89 Tm (GUARDED: ALTHOLD/LAND) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 226.89 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 226.89 Tm (Established: current repo compiles/tests in CI; Angle V2 is integrated and authoritative;) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 214.79 Tm (supplied basic Angle V2 regression suite passes.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 201.69 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 201.69 Tm (Guarded: AltHold V2 and LAND V2 exist, but activation remains compile-time policy controlled.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 188.59 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 188.59 Tm (Not established by supplied sources: real-world behavior of Sep 27 HEAD; whether the currently) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 176.49 Tm (flashed hardware binary exactly equals cf4c237b.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 163.39 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 163.39 Tm (Not yet present as dedicated tests: explicit time-bounded slew, negative-stick symmetry,) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 151.29 Tm (separate two-direction clamp cases, controller-level non-finite attitude case, and end-to-end) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 139.19 Tm (Angle scaler gain-effect tests.) Tj ET
+endstream
+endobj
+25 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 24 0 R >>
+endobj
+26 0 obj
+<< /Length 5362 >>
+stream
+0.055 0.11 0.2 rg 0.00 813.89 595.28 28.00 re f
+BT /F2 8.5 Tf 1 1 1 rg 1 0 0 1 42.00 822.89 Tm (ESP-FC FIRMWARE DELTA HANDOFF) Tj ET
+BT /F1 8.2 Tf 1 1 1 rg 1 0 0 1 433.28 822.89 Tm (TIMELINE + CHECKLIST) Tj ET
+0.82 0.85 0.89 RG 0.6 w 42.00 30.00 m 553.28 30.00 l S
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 42.00 17.00 Tm (Post-baseline firmware changes only | 27 Sep 2026) Tj ET
+BT /F1 7.6 Tf 0.36 0.4 0.46 rg 1 0 0 1 518.28 17.00 Tm (Page 11) Tj ET
+BT /F2 8.5 Tf 0.08 0.55 0.68 rg 1 0 0 1 42.00 779.89 Tm (ORIENTATION) Tj ET
+BT /F2 20.5 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 753.89 Tm (Selected post-baseline change timeline) Tj ET
+0.08 0.32 0.58 RG 1.1 w 42.00 721.89 m 553.28 721.89 l S
+0.055 0.11 0.2 rg 42.00 672.89 511.00 24.00 re f
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 48.00 680.89 Tm (When) Tj ET
+BT /F2 8.2 Tf 1 1 1 rg 1 0 0 1 138.00 680.89 Tm (Firmware delta) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 624.89 511.00 48.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 660.89 Tm (26 Sep) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 138.00 660.89 Tm (AltHold/LAND safe-bench authority; touchdown state; shared activation policy;) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 138.00 651.89 Tm (production-policy regressions; centered-stick entry gate.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 576.89 511.00 48.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 612.89 Tm (26 Sep) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 138.00 612.89 Tm (Receiver/channel validation; failsafe termination/recovery; stale gyro/disarm; mixer) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 138.00 603.89 Tm (fail-closed; pulse-range/RPM telemetry hardening.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 528.89 511.00 48.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 564.89 Tm (27 Sep early) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 138.00 564.89 Tm (LAND interlocks/diagnostics; low-thrust/touchdown refinements; sensor fail-closed changes;) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 138.00 555.89 Tm (CRSF MSP fix.) Tj ET
+1 1 1 rg 0.82 0.85 0.89 RG 0.5 w 42.00 480.89 511.00 48.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 516.89 Tm (27 Sep migration) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 138.00 516.89 Tm (AngleV2State; ACT_ANGLE_P scaler migration; Actuator/Controller moved off legacy outerPid;) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 138.00 507.89 Tm (Angle V2 made authoritative; regression updates.) Tj ET
+0.94 0.96 0.98 rg 0.82 0.85 0.89 RG 0.5 w 42.00 432.89 511.00 48.00 re B
+BT /F2 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 48.00 468.89 Tm (Current) Tj ET
+BT /F1 7.4 Tf 0.12 0.14 0.18 rg 1 0 0 1 138.00 468.89 Tm (cf4c237b; GitHub Actions run 36306884990 fully green.) Tj ET
+BT /F2 11 Tf 0.055 0.11 0.2 rg 1 0 0 1 42.00 408.89 Tm (Software-only handoff checklist) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 388.89 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 388.89 Tm (Verify the checkout is cf4c237b or later before using this document as the code reference.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 375.79 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 375.79 Tm (Run native_angle_v2 regression tests and the esp32_angle_v2_bench compile after modifying) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 363.69 Tm (Angle/assisted code.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 350.59 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 350.59 Tm (Inspect AssistedModeV2.h before changing AltHold/LAND activation policy.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 337.49 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 337.49 Tm (Do not reintroduce legacy outerPid references; preserve ACT_ANGLE_P bit 4 and reserved bit) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 325.39 Tm (positions 5..7.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 312.29 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 312.29 Tm (Keep Angle V2 as the single Angle-mode outer-loop authority unless the architecture is) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 300.19 Tm (deliberately redesigned and re-tested.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 287.09 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 287.09 Tm (Confirm hardware version/status before comparing flight-controller logs to this Sep 27) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 274.99 Tm (repository state.) Tj ET
+BT /F2 9.1 Tf 0.08 0.32 0.58 rg 1 0 0 1 42.00 261.89 Tm (-) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 261.89 Tm (Treat regression failures as defects to investigate; do not silently change controller constants) Tj ET
+BT /F1 9.1 Tf 0.12 0.14 0.18 rg 1 0 0 1 55.00 249.79 Tm (merely to make tests pass.) Tj ET
+0.055 0.11 0.2 rg 42.00 156.69 511.28 72.00 re f
+BT /F2 10 Tf 1 1 1 rg 1 0 0 1 56.00 206.69 Tm (Handoff summary) Tj ET
+BT /F1 8.7 Tf 1 1 1 rg 1 0 0 1 56.00 188.69 Tm (The major architectural milestone after the previous handoff is the move from shadow/legacy) Tj ET
+BT /F1 8.7 Tf 1 1 1 rg 1 0 0 1 56.00 177.19 Tm (assisted logic to a single authoritative Angle V2 outer loop, plus guarded AltHold/LAND V2) Tj ET
+BT /F1 8.7 Tf 1 1 1 rg 1 0 0 1 56.00 165.69 Tm (and broad fail-closed hardening. Current source and CI are internally consistent at cf4c237b.) Tj ET
+endstream
+endobj
+27 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 26 0 R >>
+endobj
+xref
+0 28
+0000000000 65535 f 
+0000000017 00000 n 
+0000000066 00000 n 
+0000000193 00000 n 
+0000000263 00000 n 
+0000000338 00000 n 
+0000000406 00000 n 
+0000004251 00000 n 
+0000004403 00000 n 
+0000010736 00000 n 
+0000010888 00000 n 
+0000016206 00000 n 
+0000016360 00000 n 
+0000022051 00000 n 
+0000022205 00000 n 
+0000026976 00000 n 
+0000027130 00000 n 
+0000033109 00000 n 
+0000033263 00000 n 
+0000037916 00000 n 
+0000038070 00000 n 
+0000042869 00000 n 
+0000043023 00000 n 
+0000047612 00000 n 
+0000047766 00000 n 
+0000053659 00000 n 
+0000053813 00000 n 
+0000059227 00000 n 
+trailer
+<< /Size 28 /Root 1 0 R >>
+startxref
+59381
+%%EOF
