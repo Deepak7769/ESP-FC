@@ -20,10 +20,10 @@ public:
   bool testConnection() final;
 
 private:
-  void setSampleAveraging(uint8_t averaging);
-  void setSampleRate(uint8_t rate);
-  void setMode(uint8_t mode);
-  void setGain(uint8_t gain);
+  bool setSampleAveraging(uint8_t averaging);
+  bool setSampleRate(uint8_t rate);
+  bool setMode(uint8_t mode);
+  bool setGain(uint8_t gain);
 
 private:
   uint8_t _mode;

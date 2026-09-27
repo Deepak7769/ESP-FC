@@ -76,13 +76,17 @@ int MagHMC5883L::begin(BusDevice* bus, uint8_t addr)
 
   if (!testConnection()) return 0;
 
-  setMode(HMC5883L_MODE_CONTINUOUS);
-  setSampleAveraging(HMC5883L_AVERAGING_1);
-  setSampleRate(HMC5883L_RATE_75);
-  setGain(HMC5883L_GAIN_1090);
-
-  uint8_t buffer[6];
-  _bus->read(_addr, HMC5883L_RA_DATAX_H, 6, buffer);
+  if (!setMode(
+          HMC5883L_MODE_CONTINUOUS) ||
+      !setSampleAveraging(
+          HMC5883L_AVERAGING_1) ||
+      !setSampleRate(
+          HMC5883L_RATE_75) ||
+      !setGain(
+          HMC5883L_GAIN_1090))
+  {
+    return 0;
+  }
 
   return 1;
 }
@@ -97,14 +101,43 @@ int MagHMC5883L::readMag(VectorInt16& v)
                     HMC5883L_MODE_SINGLE << (HMC5883L_MODEREG_BIT - HMC5883L_MODEREG_LENGTH + 1));
   }
 
-  if (result == 6)
+  if (result != 6)
   {
-    v.x = (((int16_t)buffer[0]) << 8) | buffer[1];
-    v.z = (((int16_t)buffer[2]) << 8) | buffer[3];
-    v.y = (((int16_t)buffer[4]) << 8) | buffer[5];
+    return 0;
   }
 
-  return result == 6 ? 1 : 0;
+  const int16_t x =
+      (static_cast<int16_t>(
+           buffer[0]) << 8) |
+      buffer[1];
+
+  const int16_t z =
+      (static_cast<int16_t>(
+           buffer[2]) << 8) |
+      buffer[3];
+
+  const int16_t y =
+      (static_cast<int16_t>(
+           buffer[4]) << 8) |
+      buffer[5];
+
+  // HMC5883L reports -4096 when an axis overflows. Treat the whole vector as
+  // invalid rather than injecting a large false heading step into the AHRS.
+  constexpr int16_t OVERFLOW_SAMPLE =
+      -4096;
+
+  if (x == OVERFLOW_SAMPLE ||
+      y == OVERFLOW_SAMPLE ||
+      z == OVERFLOW_SAMPLE)
+  {
+    return 0;
+  }
+
+  v.x = x;
+  v.y = y;
+  v.z = z;
+
+  return 1;
 }
 
 const VectorFloat MagHMC5883L::convert(const VectorInt16& v) const
@@ -123,35 +156,55 @@ MagDeviceType MagHMC5883L::getType() const
   return MAG_HMC5883L;
 }
 
-void MagHMC5883L::setSampleAveraging(uint8_t averaging)
+bool MagHMC5883L::setSampleAveraging(uint8_t averaging)
 {
-  uint8_t res =
-      _bus->writeBits(_addr, HMC5883L_RA_CONFIG_A, HMC5883L_CRA_AVERAGE_BIT, HMC5883L_CRA_AVERAGE_LENGTH, averaging);
-  // D("hmc5883l:avg", averaging, res);
-  (void)res;
+  return _bus->writeBits(
+      _addr,
+      HMC5883L_RA_CONFIG_A,
+      HMC5883L_CRA_AVERAGE_BIT,
+      HMC5883L_CRA_AVERAGE_LENGTH,
+      averaging);
 }
 
-void MagHMC5883L::setSampleRate(uint8_t rate)
+bool MagHMC5883L::setSampleRate(uint8_t rate)
 {
-  uint8_t res = _bus->writeBits(_addr, HMC5883L_RA_CONFIG_A, HMC5883L_CRA_RATE_BIT, HMC5883L_CRA_RATE_LENGTH, rate);
-  // D("hmc5883l:rate", rate, res);
-  (void)res;
+  return _bus->writeBits(
+      _addr,
+      HMC5883L_RA_CONFIG_A,
+      HMC5883L_CRA_RATE_BIT,
+      HMC5883L_CRA_RATE_LENGTH,
+      rate);
 }
 
-void MagHMC5883L::setMode(uint8_t mode)
+bool MagHMC5883L::setMode(uint8_t mode)
 {
-  _mode = mode; // track to tell if we have to clear bit 7 after a read
-  uint8_t res = _bus->writeByte(_addr, HMC5883L_RA_MODE, mode << (HMC5883L_MODEREG_BIT - HMC5883L_MODEREG_LENGTH + 1));
-  // D("hmc5883l:mode", mode, res);
-  (void)res;
+  const bool ok =
+      _bus->writeByte(
+          _addr,
+          HMC5883L_RA_MODE,
+          mode <<
+              (HMC5883L_MODEREG_BIT -
+               HMC5883L_MODEREG_LENGTH +
+               1));
+
+  if (ok)
+  {
+    _mode =
+        mode;
+  }
+
+  return ok;
 }
 
-void MagHMC5883L::setGain(uint8_t gain)
+bool MagHMC5883L::setGain(uint8_t gain)
 {
-  uint8_t res =
-      _bus->writeByte(_addr, HMC5883L_RA_CONFIG_B, gain << (HMC5883L_CRB_GAIN_BIT - HMC5883L_CRB_GAIN_LENGTH + 1));
-  // D("hmc5883l:gain", gain, res);
-  (void)res;
+  return _bus->writeByte(
+      _addr,
+      HMC5883L_RA_CONFIG_B,
+      gain <<
+          (HMC5883L_CRB_GAIN_BIT -
+           HMC5883L_CRB_GAIN_LENGTH +
+           1));
 }
 
 bool MagHMC5883L::testConnection()

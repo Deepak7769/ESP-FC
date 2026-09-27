@@ -151,6 +151,48 @@ void test_mag_hmc5883l_uses_first_id_byte()
   TEST_ASSERT_EQUAL_HEX8('H', chipId.value());
 }
 
+void test_mag_hmc5883l_begin_rejects_config_write_failure()
+{
+  MockBusDevice bus;
+  bus.readRegs[0x0A] = 'H';
+  bus.readRegs[0x0B] = '4';
+  bus.readRegs[0x0C] = '3';
+  bus.failWriteReg = 0x02;
+
+  MagHMC5883L dev;
+
+  TEST_ASSERT_EQUAL_INT(
+      0,
+      dev.begin(
+          &bus,
+          0x1E));
+}
+
+void test_mag_hmc5883l_rejects_overflow_sample()
+{
+  MockBusDevice bus;
+
+  // X overflow sentinel = -4096 (0xF000).
+  bus.readRegs[0x03] = 0xF0;
+  bus.readRegs[0x04] = 0x00;
+  bus.readRegs[0x05] = 0x00;
+  bus.readRegs[0x06] = 0x10;
+  bus.readRegs[0x07] = 0x00;
+  bus.readRegs[0x08] = 0x20;
+
+  MagHMC5883L dev;
+  dev.setBus(
+      &bus,
+      0x1E);
+
+  VectorInt16 sample{};
+
+  TEST_ASSERT_EQUAL_INT(
+      0,
+      dev.readMag(
+          sample));
+}
+
 void test_baro_bmp280_caches_whoami()
 {
   MockBusDevice bus;
@@ -332,6 +374,8 @@ int main(int argc, char** argv)
   RUN_TEST(test_chip_id_updated_on_mismatch);
   RUN_TEST(test_chip_id_preserved_on_read_failure);
   RUN_TEST(test_mag_hmc5883l_uses_first_id_byte);
+  RUN_TEST(test_mag_hmc5883l_begin_rejects_config_write_failure);
+  RUN_TEST(test_mag_hmc5883l_rejects_overflow_sample);
   RUN_TEST(test_baro_bmp280_caches_whoami);
   RUN_TEST(test_baro_bmp280_begin_rejects_calibration_read_failure);
   RUN_TEST(test_baro_bmp280_begin_rejects_blank_calibration);
