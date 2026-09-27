@@ -46,16 +46,55 @@ int BaroBMP280::begin(BusDevice* bus, uint8_t addr)
 
   if (!testConnection()) return 0;
 
-  _bus->read(_addr, BMP280_CALIB_REG, sizeof(CalibrationData), (uint8_t*)&_cal); // read callibration
+  CalibrationData calibration = {};
 
-  writeReg(BMP280_RESET_REG, BMP280_RESET_VAL); // device reset
+  if (_bus->read(
+          _addr,
+          BMP280_CALIB_REG,
+          sizeof(CalibrationData),
+          reinterpret_cast<uint8_t*>(
+              &calibration)) !=
+      sizeof(CalibrationData))
+  {
+    return 0;
+  }
+
+  // dig_T1 and dig_P1 are unsigned factory coefficients. Zero values are not
+  // usable; in particular dig_P1 == 0 collapses the pressure compensation
+  // denominator. Reject a corrupt/blank NVM block at probe time.
+  if (calibration.dig_T1 == 0 ||
+      calibration.dig_P1 == 0)
+  {
+    return 0;
+  }
+
+  _cal =
+      calibration;
+
+  if (!writeReg(
+          BMP280_RESET_REG,
+          BMP280_RESET_VAL))
+  {
+    return 0;
+  }
+
   delay(2);
 
-  writeReg(BMP280_CONFIG_REG, BMP280_FILTER_X4 << 2); // set minimal standby and IIR filter X2
-  // writeReg(BMP280_CONFIG_REG, 0); // set minimal standby and IIR filter off
+  if (!writeReg(
+          BMP280_CONFIG_REG,
+          BMP280_FILTER_X4 << 2))
+  {
+    return 0;
+  }
 
-  writeReg(BMP280_CONTROL_REG,
-           BMP280_SAMPLING_X2 << 5 | BMP280_SAMPLING_X8 << 2 | BMP280_MODE_NORMAL); // set sampling mode
+  if (!writeReg(
+          BMP280_CONTROL_REG,
+          BMP280_SAMPLING_X2 << 5 |
+              BMP280_SAMPLING_X8 << 2 |
+              BMP280_MODE_NORMAL))
+  {
+    return 0;
+  }
 
   delay(20);
 

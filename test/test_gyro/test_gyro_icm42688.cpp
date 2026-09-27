@@ -19,6 +19,8 @@ public:
   uint8_t writeRegs[256] = {}; // registers captured by write
   int writeCalls = 0;
   bool failRead = false;
+  int failReadReg = -1;
+  int failWriteReg = -1;
 
   BusType getType() const override
   {
@@ -27,7 +29,12 @@ public:
 
   int8_t read(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8_t* data) override
   {
-    if (failRead) return 0;
+    if (failRead ||
+        regAddr == failReadReg)
+    {
+      return 0;
+    }
+
     for (uint8_t i = 0; i < length; i++)
       data[i] = readRegs[(regAddr + i) & 0xFF];
     return length;
@@ -40,9 +47,16 @@ public:
 
   bool write(uint8_t devAddr, uint8_t regAddr, uint8_t length, const uint8_t* data) override
   {
+    writeCalls++;
+
+    if (regAddr == failWriteReg)
+    {
+      return false;
+    }
+
     for (uint8_t i = 0; i < length; i++)
       writeRegs[(regAddr + i) & 0xFF] = data[i];
-    writeCalls++;
+
     return true;
   }
 };
@@ -151,6 +165,90 @@ void test_baro_bmp280_caches_whoami()
   TEST_ASSERT_EQUAL_HEX8(0x58, chipId.value());
 }
 
+static void seedBmp280Calibration(
+    MockBusDevice& bus)
+{
+  // Only the two unsigned non-zero coefficients are required by the probe
+  // sanity gate; the remaining coefficients may be zero for this init test.
+  bus.readRegs[0x88] = 0x01;
+  bus.readRegs[0x89] = 0x00; // dig_T1 = 1
+  bus.readRegs[0x8E] = 0x01;
+  bus.readRegs[0x8F] = 0x00; // dig_P1 = 1
+}
+
+void test_baro_bmp280_begin_rejects_calibration_read_failure()
+{
+  MockBusDevice bus;
+  bus.readRegs[0xD0] = 0x58;
+  seedBmp280Calibration(bus);
+  bus.failReadReg = 0x88;
+
+  BaroBMP280 dev;
+
+  TEST_ASSERT_EQUAL_INT(
+      0,
+      dev.begin(
+          &bus,
+          0x76));
+}
+
+void test_baro_bmp280_begin_rejects_blank_calibration()
+{
+  MockBusDevice bus;
+  bus.readRegs[0xD0] = 0x58;
+
+  BaroBMP280 dev;
+
+  TEST_ASSERT_EQUAL_INT(
+      0,
+      dev.begin(
+          &bus,
+          0x76));
+}
+
+void test_baro_bmp280_begin_rejects_failed_config_write()
+{
+  MockBusDevice bus;
+  bus.readRegs[0xD0] = 0x58;
+  seedBmp280Calibration(bus);
+  bus.failWriteReg = 0xF5;
+
+  BaroBMP280 dev;
+
+  TEST_ASSERT_EQUAL_INT(
+      0,
+      dev.begin(
+          &bus,
+          0x76));
+}
+
+void test_baro_bmp280_begin_accepts_valid_initialization()
+{
+  MockBusDevice bus;
+  bus.readRegs[0xD0] = 0x58;
+  seedBmp280Calibration(bus);
+
+  BaroBMP280 dev;
+
+  TEST_ASSERT_EQUAL_INT(
+      1,
+      dev.begin(
+          &bus,
+          0x76));
+
+  TEST_ASSERT_EQUAL_HEX8(
+      0xB6,
+      bus.writeRegs[0xE0]);
+
+  TEST_ASSERT_EQUAL_HEX8(
+      0x10,
+      bus.writeRegs[0xF5]);
+
+  TEST_ASSERT_EQUAL_HEX8(
+      0x93,
+      bus.writeRegs[0xF4]);
+}
+
 void test_begin_aborts_on_failed_connection()
 {
   MockBusDevice bus;
@@ -235,6 +333,10 @@ int main(int argc, char** argv)
   RUN_TEST(test_chip_id_preserved_on_read_failure);
   RUN_TEST(test_mag_hmc5883l_uses_first_id_byte);
   RUN_TEST(test_baro_bmp280_caches_whoami);
+  RUN_TEST(test_baro_bmp280_begin_rejects_calibration_read_failure);
+  RUN_TEST(test_baro_bmp280_begin_rejects_blank_calibration);
+  RUN_TEST(test_baro_bmp280_begin_rejects_failed_config_write);
+  RUN_TEST(test_baro_bmp280_begin_accepts_valid_initialization);
   RUN_TEST(test_begin_aborts_on_failed_connection);
   RUN_TEST(test_read_gyro_decoding);
   RUN_TEST(test_read_accel_decoding);
