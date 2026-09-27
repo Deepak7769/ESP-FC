@@ -448,30 +448,44 @@ struct AltitudeState
   // Used independently from attitude/barometer freshness.
   uint32_t lastUpdateUs{0};
 };
+
+struct AngleV2State
+{
+  // Authoritative Angle-mode attitude references.
+  float angleTarget[AXIS_COUNT_RP] =
+      {0.0f, 0.0f};
+
+  // Roll/Pitch rate commands produced by the Angle
+  // outer loop and consumed by the existing rate PID.
+  float rateTarget[AXIS_COUNT_RP] =
+      {0.0f, 0.0f};
+
+  // Runtime gain scaling from the AUX scaler system.
+  // This replaces the old outerPid[].pScale dependency.
+  float pScale[AXIS_COUNT_RP] =
+      {1.0f, 1.0f};
+
+  bool active =
+      false;
+};
+
+
 struct AssistedModeShadowState
 {
-  // Candidate assisted-mode state. It remains shadow-only
-  // in ordinary builds and becomes authoritative only in
-  // the compile-time guarded V2 validation environments.
+  // AltHold/LAND V2 state remains here while those
+  // controllers are still feature-gated.
 
-  // ANGLE mode V2
-  float rollAngleTarget{0.0f};
-  float pitchAngleTarget{0.0f};
-
-  float rollRateTarget{0.0f};
-  float pitchRateTarget{0.0f};
-
-  // ALT HOLD V2
   float altitudeTarget{0.0f};
 
   float verticalRatePilot{0.0f};
   float verticalRateCorrection{0.0f};
   float verticalRateTarget{0.0f};
 
-  bool angleActive{false};
   bool altitudeActive{false};
   bool altitudeTargetValid{false};
 };
+
+
 struct VtxState
 {
   uint8_t active = false;
@@ -623,19 +637,15 @@ struct ModelState
   RotationMatrixFloat boardAlignment;
   RotationMatrixFloat trimRotation;
 
-  AltitudeState altitude;
-  AssistedModeShadowState assistedShadow;
+AltitudeState altitude;
+
+AngleV2State angleV2;
+AssistedModeShadowState assistedShadow;
 
 SetpointState setpoint;
-Control::Pid innerPid[AXIS_COUNT_RPYT];
 
-// Temporary compatibility storage for legacy ACT_OUTER_*
-// scaler dimensions. Angle V2 does NOT use this PID as an
-// attitude controller.
-//
-// Remove this array only after the scaler subsystem has
-// been migrated away from outerPid.
-Control::Pid outerPid[AXIS_COUNT_RPYT];
+// Roll/Pitch/Yaw rate controllers + vertical velocity controller.
+Control::Pid innerPid[AXIS_COUNT_RPYT];
 
 MixerState mixer;
   OutputState output;
