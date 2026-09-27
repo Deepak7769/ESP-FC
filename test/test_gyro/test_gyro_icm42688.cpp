@@ -11,6 +11,7 @@ using namespace Espfc::Device;
 using namespace Espfc::Device::Gyro;
 using namespace Espfc::Device::Mag;
 using namespace Espfc::Device::Baro;
+using namespace fakeit;
 
 class MockBusDevice : public BusDevice
 {
@@ -60,6 +61,22 @@ public:
     return true;
   }
 };
+
+void setUp()
+{
+  ArduinoFakeReset();
+
+  When(
+      Method(
+          ArduinoFake(),
+          delay))
+      .AlwaysReturn();
+}
+
+void tearDown()
+{
+}
+
 
 void test_whoami_match()
 {
