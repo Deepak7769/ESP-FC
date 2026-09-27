@@ -28,31 +28,32 @@ private:
   void reloadFilter();
   void reloadPid();
 
-  // V2 assisted-mode controller.
-  // Initially runs in shadow mode for verification.
-void updateAssistedModes();
+  // Shared assisted-controller update.
+  // Angle V2 is authoritative; AltHold/LAND remain
+  // feature-gated through AssistedModeV2.h.
+  void updateAssistedModes();
 
-float calculatePilotClimbRateShadow() const;
+  float calculatePilotClimbRateShadow() const;
 
-bool _angleV2WasActive =
-    false;
+  // Core controller dependencies.
+  Model& _model;
+  Rates _rates;
+  Utils::Filter _speedFilter;
 
-bool _shadowAltWasActive =
-    false;
+  // Angle V2 transition state.
+  bool _angleV2WasActive = false;
 
-// Tracks ownership of the thrust output so AltHold V2
-// can enter without a thrust discontinuity.
-bool _altHoldV2OutputWasActive =
-    false;
+  // AltHold V2 transition state.
+  bool _shadowAltWasActive = false;
 
-float _shadowAltitudeTarget =
-    0.0f;
+  // Tracks ownership of thrust output so AltHold V2
+  // can enter without a thrust discontinuity.
+  bool _altHoldV2OutputWasActive = false;
 
-float _shadowVzTarget =
-    0.0f;
+  float _shadowAltitudeTarget = 0.0f;
+  float _shadowVzTarget = 0.0f;
 
-uint32_t _assistedLastUpdateUs =
-    0;
+  uint32_t _assistedLastUpdateUs = 0;
 };
 
 } // namespace Espfc::Control
