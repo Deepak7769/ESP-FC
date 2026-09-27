@@ -761,9 +761,9 @@ void Actuator::updateFailsafeLandShadow()
     failsafe.landingShadowDescentRequested =
         false;
 
-    failsafe.landingShadowFault =
-        false;
-
+    // landingShadowFault is a lifecycle diagnostic latch. It is cleared when
+    // a new LAND request begins or when a new arm starts, not merely because
+    // the request has just terminated after timeout/estimator failure.
     failsafe.landingShadowLastUpdateUs =
         0;
 

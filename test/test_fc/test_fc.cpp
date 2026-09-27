@@ -5952,6 +5952,26 @@ void test_failsafe_repeated_stage2_preserves_landed_state()
           MODE_ARMED));
 }
 
+void test_failsafe_land_fault_survives_request_termination()
+{
+  Model model;
+
+  model.state.failsafe.landingRequested =
+      false;
+
+  model.state.failsafe.landingShadowFault =
+      true;
+
+  Actuator actuator(
+      model);
+
+  actuator.updateFailsafeLandShadow();
+
+  TEST_ASSERT_TRUE(
+      model.state.failsafe
+          .landingShadowFault);
+}
+
 void test_failsafe_land_shadow_fault_latches()
 {
   ArduinoFakeReset();
@@ -6694,6 +6714,9 @@ RUN_TEST(
 
 RUN_TEST(
     test_failsafe_repeated_stage2_preserves_landed_state);
+
+RUN_TEST(
+    test_failsafe_land_fault_survives_request_termination);
 
 RUN_TEST(
     test_failsafe_land_shadow_fault_latches);
