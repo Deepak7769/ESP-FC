@@ -698,6 +698,24 @@ config.controller.tpaBreakpoint =
         1000,
         1999);
 
+config.controller.antiGravityGain =
+    std::clamp<uint8_t>(
+        config.controller.antiGravityGain,
+        0,
+        250);
+
+config.controller.antiGravityCutoffHz =
+    std::clamp<uint8_t>(
+        config.controller.antiGravityCutoffHz,
+        2,
+        50);
+
+config.controller.antiGravityPGain =
+    std::clamp<uint8_t>(
+        config.controller.antiGravityPGain,
+        0,
+        250);
+
 // Receiver/control settings are persisted and can be edited over MSP/CLI.
 // Keep them inside ranges that preserve the arming and smoothing invariants.
 if (config.input.ppmMode != PPM_MODE_NORMAL &&
@@ -1024,7 +1042,7 @@ if(config.output.protocol == ESC_PROTOCOL_PWM)
       constexpr uint32_t serialFunctionAllowedMask = SERIAL_FUNCTION_MSP | SERIAL_FUNCTION_RX_SERIAL | SERIAL_FUNCTION_BLACKBOX | 
         SERIAL_FUNCTION_GPS | SERIAL_FUNCTION_TELEMETRY_FRSKY | SERIAL_FUNCTION_TELEMETRY_HOTT | SERIAL_FUNCTION_TELEMETRY_IBUS | SERIAL_FUNCTION_VTX_SMARTAUDIO;
       uint32_t featureAllowMask =  FEATURE_RX_PPM | FEATURE_RX_SERIAL | FEATURE_MOTOR_STOP | FEATURE_SOFTSERIAL | FEATURE_GPS |
-        FEATURE_TELEMETRY | FEATURE_RX_SPI;// | FEATURE_AIRMODE;
+        FEATURE_TELEMETRY | FEATURE_RX_SPI | FEATURE_ANTI_GRAVITY;// | FEATURE_AIRMODE;
 
       config.featureMask &= featureAllowMask;
 
