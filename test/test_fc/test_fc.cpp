@@ -1820,6 +1820,13 @@ void test_controller_anti_gravity_shadow_tracks_manual_throttle_transient()
 {
   ArduinoFakeReset();
 
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          2100000);
+
   Model model;
 
   model.config.featureMask |=
@@ -1901,6 +1908,13 @@ void test_controller_anti_gravity_shadow_tracks_manual_throttle_transient()
 void test_controller_anti_gravity_shadow_yields_to_assisted_vertical_control()
 {
   ArduinoFakeReset();
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          2200000);
 
   Model model;
 
