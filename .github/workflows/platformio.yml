@@ -33,6 +33,34 @@ jobs:
           platformio test -e native_assisted_v2_active -f test_fc
           platformio run -e esp32_assisted_v2_bench
           platformio run -e esp32_assisted_v2_candidate
+  assisted_validation_artifact:
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Cache Pio
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install Dependencies
+        run: pip install --upgrade platformio
+      - name: Build non-actuating Assisted V2 validation firmware
+        run: platformio run -e esp32_assisted_v2_candidate
+        env:
+          PLATFORMIO_BUILD_FLAGS: -DESPFC_REVISION=${{ github.sha }} -DESPFC_VERSION=validation
+      - name: Upload Assisted V2 validation artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: esp32_assisted_v2_validation_${{ github.sha }}
+          path: .pio/build/esp32_assisted_v2_candidate/firmware.bin
+
   build:
     needs: test
     runs-on: ubuntu-24.04
