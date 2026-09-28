@@ -31,6 +31,7 @@ In this repository you can find firmware code that allows you to build your own 
  * [Setup Guide](/docs/setup.md)
  * [Wiring](/docs/wiring.md)
  * [CLI Commands](/docs/cli.md)
+ * [MSP Companion Current Meter](/docs/MSP_CURRENT_METER.md)
  * [WIFI and ESP-NOW Receiver](/docs/wireless.md)
 
 Join our **[Discord Channel](https://discord.gg/jhyPPM5UEH)** to get help
@@ -95,6 +96,7 @@ After flashing you need to configure few things first:
  * Esc Protocols: PWM, BRUSHED, ONESHOT125, ONESHOT42, MULTISHOT, DSHOT150, DSHOT300, DSHOT600
  * GPS: M8, M9, F9 & M10(dual band, all constellations configurable by cli)
  * Other protocols: MSP, CLI, BLACKBOX, ESPNOW
+ * Battery current: ADC or MSP companion telemetry (including INA219 on a companion processor)
 
 ## Issues
 
