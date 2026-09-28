@@ -1177,13 +1177,14 @@ void Actuator::updateFailsafeLand()
         // Touchdown is primarily confirmed from near-ground height + low
         // vertical speed. A bounded timeout prevents a failed/noisy ground
         // detector from leaving the aircraft in LAND forever after RX loss.
-        // The timeout scales with the entry height at the commanded 0.5 m/s
+        // The timeout scales with the entry height at the selected LAND V2
         // descent rate, then adds a generous ten-second margin.
         // -------------------------------------------------
 
         constexpr float
             LAND_COMMAND_DESCENT_RATE_MS =
-                0.50f;
+                static_cast<float>(
+                    ESPFC_LAND_V2_DESCENT_RATE_MS);
 
         constexpr float
             LAND_TIMEOUT_MARGIN_S =

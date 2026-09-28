@@ -1382,7 +1382,8 @@ const bool altActive =
     assistedBaroFresh;
 
   constexpr float LAND_DESCENT_RATE_MS =
-      -0.50f;
+      -static_cast<float>(
+          ESPFC_LAND_V2_DESCENT_RATE_MS);
 
   const float pilotVz =
       landingV2Requested

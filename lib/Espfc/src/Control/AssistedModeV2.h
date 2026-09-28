@@ -68,3 +68,10 @@
     ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL > 15
 #error "ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL must be in range 0..15"
 #endif
+
+// Positive LAND V2 descent speed in m/s. The controller applies the negative
+// sign for downward motion. Production keeps the historical default unless a
+// validation/build policy explicitly selects another value.
+#ifndef ESPFC_LAND_V2_DESCENT_RATE_MS
+#define ESPFC_LAND_V2_DESCENT_RATE_MS 0.50f
+#endif

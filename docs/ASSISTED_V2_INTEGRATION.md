@@ -147,12 +147,16 @@ validation path has been checked on the actual hardware.
 
 ## LAND termination
 
-LAND uses a nominal -0.50 m/s descent request. Touchdown confirmation uses
-near-ground altitude, low vertical speed, descent evidence, and a dwell period.
-A second independent termination path bounds LAND duration:
+LAND V2 uses a build-selectable descent rate. The non-actuating ESP32
+validation environments currently select **0.10 m/s downward**. The ordinary
+production-policy default remains 0.50 m/s until the slower behavior has been
+validated. Touchdown confirmation uses near-ground altitude, low vertical
+speed, descent evidence, and a dwell period.
+
+The timeout uses the same selected descent-rate constant:
 
 ```
-timeout = clamp(entry_height / 0.50 m/s + 10 s, 15 s, 60 s)
+timeout = clamp(entry_height / selected_descent_rate + 10 s, 15 s, 60 s)
 ```
 
 If the estimator becomes invalid or the timeout expires, LAND disarms through
