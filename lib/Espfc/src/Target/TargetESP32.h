@@ -28,6 +28,9 @@
 #define ESPFC_SERIAL_1_BBAUD (SERIAL_SPEED_NONE)
 
 #define ESPFC_SERIAL_2
+// Project NEO-6M wiring uses this hardware UART: TX=GPIO17, RX=GPIO16.
+// The same UART is the current default SERIAL_RX port, so GPS and SERIAL_RX
+// are intentionally mutually exclusive on this target.
 #define ESPFC_SERIAL_2_TX 17
 #define ESPFC_SERIAL_2_RX 16
 #define ESPFC_SERIAL_2_FN (SERIAL_FUNCTION_RX_SERIAL)

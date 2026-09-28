@@ -70,6 +70,20 @@ int SerialManager::begin()
     auto * port = getSerialPortById((SerialPort)i);
     const auto& spc = _model.config.serial[i];
 
+    const uint32_t gpsRxMask =
+        SERIAL_FUNCTION_GPS |
+        SERIAL_FUNCTION_RX_SERIAL;
+
+    const bool gpsRxConflict =
+        (spc.functionMask & gpsRxMask) ==
+        gpsRxMask;
+
+    if (gpsRxConflict)
+    {
+      _model.state.gps.serialConflict = true;
+      _model.logger.err().log("UART GPS/RX CONFLICT ").logln(i);
+    }
+
     if(!port || !spc.functionMask)
     {
       continue;
@@ -161,7 +175,8 @@ int SerialManager::begin()
     {
       _vtx.begin(port);
     }
-    if(spc.functionMask & SERIAL_FUNCTION_GPS)
+    if((spc.functionMask & SERIAL_FUNCTION_GPS) &&
+       !gpsRxConflict)
     {
       _gps.begin(port, sdc.baud);
     }

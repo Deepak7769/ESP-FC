@@ -644,6 +644,7 @@ struct GpsState
   bool wasLocked = false;
   bool homeSet = false;
   bool solutionFresh = false;
+  bool serialConflict = false;
   uint32_t interval = 0;
   uint32_t lastMsgTs = 0;
   uint32_t lastSolutionUs = 0;

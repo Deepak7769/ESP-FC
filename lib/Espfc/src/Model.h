@@ -272,6 +272,24 @@ for(size_t i = 0; i < AXIS_COUNT_RPY; i++)
       return -1;
     }
 
+    static bool sanitizeSerialFunctionMask(int32_t& functionMask)
+    {
+      const uint32_t gpsRxMask =
+          SERIAL_FUNCTION_GPS |
+          SERIAL_FUNCTION_RX_SERIAL;
+
+      if ((static_cast<uint32_t>(functionMask) & gpsRxMask) != gpsRxMask)
+      {
+        return false;
+      }
+
+      // Receiver input has priority. GPS must move to a different UART.
+      functionMask &=
+          ~SERIAL_FUNCTION_GPS;
+
+      return true;
+    }
+
     uint16_t getRssi() const
     {
       size_t channel = config.input.rssiChannel;
@@ -1080,9 +1098,20 @@ if(config.output.protocol == ESC_PROTOCOL_PWM)
 
       config.featureMask &= featureAllowMask;
 
+      state.gps.serialConflict = false;
+
       for(int i = 0; i < SERIAL_UART_COUNT; i++)
       {
         config.serial[i].functionMask &= serialFunctionAllowedMask;
+
+        // A GPS stream and a serial-RX stream cannot share one UART byte
+        // stream. Preserve receiver control and fail closed on GPS if a saved
+        // configuration accidentally enables both on the same port.
+        if (sanitizeSerialFunctionMask(
+                config.serial[i].functionMask))
+        {
+          state.gps.serialConflict = true;
+        }
       }
       validatePinResources();
 

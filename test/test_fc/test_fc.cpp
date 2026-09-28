@@ -7852,6 +7852,27 @@ void test_model_sanitize_preserves_rc_safety_invariants()
       model.config.output.channel[0].neutral);
 }
 
+void test_model_sanitize_rejects_gps_and_serial_rx_on_same_uart()
+{
+  int32_t functionMask =
+      SERIAL_FUNCTION_GPS |
+      SERIAL_FUNCTION_RX_SERIAL;
+
+  const bool conflict =
+      Model::sanitizeSerialFunctionMask(
+          functionMask);
+
+  TEST_ASSERT_TRUE(conflict);
+
+  TEST_ASSERT_TRUE(
+      functionMask &
+      SERIAL_FUNCTION_RX_SERIAL);
+
+  TEST_ASSERT_FALSE(
+      functionMask &
+      SERIAL_FUNCTION_GPS);
+}
+
 void test_fusion_mode_name_rejects_negative_enum()
 {
   TEST_ASSERT_EQUAL_STRING(
@@ -8050,6 +8071,7 @@ RUN_TEST(
   RUN_TEST(test_ppm_only_publishes_complete_stable_frames);
   RUN_TEST(test_input_frame_rate_ignores_startup_and_loss_gaps);
   RUN_TEST(test_model_sanitize_preserves_rc_safety_invariants);
+  RUN_TEST(test_model_sanitize_rejects_gps_and_serial_rx_on_same_uart);
   RUN_TEST(test_fusion_mode_name_rejects_negative_enum);
 RUN_TEST(
     test_failsafe_startup_without_rx_does_not_enter_stage2);
