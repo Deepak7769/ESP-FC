@@ -756,7 +756,7 @@ void Controller::updateAntiGravityShadow()
   const float scaledDerivative =
       filteredDerivative *
       static_cast<float>(
-          _model.config.controller
+          _model.config
               .antiGravityGain);
 
   // Betaflight constants are used only to report the equivalent gain demand.
@@ -798,8 +798,7 @@ void Controller::updateAntiGravityShadow()
 
   const float pGain =
       (static_cast<float>(
-           _model.config.controller
-               .antiGravityPGain) /
+           ControllerConfig::ANTI_GRAVITY_P_GAIN) /
        100.0f) *
       ANTIGRAVITY_KP;
 
@@ -1564,8 +1563,7 @@ void Controller::reloadFilter()
   _antiGravityFilter.begin(
       FilterConfig(
           FILTER_PT2,
-          _model.config.controller
-              .antiGravityCutoffHz),
+          ControllerConfig::ANTI_GRAVITY_CUTOFF_HZ),
       pidFilterRate);
 
   _antiGravityPrimed =
