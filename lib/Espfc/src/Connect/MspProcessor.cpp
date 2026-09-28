@@ -540,13 +540,37 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       break;
 
     case MSP_CURRENT_METERS:
-      for (int i = 0; i < 1; i++)
-      {
-        r.writeU8(i + 10); // meter id (10-19 ibat adc)
-        r.writeU16(0);     // mah drawn
-        r.writeU16(std::clamp<int>(toIbatCurrent(_model.state.battery.current) * 10, 0, 0xffff)); // meter value
-      }
+    {
+      const bool mspSource =
+          _model.config.ibat.source ==
+          CURRENT_METER_MSP;
+
+      // Betaflight reserves 10..19 for battery ADC current meters and 90..99
+      // for MSP current meters. Report the ID corresponding to the selected
+      // source so Configurator identifies an external companion meter.
+      r.writeU8(
+          mspSource
+              ? 90
+              : 10);
+
+      r.writeU16(
+          mspSource
+              ? _model.state.battery.mspMahDrawn
+              : 0);
+
+      const long milliAmps =
+          lrintf(
+              _model.state.battery.current *
+              1000.0f);
+
+      r.writeU16(
+          static_cast<uint16_t>(
+              std::clamp<long>(
+                  milliAmps,
+                  0L,
+                  65535L)));
       break;
+    }
 
     case MSP_VOLTAGE_METER_CONFIG:
       r.writeU8(1); // num voltage sensors
