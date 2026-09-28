@@ -21,6 +21,13 @@ static constexpr std::array<std::tuple<uint16_t, uint8_t>, 2> UBX_MSG_ON{{
     {Gps::UBX_NAV_SAT, 10u},
 }};
 
+static constexpr std::array<std::tuple<uint16_t, uint8_t>, 4> UBX6_MSG_ON{{
+    {Gps::UBX_NAV_POSLLH, 1u},
+    {Gps::UBX_NAV_SOL, 1u},
+    {Gps::UBX_NAV_VELNED, 1u},
+    {Gps::UBX_NAV_SVINFO, 5u},
+}};
+
 GpsSensor::GpsSensor(Model& model): _model(model) {}
 
 int GpsSensor::begin(Stream::ReadWritable* port, int baud)
@@ -202,6 +209,22 @@ void GpsSensor::handleReceive()
     {
       handleNavSat();
     }
+    else if (_ubxMsg.isResponse(Gps::UbxNavPosLlh28::ID))
+    {
+      handleNavPosLlh();
+    }
+    else if (_ubxMsg.isResponse(Gps::UbxNavSol52::ID))
+    {
+      handleNavSol();
+    }
+    else if (_ubxMsg.isResponse(Gps::UbxNavVelNed36::ID))
+    {
+      handleNavVelNed();
+    }
+    else if (_ubxMsg.isResponse(Gps::UbxNavSvInfoHeader8::ID))
+    {
+      handleNavSvInfo();
+    }
   }
   else if (_state == WAIT &&
            static_cast<int32_t>(
@@ -314,21 +337,43 @@ void GpsSensor::enableUbx()
 {
   if (isLegacyProto())
   {
-    const Gps::UbxCfgMsg3 m{
-        .msgId = std::get<0>(UBX_MSG_ON[_counter]),
-        .rate = std::get<1>(UBX_MSG_ON[_counter]),
-    };
-    _counter++;
-    if (_counter < UBX_MSG_ON.size())
+    if (isUbx6())
     {
-      send(m, _state);
+      const Gps::UbxCfgMsg3 m{
+          .msgId = std::get<0>(UBX6_MSG_ON[_counter]),
+          .rate = std::get<1>(UBX6_MSG_ON[_counter]),
+      };
+      _counter++;
+      if (_counter < UBX6_MSG_ON.size())
+      {
+        send(m, _state);
+      }
+      else
+      {
+        send(m, ENABLE_NAV5);
+        _counter = 0;
+        _timeout = micros() + 10 * TIMEOUT;
+        _model.logger.info().logln("GPS UBX6 ON");
+      }
     }
     else
     {
-      send(m, ENABLE_NAV5);
-      _counter = 0;
-      _timeout = micros() + 10 * TIMEOUT;
-      _model.logger.info().logln("GPS UBX ON");
+      const Gps::UbxCfgMsg3 m{
+          .msgId = std::get<0>(UBX_MSG_ON[_counter]),
+          .rate = std::get<1>(UBX_MSG_ON[_counter]),
+      };
+      _counter++;
+      if (_counter < UBX_MSG_ON.size())
+      {
+        send(m, _state);
+      }
+      else
+      {
+        send(m, ENABLE_NAV5);
+        _counter = 0;
+        _timeout = micros() + 10 * TIMEOUT;
+        _model.logger.info().logln("GPS UBX ON");
+      }
     }
   }
   else
@@ -395,7 +440,7 @@ void GpsSensor::enableSbas()
               .scanmode2 = 0,
               .scanmode1 = 0,
           },
-          DETECT_GPS_L5);
+          isUbx6() ? CONFIGURE_NAV_RATE : DETECT_GPS_L5);
       _model.logger.info().logln("GPS SBAS");
     }
     else
@@ -409,12 +454,18 @@ void GpsSensor::enableSbas()
   }
   else
   {
-    setState(DETECT_GPS_L5);
+    setState(isUbx6() ? CONFIGURE_NAV_RATE : DETECT_GPS_L5);
   }
 }
 
 void GpsSensor::detectGpsL5()
 {
+  if (isUbx6())
+  {
+    setState(CONFIGURE_NAV_RATE);
+    return;
+  }
+
   Gps::UbxRequest req(Gps::UBX_CFG_VALGET);
   req.write(Gps::UbxCfgValsetHeader{.version = 0, .layers = 0x01}); // RAM only
   req.write(Gps::CFG_SIGNAL_GPS_L5);
@@ -425,7 +476,7 @@ void GpsSensor::detectGpsL5()
 void GpsSensor::configureRate()
 {
   uint16_t mRate = 200;
-  if (_currentBaud > 100000) mRate = 100;
+  if (!isUbx6() && _currentBaud > 100000) mRate = 100;
   if (_model.state.gps.support.version == GPS_M10 && _currentBaud > 200000) mRate = 40; // (proto<24 => >50ms)
   const uint16_t nRate = 1;
 
@@ -486,6 +537,15 @@ void GpsSensor::handleError()
 
 void GpsSensor::configureGnss()
 {
+  // NEO-6M is a GPS L1 receiver. CFG-GNSS and CFG-VALSET are not part of
+  // the GPS-only u-blox 6 configuration path, so do not probe unsupported
+  // constellation or dual-band settings.
+  if (isUbx6())
+  {
+    setState(CONFIGURE_NAV_RATE);
+    return;
+  }
+
   const bool useDualBand = _model.config.gps.enableDualBand && _model.state.gps.support.gpsL5;
   bool enableGPS = _model.config.gps.enableGPS;
   bool enableGLO = _model.config.gps.enableGLONASS;
@@ -706,6 +766,11 @@ void GpsSensor::handleCfgValGet() const
 
 void GpsSensor::handleNavPvt() const
 {
+  if (_ubxMsg.length < sizeof(Gps::UbxNavPvt92))
+  {
+    return;
+  }
+
   const auto& m = *_ubxMsg.getAs<Gps::UbxNavPvt92>();
 
   _model.state.gps.fix = m.fixType == 3 && m.flags.gnssFixOk;
@@ -756,13 +821,156 @@ void GpsSensor::handleNavPvt() const
   calculateHomeVector();
 }
 
+void GpsSensor::handleNavPosLlh() const
+{
+  if (_ubxMsg.length != sizeof(Gps::UbxNavPosLlh28))
+  {
+    return;
+  }
+
+  const auto& m = *_ubxMsg.getAs<Gps::UbxNavPosLlh28>();
+
+  _model.state.gps.time = m.iTow;
+  _model.state.gps.location.raw.lat = m.lat;
+  _model.state.gps.location.raw.lon = m.lon;
+  _model.state.gps.location.raw.height = m.hMsl;
+  _model.state.gps.accuracy.horizontal = m.hAcc;
+  _model.state.gps.accuracy.vertical = m.vAcc;
+
+  const uint32_t now = micros();
+  _model.state.gps.interval = now - _model.state.gps.lastMsgTs;
+  _model.state.gps.lastMsgTs = now;
+
+  calculateHomeVector();
+}
+
+void GpsSensor::handleNavSol() const
+{
+  if (_ubxMsg.length != sizeof(Gps::UbxNavSol52))
+  {
+    return;
+  }
+
+  const auto& m = *_ubxMsg.getAs<Gps::UbxNavSol52>();
+  const bool fixOk = (m.flags & 0x01u) != 0;
+
+  _model.state.gps.fixType = m.gpsFix;
+  _model.state.gps.fix = fixOk && m.gpsFix == 3u;
+  _model.state.gps.numSats = m.numSv;
+  _model.state.gps.time = m.iTow;
+  _model.state.gps.accuracy.pDop = m.pDop;
+
+  // NAV-SOL accuracy units are centimetres; GpsState stores millimetres.
+  _model.state.gps.accuracy.speed =
+      std::min<uint32_t>(m.sAcc, UINT32_MAX / 10u) * 10u;
+
+  if (_model.state.gps.accuracy.horizontal == 0)
+  {
+    _model.state.gps.accuracy.horizontal =
+        std::min<uint32_t>(m.pAcc, UINT32_MAX / 10u) * 10u;
+  }
+}
+
+void GpsSensor::handleNavVelNed() const
+{
+  if (_ubxMsg.length != sizeof(Gps::UbxNavVelNed36))
+  {
+    return;
+  }
+
+  const auto& m = *_ubxMsg.getAs<Gps::UbxNavVelNed36>();
+
+  _model.state.gps.time = m.iTow;
+  _model.state.gps.velocity.raw.north = m.velN * 10;
+  _model.state.gps.velocity.raw.east = m.velE * 10;
+  _model.state.gps.velocity.raw.down = m.velD * 10;
+  _model.state.gps.velocity.raw.speed3d =
+      static_cast<int32_t>(
+          std::min<uint32_t>(
+              m.speed,
+              static_cast<uint32_t>(INT32_MAX / 10)) *
+          10u);
+  _model.state.gps.velocity.raw.groundSpeed =
+      static_cast<int32_t>(
+          std::min<uint32_t>(
+              m.gSpeed,
+              static_cast<uint32_t>(INT32_MAX / 10)) *
+          10u);
+  _model.state.gps.velocity.raw.heading = m.heading;
+  _model.state.gps.accuracy.speed =
+      std::min<uint32_t>(m.sAcc, UINT32_MAX / 10u) * 10u;
+  _model.state.gps.accuracy.heading = m.cAcc;
+}
+
+void GpsSensor::handleNavSvInfo() const
+{
+  if (_ubxMsg.length < sizeof(Gps::UbxNavSvInfoHeader8))
+  {
+    return;
+  }
+
+  Gps::UbxNavSvInfoHeader8 header{};
+  std::memcpy(&header, _ubxMsg.payload, sizeof(header));
+
+  const size_t availableBlocks =
+      (_ubxMsg.length - sizeof(header)) /
+      sizeof(Gps::UbxNavSvInfoBlock12);
+
+  const size_t count =
+      std::min<size_t>(
+          std::min<size_t>(header.numCh, availableBlocks),
+          SAT_MAX);
+
+  _model.state.gps.numCh = static_cast<uint8_t>(count);
+
+  for (size_t i = 0; i < SAT_MAX; ++i)
+  {
+    if (i < count)
+    {
+      Gps::UbxNavSvInfoBlock12 block{};
+      std::memcpy(
+          &block,
+          _ubxMsg.payload +
+              sizeof(header) +
+              i * sizeof(block),
+          sizeof(block));
+
+      auto& sv = _model.state.gps.svinfo[i];
+      sv = GpsSatelite{};
+      sv.id = block.svid;
+      sv.gnssId = 0; // NEO-6M GPS/SBAS generation has no NAV-SAT gnssId field.
+      sv.cno = block.cno;
+      sv.quality.qualityInd = block.quality & 0x07u;
+      sv.quality.svUsed = (block.flags & 0x01u) != 0;
+      sv.quality.difCorr = (block.flags & 0x02u) != 0;
+    }
+    else
+    {
+      _model.state.gps.svinfo[i] = GpsSatelite{};
+    }
+  }
+}
+
 void GpsSensor::handleNavSat() const
 {
+  if (_ubxMsg.length < 8u)
+  {
+    return;
+  }
+
   const auto& m = *_ubxMsg.getAs<Gps::UbxNavSat>();
-  _model.state.gps.numCh = m.numSvs;
+  const size_t available =
+      (_ubxMsg.length - 8u) / 12u;
+  const uint8_t count =
+      static_cast<uint8_t>(
+          std::min<size_t>(
+              std::min<size_t>(m.numSvs, available),
+              SAT_MAX));
+
+  _model.state.gps.numCh = count;
   for (uint8_t i = 0; i < SAT_MAX; i++)
   {
-    if (i < m.numSvs)
+    if (i < count)
     {
       _model.state.gps.svinfo[i].id = m.sats[i].svId;
       _model.state.gps.svinfo[i].gnssId = m.sats[i].gnssId;
@@ -778,47 +986,51 @@ void GpsSensor::handleNavSat() const
 
 void GpsSensor::handleVersion() const
 {
-  const char* payload = (const char*)_ubxMsg.payload;
+  const char* payload = reinterpret_cast<const char*>(_ubxMsg.payload);
 
-  _model.logger.info().log("GPS VER").logln(payload);
-  _model.logger.info().log("GPS VER").logln(payload + 30);
+  if (_ubxMsg.length >= 30)
+  {
+    _model.logger.info().log("GPS VER").logln(payload);
+  }
+  if (_ubxMsg.length >= 40)
+  {
+    _model.logger.info().log("GPS VER").logln(payload + 30);
 
-  if (std::strcmp(payload + 30, "00080000") == 0)
-  {
-    _model.state.gps.support.version = GPS_M8;
-  }
-  else if (std::strcmp(payload + 30, "00090000") == 0)
-  {
-    _model.state.gps.support.version = GPS_M9;
-  }
-  else if (std::strcmp(payload + 30, "00190000") == 0)
-  {
-    _model.state.gps.support.version = GPS_F9;
-  }
-  else if (std::strcmp(payload + 30, "000A0000") == 0)
-  {
-    _model.state.gps.support.version = GPS_M10;
+    if (std::strncmp(payload + 30, "00080000", 8) == 0)
+    {
+      _model.state.gps.support.version = GPS_M8;
+    }
+    else if (std::strncmp(payload + 30, "00090000", 8) == 0)
+    {
+      _model.state.gps.support.version = GPS_M9;
+    }
+    else if (std::strncmp(payload + 30, "00190000", 8) == 0)
+    {
+      _model.state.gps.support.version = GPS_F9;
+    }
+    else if (std::strncmp(payload + 30, "000A0000", 8) == 0)
+    {
+      _model.state.gps.support.version = GPS_M10;
+    }
   }
 
-  if (_ubxMsg.length >= 70)
+  for (size_t offset = 40; offset + 30 <= _ubxMsg.length; offset += 30)
   {
-    checkSupport(payload + 40);
-    _model.logger.info().log("GPS EXT").logln(payload + 40);
+    checkSupport(payload + offset);
+    _model.logger.info().log("GPS EXT").logln(payload + offset);
   }
-  if (_ubxMsg.length >= 100)
+
+  // GPS-only u-blox 6 firmware reports protocol versions in the 6..15 range.
+  // Capability-gate it before any generation-9+ CFG-VAL* probes are attempted.
+  const uint8_t prot =
+      _model.state.gps.support.protVerMajor;
+
+  if (_model.state.gps.support.version == GPS_UNKNOWN &&
+      prot >= 6u &&
+      prot <= 15u)
   {
-    checkSupport(payload + 70);
-    _model.logger.info().log("GPS EXT").logln(payload + 70);
-  }
-  if (_ubxMsg.length >= 130)
-  {
-    checkSupport(payload + 100);
-    _model.logger.info().log("GPS EXT").logln(payload + 100);
-  }
-  if (_ubxMsg.length >= 160)
-  {
-    checkSupport(payload + 130);
-    _model.logger.info().log("GPS EXT").logln(payload + 130);
+    _model.state.gps.support.version = GPS_M6;
+    _model.state.gps.support.gps = true;
   }
 }
 

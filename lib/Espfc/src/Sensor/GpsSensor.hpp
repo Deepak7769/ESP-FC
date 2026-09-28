@@ -68,12 +68,21 @@ private:
     return _model.state.gps.support.protVerMajor < 27;
   }
 
+  bool isUbx6() const
+  {
+    return _model.state.gps.support.version == GPS_M6;
+  }
+
   void setState(State state, State ackState, State timeoutState);
   void setState(State state);
 
   void handleError();
   void handleNavPvt() const;
   void handleNavSat() const;
+  void handleNavPosLlh() const;
+  void handleNavSol() const;
+  void handleNavVelNed() const;
+  void handleNavSvInfo() const;
   void handleVersion() const;
   void handleReceive();
   void handleCfgValGet() const;
