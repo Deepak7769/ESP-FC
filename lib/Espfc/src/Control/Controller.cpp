@@ -4,11 +4,6 @@
 #include "Utils/Math.hpp"
 #include <algorithm>
 #include <cmath>
-#if defined(ESPFC_ANTI_GRAVITY_ACTIVE) && \
-    !defined(ESPFC_SAFE_BENCH_BUILD)
-#error "ESPFC_ANTI_GRAVITY_ACTIVE requires ESPFC_SAFE_BENCH_BUILD"
-#endif
-
 namespace Espfc::Control {
 namespace {
 
@@ -161,8 +156,8 @@ updateAssistedModes();
   }
 
   // Betaflight-style Anti-Gravity demand is computed every cycle. Ordinary
-  // builds keep it diagnostic-only. ESPFC_ANTI_GRAVITY_ACTIVE may feed
-  // that demand into rate-PID math, but only in a SAFE_BENCH build where
+  // builds keep it diagnostic-only. SAFE_BENCH builds feed that demand
+  // into rate-PID math while Mixer.cpp keeps physical outputs unattached.
   // Mixer.cpp cannot attach ESC/servo outputs.
   updateAntiGravity();
 
@@ -419,9 +414,9 @@ void FAST_CODE_ATTR Controller::innerLoop()
   auto& output = _model.state.output;
   auto& antiGravity = _model.state.antiGravity;
 
-#if defined(ESPFC_ANTI_GRAVITY_ACTIVE)
-  // The compile-time guard above requires SAFE_BENCH, so this can change only
-  // internal PID math while Mixer.cpp keeps physical outputs unattached.
+#if defined(ESPFC_SAFE_BENCH_BUILD)
+  // SAFE_BENCH is the single compile-time Anti-Gravity authority gate;
+  // Mixer.cpp keeps physical outputs unattached in the same build.
   antiGravity.ratePidApplied =
       antiGravity.active;
 #else
@@ -470,7 +465,7 @@ void FAST_CODE_ATTR Controller::innerLoop()
   float antiGravityIAccelerator =
       0.0f;
 
-#if defined(ESPFC_ANTI_GRAVITY_ACTIVE)
+#if defined(ESPFC_SAFE_BENCH_BUILD)
   // Match Betaflight's current axis policy: Anti-Gravity boosts P and I on
   // roll/pitch, while yaw receives neither Anti-Gravity I acceleration nor P
   // boost. P boost is attenuated above 50 deg/s of commanded axis rate.
@@ -1000,8 +995,8 @@ void Controller::updateAntiGravity()
               .antiGravityGain);
 
   // Betaflight constants define the Anti-Gravity gain demand. The demand is
-  // diagnostic in ordinary builds and is applied only when the authoritative
-  // ESPFC_ANTI_GRAVITY_ACTIVE path is compiled.
+  // diagnostic in ordinary builds and is applied only when the SAFE_BENCH
+  // authority path is compiled.
   constexpr float ANTIGRAVITY_KI =
       0.34f;
 
