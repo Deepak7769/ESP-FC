@@ -5,8 +5,9 @@
 #include <algorithm>
 #include <cmath>
 #if defined(ESPFC_ANTI_GRAVITY_ACTIVE) && \
-    !defined(ESPFC_SAFE_BENCH_BUILD)
-#error "ESPFC_ANTI_GRAVITY_ACTIVE requires ESPFC_SAFE_BENCH_BUILD"
+    !defined(ESPFC_SAFE_BENCH_BUILD) && \
+    !defined(UNIT_TEST)
+#error "ESPFC_ANTI_GRAVITY_ACTIVE requires ESPFC_SAFE_BENCH_BUILD on hardware targets"
 #endif
 
 namespace Espfc::Control {
@@ -162,8 +163,8 @@ updateAssistedModes();
 
   // Betaflight-style Anti-Gravity demand is computed every cycle. Ordinary
   // builds keep it diagnostic-only. ESPFC_ANTI_GRAVITY_ACTIVE may feed
-  // that demand into rate-PID math, but only in a SAFE_BENCH build where
-  // Mixer.cpp cannot attach ESC/servo outputs.
+  // that demand into rate-PID math. Hardware targets require SAFE_BENCH,
+  // while UNIT_TEST may exercise the same authority path without actuators.
   updateAntiGravity();
 
   {
