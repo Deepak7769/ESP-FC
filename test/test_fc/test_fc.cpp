@@ -1812,6 +1812,164 @@ void test_actuator_mode_link_rejects_linked_source_chain()
 }
 
 
+void test_controller_anti_gravity_shadow_tracks_manual_throttle_transient()
+{
+  ArduinoFakeReset();
+
+  Model model;
+
+  model.config.featureMask |=
+      FEATURE_ANTI_GRAVITY;
+
+  model.state.gyro.clock =
+      1000;
+
+  model.config.gyro.dlpf =
+      GYRO_DLPF_256;
+
+  model.config.loopSync =
+      1;
+
+  model.config.mixerSync =
+      1;
+
+  model.config.mixer.type =
+      FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(
+      model);
+
+  controller.begin();
+
+  model.state.input.channelsValid =
+      true;
+
+  model.state.input.rxLoss =
+      false;
+
+  model.state.input.rxFailSafe =
+      false;
+
+  model.state.input.ch[
+      AXIS_THRUST] =
+      -1.0f;
+
+  // First cycle primes the detector without creating a synthetic startup spike.
+  controller.update();
+
+  TEST_ASSERT_TRUE(
+      model.state.antiGravity.enabled);
+
+  TEST_ASSERT_FALSE(
+      model.state.antiGravity.active);
+
+  model.state.input.ch[
+      AXIS_THRUST] =
+      0.0f;
+
+  controller.update();
+
+  TEST_ASSERT_TRUE(
+      model.state.antiGravity.enabled);
+
+  TEST_ASSERT_TRUE(
+      model.state.antiGravity.derivative >
+      0.0f);
+
+  TEST_ASSERT_TRUE(
+      model.state.antiGravity.filteredDerivative >=
+      0.0f);
+
+  TEST_ASSERT_TRUE(
+      model.state.antiGravity.iMultiplier >=
+      1.0f);
+
+  TEST_ASSERT_TRUE(
+      model.state.antiGravity.pMultiplier >=
+      1.0f);
+}
+
+
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
+
+void test_controller_anti_gravity_shadow_yields_to_assisted_vertical_control()
+{
+  ArduinoFakeReset();
+
+  Model model;
+
+  model.config.featureMask |=
+      FEATURE_ANTI_GRAVITY;
+
+  model.state.gyro.clock =
+      1000;
+
+  model.config.gyro.dlpf =
+      GYRO_DLPF_256;
+
+  model.config.loopSync =
+      1;
+
+  model.config.mixerSync =
+      1;
+
+  model.config.mixer.type =
+      FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(
+      model);
+
+  controller.begin();
+
+  model.state.input.channelsValid =
+      true;
+
+  model.state.input.rxLoss =
+      false;
+
+  model.state.input.rxFailSafe =
+      false;
+
+  model.state.input.ch[
+      AXIS_THRUST] =
+      -1.0f;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ALTHOLD);
+
+  controller.update();
+
+  model.state.input.ch[
+      AXIS_THRUST] =
+      1.0f;
+
+  controller.update();
+
+  TEST_ASSERT_TRUE(
+      model.state.antiGravity.enabled);
+
+  TEST_ASSERT_FALSE(
+      model.state.antiGravity.active);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      1.0f,
+      model.state.antiGravity.iMultiplier);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      1.0f,
+      model.state.antiGravity.pMultiplier);
+}
+
+#endif
+
+
 void test_actuator_angle_fault_requires_switch_cycle()
 {
   When(Method(ArduinoFake(), micros)).AlwaysReturn(50000);
@@ -7094,6 +7252,10 @@ RUN_TEST(
   RUN_TEST(test_actuator_mode_link_cannot_target_arm);
   RUN_TEST(test_actuator_mode_link_rejects_linked_source_chain);
   RUN_TEST(test_actuator_mode_logic_and_requires_all_ranges);
+  RUN_TEST(test_controller_anti_gravity_shadow_tracks_manual_throttle_transient);
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
+  RUN_TEST(test_controller_anti_gravity_shadow_yields_to_assisted_vertical_control);
+#endif
   RUN_TEST(test_actuator_no_receiver_cannot_activate_aux_mode);
   RUN_TEST(test_actuator_gps_arming_block_clears_when_feature_disabled);
   RUN_TEST(test_ppm_only_publishes_complete_stable_frames);
