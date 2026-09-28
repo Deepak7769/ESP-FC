@@ -73,5 +73,5 @@
 // sign for downward motion. Production keeps the historical default unless a
 // validation/build policy explicitly selects another value.
 #ifndef ESPFC_LAND_V2_DESCENT_RATE_MS
-#define ESPFC_LAND_V2_DESCENT_RATE_MS 0.50f
+#define ESPFC_LAND_V2_DESCENT_RATE_MS 0.10f
 #endif
