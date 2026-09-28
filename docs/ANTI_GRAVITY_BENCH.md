@@ -4,17 +4,22 @@ This is the authoritative Anti-Gravity controller implementation validation stag
 
 ## Safety boundary
 
-The active validation path is compiled only when both:
+On hardware targets, the active validation path is compiled only when both:
 
 - `ESPFC_ANTI_GRAVITY_ACTIVE`
 - `ESPFC_SAFE_BENCH_BUILD`
 
-are defined. Compilation fails if the active-test macro is used without the
-safe-bench macro.
+are defined. Compilation fails if the active macro is used on a hardware target
+without the safe-bench macro.
 
 `ESPFC_SAFE_BENCH_BUILD` keeps the mixer math running but prevents the motor
 and servo drivers from being initialized or attached. This validation firmware
 is therefore intended only for non-actuating bench observation, not flight.
+
+Native unit tests may define `ESPFC_ANTI_GRAVITY_ACTIVE` without
+`ESPFC_SAFE_BENCH_BUILD`. The `UNIT_TEST` build has no physical actuator
+path and exists so CI can exercise the same controller-authority policy that a
+future hardware build would use.
 
 The ordinary ESP32 firmware remains non-authoritative for Anti-Gravity at this milestone. There is now one Anti-Gravity controller algorithm; the compile-time authority gate decides whether its P/I demand reaches the rate PID.
 
@@ -31,6 +36,22 @@ GitHub Actions publishes the matching firmware as:
 ```
 esp32_antigravity_validation_<commit>
 ```
+
+## Production-policy regression
+
+PlatformIO environment:
+
+```
+native_antigravity_active
+```
+
+This target deliberately omits `ESPFC_SAFE_BENCH_BUILD` while retaining
+`UNIT_TEST`. It verifies that the Anti-Gravity authority path compiles and
+that the controller tests observe `ratePidApplied == true` during a valid
+throttle transient, without creating a flashable motor-driving firmware.
+
+CI runs both the safe-bench hardware build and this native active-policy test.
+A real actuator-authority target is intentionally still absent.
 
 ## Controller behavior under the bench gate
 
