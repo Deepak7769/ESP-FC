@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install Dependencies
-        run: pip install --upgrade platformio
+        run: python -m pip install --upgrade "platformio==6.2.0"
       - name: Run PlatformIO Tests
         run: |
           platformio test -e native
@@ -50,7 +50,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install Dependencies
-        run: pip install --upgrade platformio
+        run: python -m pip install --upgrade "platformio==6.2.0"
       - name: Build non-actuating Assisted V2 validation firmware
         run: platformio run -e esp32_assisted_v2_candidate
         env:
@@ -89,7 +89,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install Dependencies
-        run: pip install --upgrade platformio
+        run: python -m pip install --upgrade "platformio==6.2.0"
 
       - name: Extract Version
         run: |
