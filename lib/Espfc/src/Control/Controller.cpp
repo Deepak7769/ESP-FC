@@ -86,6 +86,15 @@ _shadowVzTarget =
 _assistedLastUpdateUs =
     0;
 
+_antiGravityPrimed =
+    false;
+
+_antiGravityPrevThrottle =
+    0.0f;
+
+_model.state.antiGravity =
+    AntiGravityState{};
+
 _model.state.angleV2 =
     AngleV2State{};
 
@@ -145,6 +154,11 @@ updateAssistedModes();
         break;
     }
   }
+
+  // Betaflight-style anti-gravity transient detection is maintained as a
+  // diagnostic/shadow path. It intentionally does not scale the motor-driving
+  // PID terms.
+  updateAntiGravityShadow();
 
   {
     Utils::Stats::Measure measure(_model.state.stats, COUNTER_INNER_PID);
@@ -606,6 +620,235 @@ else
     _model.state.debug[3] = lrintf(innerPid[AXIS_ROLL].iTerm * 1000.0f);
   }
 }
+void Controller::updateAntiGravityShadow()
+{
+  auto& antiGravity =
+      _model.state.antiGravity;
+
+  antiGravity.enabled =
+      _model.isFeatureActive(
+          FEATURE_ANTI_GRAVITY);
+
+  const auto& input =
+      _model.state.input;
+
+  const bool manualThrustOwnsOutput =
+      !assistedVerticalControlOwnsThrust(
+          _model);
+
+  const bool inputHealthy =
+      input.channelsValid &&
+      !input.rxLoss &&
+      !input.rxFailSafe;
+
+  if (!antiGravity.enabled ||
+      !manualThrustOwnsOutput ||
+      !inputHealthy)
+  {
+    antiGravity.active =
+        false;
+
+    antiGravity.throttle =
+        0.0f;
+
+    antiGravity.derivative =
+        0.0f;
+
+    antiGravity.filteredDerivative =
+        0.0f;
+
+    antiGravity.iMultiplier =
+        1.0f;
+
+    antiGravity.pMultiplier =
+        1.0f;
+
+    _antiGravityPrimed =
+        false;
+
+    return;
+  }
+
+  const float throttle =
+      std::clamp(
+          (_model.state.input.ch[
+               AXIS_THRUST] +
+           1.0f) *
+              0.5f,
+          0.0f,
+          1.0f);
+
+  antiGravity.throttle =
+      throttle;
+
+  if (!_antiGravityPrimed)
+  {
+    _antiGravityPrevThrottle =
+        throttle;
+
+    _antiGravityFilter.prime(
+        0.0f);
+
+    _antiGravityPrimed =
+        true;
+
+    antiGravity.active =
+        false;
+
+    antiGravity.derivative =
+        0.0f;
+
+    antiGravity.filteredDerivative =
+        0.0f;
+
+    antiGravity.iMultiplier =
+        1.0f;
+
+    antiGravity.pMultiplier =
+        1.0f;
+
+    return;
+  }
+
+  const float loopRate =
+      static_cast<float>(
+          std::max<int>(
+              _model.state.loopTimer.rate,
+              1));
+
+  const float throttleInv =
+      1.0f -
+      throttle;
+
+  float derivative =
+      std::fabs(
+          throttle -
+          _antiGravityPrevThrottle) *
+      loopRate;
+
+  derivative *=
+      throttleInv *
+      throttleInv;
+
+  if (throttle >
+      _antiGravityPrevThrottle)
+  {
+    derivative *=
+        throttleInv *
+        0.5f;
+  }
+
+  _antiGravityPrevThrottle =
+      throttle;
+
+  const float filteredDerivative =
+      _antiGravityFilter.update(
+          derivative);
+
+  antiGravity.derivative =
+      derivative;
+
+  antiGravity.filteredDerivative =
+      filteredDerivative;
+
+  const float scaledDerivative =
+      filteredDerivative *
+      static_cast<float>(
+          _model.config.controller
+              .antiGravityGain);
+
+  // Betaflight constants are used only to report the equivalent gain demand.
+  // These multipliers are not applied to the active flight PID path.
+  constexpr float ANTIGRAVITY_KI =
+      0.34f;
+
+  constexpr float ANTIGRAVITY_KP =
+      0.0034f;
+
+  const float pitchKi =
+      std::fabs(
+          _model.state.innerPid[
+              AXIS_PITCH]
+              .Ki);
+
+  const float itermAccelerator =
+      scaledDerivative *
+      ANTIGRAVITY_KI;
+
+  antiGravity.iMultiplier =
+      pitchKi > 0.000001f
+          ? 1.0f +
+                itermAccelerator /
+                    pitchKi
+          : 1.0f;
+
+  const float pitchRateDps =
+      std::fabs(
+          Utils::toDeg(
+              _model.state.setpoint.rate[
+                  AXIS_PITCH]));
+
+  const float setpointAttenuator =
+      std::max(
+          pitchRateDps /
+              50.0f,
+          1.0f);
+
+  const float pGain =
+      (static_cast<float>(
+           _model.config.controller
+               .antiGravityPGain) /
+       100.0f) *
+      ANTIGRAVITY_KP;
+
+  antiGravity.pMultiplier =
+      1.0f +
+      (scaledDerivative /
+       setpointAttenuator) *
+          pGain;
+
+  antiGravity.active =
+      scaledDerivative >
+      0.01f;
+
+  if (_model.config.debug.mode ==
+      DEBUG_ANTI_GRAVITY)
+  {
+    _model.state.debug[0] =
+        std::clamp<long>(
+            lrintf(
+                derivative *
+                100.0f),
+            -32000L,
+            32000L);
+
+    _model.state.debug[1] =
+        std::clamp<long>(
+            lrintf(
+                filteredDerivative *
+                100.0f),
+            -32000L,
+            32000L);
+
+    _model.state.debug[2] =
+        std::clamp<long>(
+            lrintf(
+                antiGravity.iMultiplier *
+                1000.0f),
+            -32000L,
+            32000L);
+
+    _model.state.debug[3] =
+        std::clamp<long>(
+            lrintf(
+                antiGravity.pMultiplier *
+                1000.0f),
+            -32000L,
+            32000L);
+  }
+}
+
+
 float Controller::calculatePilotClimbRateShadow() const
 {
   constexpr float DEADBAND =
@@ -1311,7 +1554,20 @@ void Controller::reloadFilter()
 {
   _speedFilter.begin(FilterConfig(FILTER_BIQUAD, 10), _model.state.loopTimer.rate);
 
-  const int pidFilterRate = _model.state.loopTimer.rate;
+  const int pidFilterRate =
+      std::max<int>(
+          _model.state.loopTimer.rate,
+          1);
+
+  _antiGravityFilter.begin(
+      FilterConfig(
+          FILTER_PT2,
+          _model.config.controller
+              .antiGravityCutoffHz),
+      pidFilterRate);
+
+  _antiGravityPrimed =
+      false;
 
   // inner loop
   const auto& dtermConf = _model.config.dterm;
