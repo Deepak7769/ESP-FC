@@ -599,6 +599,141 @@ else
       false;
 }
 
+  if (_model.config.debug.mode ==
+      DEBUG_AUTOPILOT_PID)
+  {
+    // Assisted vertical-controller trace. Units are chosen so Blackbox can
+    // display the entire AltHold/LAND cause-and-effect chain using int16 debug
+    // channels while the SAFE_BENCH build keeps physical outputs disconnected.
+    const float verticalError =
+        setpoint.rate[AXIS_THRUST] -
+        altitude.vario;
+
+    _model.state.debug[0] =
+        std::clamp<long>(
+            lrintf(
+                setpoint.rate[AXIS_THRUST] *
+                100.0f),
+            -32000L,
+            32000L); // vertical-rate target, cm/s
+
+    _model.state.debug[1] =
+        std::clamp<long>(
+            lrintf(
+                altitude.vario *
+                100.0f),
+            -32000L,
+            32000L); // measured vertical rate, cm/s
+
+    _model.state.debug[2] =
+        std::clamp<long>(
+            lrintf(
+                verticalError *
+                100.0f),
+            -32000L,
+            32000L); // vertical-rate error, cm/s
+
+    _model.state.debug[3] =
+        std::clamp<long>(
+            lrintf(
+                verticalPid.pTerm *
+                1000.0f),
+            -32000L,
+            32000L);
+
+    _model.state.debug[4] =
+        std::clamp<long>(
+            lrintf(
+                verticalPid.iTerm *
+                1000.0f),
+            -32000L,
+            32000L);
+
+    _model.state.debug[5] =
+        std::clamp<long>(
+            lrintf(
+                verticalPid.dTerm *
+                1000.0f),
+            -32000L,
+            32000L);
+
+    _model.state.debug[6] =
+        std::clamp<long>(
+            lrintf(
+                output.ch[AXIS_THRUST] *
+                1000.0f),
+            -32000L,
+            32000L);
+
+    uint16_t flags =
+        0;
+
+    if (_model.isModeActive(
+            MODE_ALTHOLD))
+    {
+      flags |=
+          uint16_t{1} << 0;
+    }
+
+    if (_model.state.assistedShadow
+            .altitudeActive)
+    {
+      flags |=
+          uint16_t{1} << 1;
+    }
+
+    if (altitude.healthy)
+    {
+      flags |=
+          uint16_t{1} << 2;
+    }
+
+    if (altitude.baroAccepted)
+    {
+      flags |=
+          uint16_t{1} << 3;
+    }
+
+    if (_altHoldV2OutputWasActive)
+    {
+      flags |=
+          uint16_t{1} << 4;
+    }
+
+#if defined(ESPFC_LAND_V2_ACTIVE)
+    if (_model.state.failsafe
+            .landingRequested)
+    {
+      flags |=
+          uint16_t{1} << 5;
+    }
+
+    if (_model.state.failsafe
+            .landingShadowActive)
+    {
+      flags |=
+          uint16_t{1} << 6;
+    }
+
+    if (_model.state.failsafe
+            .landingShadowOutputBlocked)
+    {
+      flags |=
+          uint16_t{1} << 7;
+    }
+#endif
+
+    if (_model.state.input.channelsValid)
+    {
+      flags |=
+          uint16_t{1} << 8;
+    }
+
+    _model.state.debug[7] =
+        static_cast<int16_t>(
+            flags);
+  }
+
   if (_model.config.debug.mode == DEBUG_STACK)
   {
     _model.state.debug[0] = std::clamp(lrintf(setpoint.rate[AXIS_THRUST] * 1000.0f), -3000l, 3000l);    // hi mem
