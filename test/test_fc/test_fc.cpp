@@ -2,12 +2,14 @@
 #include "Control/AssistedModeV2.h"
 #include "Control/Controller.h"
 #include "Control/Altitude.hpp"
+#include "Connect/MspProcessor.hpp"
 #include "Input.h"
 #include "Device/InputPPM.h"
 #include "TelemetryManager.h"
 #include <Complementary.hpp>
 #include "Control/Fusion.h"
 #include "Sensor/BaroSensor.hpp"
+#include "Sensor/VoltageSensor.hpp"
 #include "Model.h"
 #include "Output/Mixer.h"
 #include "Utils/Timer.h"
@@ -1968,6 +1970,151 @@ void test_controller_anti_gravity_shadow_yields_to_assisted_vertical_control()
 }
 
 #endif
+
+
+void test_msp_current_meter_reply_updates_battery_state()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      2300000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  model.config.ibat.source =
+      CURRENT_METER_MSP;
+
+  Connect::MspProcessor processor(
+      model);
+
+  Connect::MspMessage reply;
+
+  reply.cmd =
+      MSP_ANALOG;
+
+  reply.dir =
+      Connect::MSP_TYPE_REPLY;
+
+  reply.state =
+      Connect::MSP_STATE_RECEIVED;
+
+  reply.received =
+      7;
+
+  // voltage=12.0V legacy, mAh=321, RSSI=0, current=12.34A.
+  const uint8_t payload[7] = {
+      120,
+      0x41, 0x01,
+      0x00, 0x00,
+      0xD2, 0x04};
+
+  std::copy(
+      payload,
+      payload + sizeof(payload),
+      reply.buffer);
+
+  processor.processReply(
+      reply);
+
+  TEST_ASSERT_TRUE(
+      model.state.battery
+          .mspCurrentValid);
+
+  TEST_ASSERT_EQUAL_INT16(
+      1234,
+      model.state.battery
+          .mspCurrentCentiAmps);
+
+  TEST_ASSERT_EQUAL_UINT16(
+      321,
+      model.state.battery
+          .mspMahDrawn);
+
+  TEST_ASSERT_EQUAL_UINT32(
+      NOW_US,
+      model.state.battery
+          .mspCurrentLastUpdateUs);
+}
+
+
+void test_voltage_sensor_reads_fresh_msp_current_and_rejects_stale_data()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      3000000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  model.config.ibat.source =
+      CURRENT_METER_MSP;
+
+  Sensor::VoltageSensor sensor(
+      model);
+
+  sensor.begin();
+
+  model.state.battery
+      .mspCurrentCentiAmps =
+      750;
+
+  model.state.battery
+      .mspMahDrawn =
+      42;
+
+  model.state.battery
+      .mspCurrentLastUpdateUs =
+      NOW_US;
+
+  model.state.battery
+      .mspCurrentValid =
+      true;
+
+  TEST_ASSERT_EQUAL_INT(
+      1,
+      sensor.readIbat());
+
+  TEST_ASSERT_EQUAL_INT16(
+      750,
+      model.state.battery
+          .rawCurrent);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.001f,
+      7.5f,
+      model.state.battery
+          .currentUnfiltered);
+
+  // Make the same sample older than the 500 ms freshness contract.
+  model.state.battery
+      .mspCurrentLastUpdateUs =
+      NOW_US -
+      600000u;
+
+  TEST_ASSERT_EQUAL_INT(
+      0,
+      sensor.readIbat());
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.001f,
+      0.0f,
+      model.state.battery
+          .currentUnfiltered);
+}
 
 
 void test_actuator_angle_fault_requires_switch_cycle()
@@ -7253,6 +7400,8 @@ RUN_TEST(
   RUN_TEST(test_actuator_mode_link_rejects_linked_source_chain);
   RUN_TEST(test_actuator_mode_logic_and_requires_all_ranges);
   RUN_TEST(test_controller_anti_gravity_shadow_tracks_manual_throttle_transient);
+  RUN_TEST(test_msp_current_meter_reply_updates_battery_state);
+  RUN_TEST(test_voltage_sensor_reads_fresh_msp_current_and_rejects_stale_data);
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
   RUN_TEST(test_controller_anti_gravity_shadow_yields_to_assisted_vertical_control);
 #endif
