@@ -2146,6 +2146,116 @@ void test_controller_anti_gravity_shadow_yields_to_assisted_vertical_control()
 #endif
 
 
+void test_msp_current_meter_reply_is_ignored_when_source_is_not_msp()
+{
+  ArduinoFakeReset();
+
+  Model model;
+
+  model.config.ibat.source =
+      CURRENT_METER_ADC;
+
+  Connect::MspProcessor processor(
+      model);
+
+  Connect::MspMessage reply;
+
+  reply.cmd =
+      MSP_ANALOG;
+
+  reply.dir =
+      Connect::MSP_TYPE_REPLY;
+
+  reply.state =
+      Connect::MSP_STATE_RECEIVED;
+
+  reply.received =
+      7;
+
+  const uint8_t payload[7] = {
+      120,
+      0x01, 0x00,
+      0x00, 0x00,
+      0x64, 0x00};
+
+  std::copy(
+      payload,
+      payload + sizeof(payload),
+      reply.buffer);
+
+  processor.processReply(
+      reply);
+
+  TEST_ASSERT_FALSE(
+      model.state.battery
+          .mspCurrentValid);
+
+  TEST_ASSERT_EQUAL_INT16(
+      0,
+      model.state.battery
+          .mspCurrentCentiAmps);
+}
+
+
+void test_msp_current_meter_short_reply_is_ignored()
+{
+  ArduinoFakeReset();
+
+  Model model;
+
+  model.config.ibat.source =
+      CURRENT_METER_MSP;
+
+  Connect::MspProcessor processor(
+      model);
+
+  Connect::MspMessage reply;
+
+  reply.cmd =
+      MSP_ANALOG;
+
+  reply.dir =
+      Connect::MSP_TYPE_REPLY;
+
+  reply.state =
+      Connect::MSP_STATE_RECEIVED;
+
+  reply.received =
+      6;
+
+  processor.processReply(
+      reply);
+
+  TEST_ASSERT_FALSE(
+      model.state.battery
+          .mspCurrentValid);
+}
+
+
+void test_model_sanitize_preserves_msp_current_source()
+{
+  Model model;
+
+  model.config.ibat.source =
+      CURRENT_METER_MSP;
+
+  model.sanitize();
+
+  TEST_ASSERT_EQUAL_INT(
+      CURRENT_METER_MSP,
+      model.config.ibat.source);
+
+  model.config.ibat.source =
+      99;
+
+  model.sanitize();
+
+  TEST_ASSERT_EQUAL_INT(
+      CURRENT_METER_NONE,
+      model.config.ibat.source);
+}
+
+
 void test_msp_current_meter_reply_updates_battery_state()
 {
   ArduinoFakeReset();
@@ -7582,6 +7692,9 @@ RUN_TEST(
   RUN_TEST(test_model_sanitize_preserves_valid_antigravity_gain);
   RUN_TEST(test_controller_anti_gravity_shadow_tracks_manual_throttle_transient);
   RUN_TEST(test_controller_anti_gravity_shadow_can_be_enabled_by_mode);
+  RUN_TEST(test_msp_current_meter_reply_is_ignored_when_source_is_not_msp);
+  RUN_TEST(test_msp_current_meter_short_reply_is_ignored);
+  RUN_TEST(test_model_sanitize_preserves_msp_current_source);
   RUN_TEST(test_msp_current_meter_reply_updates_battery_state);
   RUN_TEST(test_voltage_sensor_reads_fresh_msp_current_and_rejects_stale_data);
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
