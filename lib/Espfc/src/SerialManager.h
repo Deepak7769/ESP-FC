@@ -42,6 +42,9 @@ private:
   TelemetryManager& _telemetry;
   Output::OutputIBUS _ibus;
   Sensor::GpsSensor _gps;
+
+  // Per-port schedule for Betaflight CURRENT_METER_MSP polling.
+  uint32_t _mspCurrentRequestAt[SERIAL_UART_COUNT] = {};
 #ifdef ESPFC_SERIAL_SOFT_0_WIFI
   Wireless _wireless;
 #endif
