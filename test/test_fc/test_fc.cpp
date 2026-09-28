@@ -1864,11 +1864,11 @@ void test_model_sanitize_migrates_legacy_antigravity_tail()
   model.sanitize();
 
   TEST_ASSERT_EQUAL_UINT8(
-      80,
+      ModelConfig::ANTI_GRAVITY_GAIN_DEFAULT,
       model.config.antiGravityGain);
 
   TEST_ASSERT_EQUAL_UINT16(
-      0xA647,
+      ModelConfig::ANTI_GRAVITY_CONFIG_TAG,
       model.config.antiGravityConfigTag);
 }
 
@@ -1881,7 +1881,7 @@ void test_model_sanitize_preserves_valid_antigravity_gain()
       173;
 
   model.config.antiGravityConfigTag =
-      0xA647;
+      ModelConfig::ANTI_GRAVITY_CONFIG_TAG;
 
   model.config.featureMask |=
       FEATURE_ANTI_GRAVITY;
