@@ -79,6 +79,60 @@ Assisted V2 motor-driving target by these changes. Physical-actuator activation
 is a separate hardware-validation milestone rather than an accidental side
 effect of compiling the default target.
 
+GitHub Actions also publishes the `esp32_assisted_v2_candidate` firmware as an
+`esp32_assisted_v2_validation_<commit>` artifact. It is intentionally
+non-actuating: the controller, estimator, mixer math, mode logic, and Blackbox
+paths execute, but `ESPFC_SAFE_BENCH_BUILD` prevents ESC/servo drivers from
+being attached.
+
+## Blackbox validation views
+
+Use the existing debug modes to identify which layer generated an unexpected
+command during non-actuating hardware validation.
+
+### `AUTOPILOT_ALTITUDE`
+
+| debug field | value |
+| --- | --- |
+| debug[0] | fused altitude, cm |
+| debug[1] | altitude target, cm |
+| debug[2] | fused vertical rate, cm/s |
+| debug[3] | vertical-rate target, cm/s |
+| debug[4] | pilot vertical-rate request, cm/s |
+| debug[5] | barometer innovation, cm |
+| debug[6] | altitude estimator healthy (0/1) |
+| debug[7] | barometer sample accepted (0/1) |
+
+### `AUTOPILOT_PID`
+
+| debug field | value |
+| --- | --- |
+| debug[0] | vertical-rate target, cm/s |
+| debug[1] | measured vertical rate, cm/s |
+| debug[2] | vertical-rate error, cm/s |
+| debug[3] | vertical PID P term x1000 |
+| debug[4] | vertical PID I term x1000 |
+| debug[5] | vertical PID D term x1000 |
+| debug[6] | requested normalized thrust x1000 |
+| debug[7] | packed Assisted V2 status bits |
+
+`debug[7]` status bits:
+
+| bit | meaning |
+| ---: | --- |
+| 0 | ALTHOLD mode active |
+| 1 | assisted altitude controller active |
+| 2 | altitude estimator healthy |
+| 3 | barometer sample accepted |
+| 4 | Assisted V2 currently owns vertical output |
+| 5 | LAND requested |
+| 6 | LAND supervisor active |
+| 7 | LAND output blocked |
+| 8 | receiver channels valid |
+
+These fields are intended to make the complete command chain observable before
+physical actuator authority is enabled.
+
 ## Configuration prerequisites
 
 Before Assisted V2 can be considered available at runtime, the FC still
