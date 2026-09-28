@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 
 using namespace fakeit;
@@ -1813,6 +1814,87 @@ void test_actuator_mode_link_rejects_linked_source_chain()
   TEST_ASSERT_FALSE(
       model.isModeActive(
           MODE_BLACKBOX_ERASE));
+}
+
+
+void test_model_config_antigravity_tail_layout_stays_packed()
+{
+  const size_t modelNameEnd =
+      offsetof(
+          ModelConfig,
+          modelName) +
+      sizeof(
+          ModelConfig::modelName);
+
+  TEST_ASSERT_EQUAL_UINT32(
+      modelNameEnd,
+      offsetof(
+          ModelConfig,
+          antiGravityGain));
+
+  TEST_ASSERT_EQUAL_UINT32(
+      offsetof(
+          ModelConfig,
+          antiGravityGain) +
+          sizeof(uint8_t),
+      offsetof(
+          ModelConfig,
+          antiGravityConfigTag));
+
+  TEST_ASSERT_EQUAL_UINT32(
+      offsetof(
+          ModelConfig,
+          antiGravityConfigTag) +
+          sizeof(uint16_t),
+      sizeof(
+          ModelConfig));
+}
+
+
+void test_model_sanitize_migrates_legacy_antigravity_tail()
+{
+  Model model;
+
+  model.config.antiGravityGain =
+      247;
+
+  model.config.antiGravityConfigTag =
+      0;
+
+  model.sanitize();
+
+  TEST_ASSERT_EQUAL_UINT8(
+      80,
+      model.config.antiGravityGain);
+
+  TEST_ASSERT_EQUAL_UINT16(
+      0xA647,
+      model.config.antiGravityConfigTag);
+}
+
+
+void test_model_sanitize_preserves_valid_antigravity_gain()
+{
+  Model model;
+
+  model.config.antiGravityGain =
+      173;
+
+  model.config.antiGravityConfigTag =
+      0xA647;
+
+  model.config.featureMask |=
+      FEATURE_ANTI_GRAVITY;
+
+  model.sanitize();
+
+  TEST_ASSERT_EQUAL_UINT8(
+      173,
+      model.config.antiGravityGain);
+
+  TEST_ASSERT_TRUE(
+      model.config.featureMask &
+      FEATURE_ANTI_GRAVITY);
 }
 
 
@@ -7495,6 +7577,9 @@ RUN_TEST(
   RUN_TEST(test_actuator_mode_link_cannot_target_arm);
   RUN_TEST(test_actuator_mode_link_rejects_linked_source_chain);
   RUN_TEST(test_actuator_mode_logic_and_requires_all_ranges);
+  RUN_TEST(test_model_config_antigravity_tail_layout_stays_packed);
+  RUN_TEST(test_model_sanitize_migrates_legacy_antigravity_tail);
+  RUN_TEST(test_model_sanitize_preserves_valid_antigravity_gain);
   RUN_TEST(test_controller_anti_gravity_shadow_tracks_manual_throttle_transient);
   RUN_TEST(test_controller_anti_gravity_shadow_can_be_enabled_by_mode);
   RUN_TEST(test_msp_current_meter_reply_updates_battery_state);
