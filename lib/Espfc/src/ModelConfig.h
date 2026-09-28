@@ -256,8 +256,10 @@ enum Feature {
   FEATURE_SOFTSERIAL = 1 << 6,
   FEATURE_GPS        = 1 << 7,
   FEATURE_TELEMETRY  = 1 << 10,
-  FEATURE_AIRMODE    = 1 << 22,
-  FEATURE_RX_SPI     = 1 << 25,
+  FEATURE_AIRMODE      = 1 << 22,
+  FEATURE_RX_SPI       = 1 << 25,
+  // FEATURE_ESC_SENSOR = 1 << 27, (not implemented here)
+  FEATURE_ANTI_GRAVITY = 1 << 28,
   // FEATURE_DYNAMIC_FILTER = 1 << 29, (removed)
 };
 
@@ -712,6 +714,14 @@ struct ControllerConfig
   int8_t tpaMode = 0;
   int8_t tpaScale = 10;
   int16_t tpaBreakpoint = 1650;
+
+  // Betaflight-compatible anti-gravity profile values.
+  // Runtime integration is kept non-actuating in this project: the controller
+  // computes and exposes the transient boost diagnostics without modifying
+  // flight PID authority.
+  uint8_t antiGravityGain = 80;
+  uint8_t antiGravityCutoffHz = 5;
+  uint8_t antiGravityPGain = 100;
 };
 
 struct VtxConfig
