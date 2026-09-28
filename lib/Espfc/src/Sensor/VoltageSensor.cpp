@@ -124,12 +124,17 @@ int VoltageSensor::readIbat()
     {
       // Never keep publishing an old companion current indefinitely. Current
       // telemetry is deliberately fail-silent and has no control authority.
+      battery.mspCurrentValid =
+          false;
+
       battery.currentUnfiltered =
           0.0f;
 
       battery.current =
-          _iFilter.update(
-              0.0f);
+          0.0f;
+
+      _iFilter.prime(
+          0.0f);
 
       return 0;
     }
