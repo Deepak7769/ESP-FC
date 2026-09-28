@@ -496,6 +496,86 @@ constexpr uint32_t CFG_MOT_GNSSSPEED_THRS = 0x20250038; // (0) GNSS speed thresh
 constexpr uint32_t CFG_MOT_GNSSDIST_THRS = 0x3025003b; //  (0) Distance above which GNSS-based stationary motion is exit (a.k.a. static hold distance threshold)
 
 /**
+ * u-blox 6 legacy navigation messages.
+ *
+ * NEO-6 generation receivers expose position/fix/velocity/satellite data
+ * through these messages on the GPS-only firmware used by NEO-6M modules.
+ */
+class UbxNavPosLlh28
+{
+public:
+  static constexpr MsgId ID = UBX_NAV_POSLLH;
+  uint32_t iTow;
+  int32_t lon;
+  int32_t lat;
+  int32_t height;
+  int32_t hMsl;
+  uint32_t hAcc;
+  uint32_t vAcc;
+} __attribute__((packed));
+
+class UbxNavSol52
+{
+public:
+  static constexpr MsgId ID = UBX_NAV_SOL;
+  uint32_t iTow;
+  int32_t fTow;
+  int16_t week;
+  uint8_t gpsFix;
+  uint8_t flags;
+  int32_t ecefX;
+  int32_t ecefY;
+  int32_t ecefZ;
+  uint32_t pAcc;
+  int32_t ecefVx;
+  int32_t ecefVy;
+  int32_t ecefVz;
+  uint32_t sAcc;
+  uint16_t pDop;
+  uint8_t reserved1;
+  uint8_t numSv;
+  uint32_t reserved2;
+} __attribute__((packed));
+
+class UbxNavVelNed36
+{
+public:
+  static constexpr MsgId ID = UBX_NAV_VELNED;
+  uint32_t iTow;
+  int32_t velN;      // cm/s
+  int32_t velE;      // cm/s
+  int32_t velD;      // cm/s
+  uint32_t speed;    // cm/s, 3D
+  uint32_t gSpeed;   // cm/s, 2D
+  int32_t heading;   // deg * 1e-5
+  uint32_t sAcc;     // cm/s
+  uint32_t cAcc;     // deg * 1e-5
+} __attribute__((packed));
+
+class UbxNavSvInfoHeader8
+{
+public:
+  static constexpr MsgId ID = UBX_NAV_SVINFO;
+  uint32_t iTow;
+  uint8_t numCh;
+  uint8_t globalFlags;
+  uint16_t reserved2;
+} __attribute__((packed));
+
+class UbxNavSvInfoBlock12
+{
+public:
+  uint8_t chn;
+  uint8_t svid;
+  uint8_t flags;
+  uint8_t quality;
+  uint8_t cno;
+  int8_t elev;
+  int16_t azim;
+  int32_t prRes;
+} __attribute__((packed));
+
+/**
  * Used to receive high rate PVT solution
  */
 class UbxNavPvt92

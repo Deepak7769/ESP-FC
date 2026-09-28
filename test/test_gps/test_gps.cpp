@@ -107,6 +107,16 @@ void test_date_line_crossing_bearing()
   TEST_ASSERT_FLOAT_WITHIN(0.01f, toRad(270.0f), bearing);
 }
 
+// Protocol layout regressions for u-blox 6 legacy UBX navigation messages.
+void test_ublox6_legacy_struct_sizes()
+{
+  TEST_ASSERT_EQUAL_UINT32(28u, sizeof(Gps::UbxNavPosLlh28));
+  TEST_ASSERT_EQUAL_UINT32(52u, sizeof(Gps::UbxNavSol52));
+  TEST_ASSERT_EQUAL_UINT32(36u, sizeof(Gps::UbxNavVelNed36));
+  TEST_ASSERT_EQUAL_UINT32(8u, sizeof(Gps::UbxNavSvInfoHeader8));
+  TEST_ASSERT_EQUAL_UINT32(12u, sizeof(Gps::UbxNavSvInfoBlock12));
+}
+
 // ---------------------------------------------------------------------------
 
 int main()
@@ -124,6 +134,7 @@ int main()
   RUN_TEST(test_date_line_crossing_east_to_west);
   RUN_TEST(test_date_line_crossing_west_to_east);
   RUN_TEST(test_date_line_crossing_bearing);
+  RUN_TEST(test_ublox6_legacy_struct_sizes);
 
   return UNITY_END();
 }
