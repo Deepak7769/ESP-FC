@@ -21,6 +21,7 @@ public:
                           bool allowCompression);
 
   void sendResponse(MspResponse& r, Stream::ReadWritable& s);
+  void requestCurrentMeter(Stream::ReadWritable& s);
   void postCommand();
   bool debugSkip(uint8_t cmd);
   void debugMessage(const MspMessage& m);
