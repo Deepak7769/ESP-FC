@@ -1848,6 +1848,21 @@ void test_model_config_antigravity_tail_layout_stays_packed()
           sizeof(uint16_t),
       sizeof(
           ModelConfig));
+
+  // Reconstruct the size the legacy class had when modelName was its final
+  // member. If this rounded legacy end equals the current size, the new bytes
+  // are consuming tail padding rather than growing the EEPROM image.
+  const size_t legacyRoundedSize =
+      ((modelNameEnd +
+        alignof(ModelConfig) -
+        1u) /
+       alignof(ModelConfig)) *
+      alignof(ModelConfig);
+
+  TEST_ASSERT_EQUAL_UINT32(
+      legacyRoundedSize,
+      sizeof(
+          ModelConfig));
 }
 
 
