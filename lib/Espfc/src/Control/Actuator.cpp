@@ -36,6 +36,71 @@ bool inputChannelAvailable(
   return !input.rxLoss;
 }
 
+constexpr uint8_t MODE_LOGIC_OR =
+    0;
+
+constexpr uint8_t MODE_LOGIC_AND =
+    1;
+
+bool modeConditionLinked(
+    const ActuatorCondition& condition)
+{
+  return
+      condition.linkId != 0 &&
+      condition.linkId < MODE_COUNT &&
+      condition.linkId != condition.id;
+}
+
+void updateMasksForCondition(
+    const ActuatorCondition& condition,
+    bool active,
+    uint32_t& andMask,
+    uint32_t& newMask)
+{
+  if (condition.id >= MODE_COUNT)
+  {
+    return;
+  }
+
+  const uint32_t bit =
+      uint32_t{1} <<
+      condition.id;
+
+  // Match Betaflight's mode-range semantics:
+  // OR rows latch a mode active when any OR row is active.
+  // AND rows keep the mode active only when every AND row is active.
+  if ((andMask & bit) ||
+      !(newMask & bit))
+  {
+    const bool useAnd =
+        condition.logicMode ==
+        MODE_LOGIC_AND;
+
+    if (!useAnd)
+    {
+      if (active)
+      {
+        andMask &=
+            ~bit;
+
+        newMask |=
+            bit;
+      }
+    }
+    else
+    {
+      andMask |=
+          bit;
+
+      if (!active)
+      {
+        newMask |=
+            bit;
+      }
+    }
+  }
+}
+
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
 bool altHoldPilotStickValid(
     const Model& model)
@@ -156,35 +221,45 @@ int Actuator::begin()
   _model.state.mode.maskPrev = 0;
   _model.state.mode.maskPresent = 0;
   _model.state.mode.maskSwitch = 0;
-  for (size_t i = 0; i < ACTUATOR_CONDITIONS; i++)
+  for (size_t i = 0;
+       i < ACTUATOR_CONDITIONS;
+       ++i)
   {
-const auto& c = _model.config.conditions[i];
+    const auto& c =
+        _model.config.conditions[i];
 
-if (c.min >= c.max)
-{
-  continue;
-}
+    if (c.id >= MODE_COUNT)
+    {
+      continue;
+    }
 
-if (c.ch < AXIS_AUX_1 ||
-    c.ch >= AXIS_COUNT)
-{
-  continue;
-}
+    const bool linked =
+        modeConditionLinked(c);
 
-if (_model.state.input.channelCount > 0 &&
-    static_cast<size_t>(c.ch) >=
-        _model.state.input.channelCount)
-{
-  continue;
-}
+    bool rangeConfigured =
+        c.min < c.max &&
+        c.ch >= AXIS_AUX_1 &&
+        c.ch < AXIS_COUNT;
 
-if (c.id >= MODE_COUNT)
-{
-  continue;
-}
+    if (rangeConfigured &&
+        _model.state.input.channelCount > 0 &&
+        static_cast<size_t>(c.ch) >=
+            _model.state.input.channelCount)
+    {
+      rangeConfigured =
+          false;
+    }
 
-_model.state.mode.maskPresent |=
-    (uint32_t{1} << c.id);
+    // Linked-only conditions have no AUX range, but still make the target
+    // mode present to the runtime/configurator.
+    if (!rangeConfigured &&
+        !linked)
+    {
+      continue;
+    }
+
+    _model.state.mode.maskPresent |=
+        (uint32_t{1} << c.id);
   }
   _model.state.mode.airmodeAllowed = false;
   _model.state.mode.rescueConfigMode = RESCUE_CONFIG_PENDING;
@@ -483,58 +558,119 @@ else
 
 void Actuator::updateModeMask()
 {
-  uint32_t newMask = 0;
-  for (size_t i = 0; i < ACTUATOR_CONDITIONS; i++)
+  uint32_t newMask =
+      0;
+
+  uint32_t andMask =
+      0;
+
+  // -----------------------------------------------------
+  // PASS 1: PHYSICAL AUX-RANGE CONDITIONS
+  // -----------------------------------------------------
+  //
+  // Linked rows are intentionally deferred to pass 2, exactly like
+  // Betaflight. This makes a linked row depend on another mode's resolved
+  // request rather than on an unrelated/stale AUX sample.
+  // -----------------------------------------------------
+
+  for (size_t i = 0;
+       i < ACTUATOR_CONDITIONS;
+       ++i)
   {
- ActuatorCondition* c =
-    &_model.config.conditions[i];
+    const ActuatorCondition& condition =
+        _model.config.conditions[i];
 
-if (c->min >= c->max)
-{
-  continue;
-}
+    if (condition.id >= MODE_COUNT ||
+        modeConditionLinked(condition))
+    {
+      continue;
+    }
 
-if (c->id >= MODE_COUNT)
-{
-  continue;
-}
+    if (condition.min >=
+        condition.max)
+    {
+      continue;
+    }
 
-int16_t min =
-    c->min;
+    const size_t channel =
+        condition.ch;
 
-int16_t max =
-    c->max;
+    if (channel < AXIS_AUX_1 ||
+        channel >= AXIS_COUNT)
+    {
+      continue;
+    }
 
-size_t ch =
-    c->ch;
+    if (!inputChannelAvailable(
+            _model,
+            channel))
+    {
+      // A configured AUX condition must never become active from the default
+      // 1500-us contents of a channel the receiver does not actually provide.
+      continue;
+    }
 
-if (ch < AXIS_AUX_1 ||
-    ch >= AXIS_COUNT)
-{
-  continue;
-}
+    const int16_t value =
+        _model.state.input.us[
+            channel];
 
-if (!inputChannelAvailable(
-        _model,
-        ch))
-{
-  // A configured AUX condition must never become active from the default
-  // 1500-us contents of a channel the receiver does not actually provide.
-  continue;
-}
+    const bool active =
+        value > condition.min &&
+        value < condition.max;
 
-int16_t val =
-    _model.state.input.us[ch];
-
-if (val > min &&
-    val < max)
-{
-  newMask |=
-      (uint32_t{1} << c->id);
-}
+    updateMasksForCondition(
+        condition,
+        active,
+        andMask,
+        newMask);
   }
 
-  _model.updateSwitchActive(newMask);
+  // -----------------------------------------------------
+  // PASS 2: MODE-LINK CONDITIONS
+  // -----------------------------------------------------
+  //
+  // Example:
+  //   target id = MODE_ANGLE
+  //   linkId    = MODE_ALTHOLD
+  //
+  // means "this ANGLE condition is active whenever ALTHOLD is requested".
+  // -----------------------------------------------------
+
+  for (size_t i = 0;
+       i < ACTUATOR_CONDITIONS;
+       ++i)
+  {
+    const ActuatorCondition& condition =
+        _model.config.conditions[i];
+
+    if (!modeConditionLinked(
+            condition))
+    {
+      continue;
+    }
+
+    const uint32_t sourceBit =
+        uint32_t{1} <<
+        condition.linkId;
+
+    const bool linkedModeActive =
+        (andMask & sourceBit) !=
+        (newMask & sourceBit);
+
+    updateMasksForCondition(
+        condition,
+        linkedModeActive,
+        andMask,
+        newMask);
+  }
+
+  // Betaflight keeps AND bookkeeping in a separate mask while all rows are
+  // evaluated. XOR resolves the requested mode state after both passes.
+  newMask ^=
+      andMask;
+
+  _model.updateSwitchActive(
+      newMask);
   // -----------------------------------------------------
   // ASSISTED-MODE SUPERVISOR
   // -----------------------------------------------------
