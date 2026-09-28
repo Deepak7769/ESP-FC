@@ -1,56 +1,67 @@
-# Anti-Gravity non-actuating bench validation
+# Anti-Gravity active controller and bench validation
 
-This is the authoritative Anti-Gravity controller implementation validation stage.
+Anti-Gravity now uses one controller implementation for both production and
+validation. The standard `esp32` production environment defines
+`ESPFC_ANTI_GRAVITY_ACTIVE`, so the calculated Anti-Gravity demand can modify
+the motor-driving roll/pitch rate PID when the runtime Anti-Gravity feature or
+mode is enabled.
 
-## Safety boundary
+## Runtime ownership
 
-The active validation path is compiled only when both:
+Anti-Gravity is active only when all of the following are true:
 
-- `ESPFC_ANTI_GRAVITY_ACTIVE`
-- `ESPFC_SAFE_BENCH_BUILD`
+- the firmware was compiled with `ESPFC_ANTI_GRAVITY_ACTIVE`;
+- the Anti-Gravity feature or mode is enabled;
+- receiver input is healthy;
+- manual thrust owns the vertical output.
 
-are defined. Compilation fails if `ESPFC_ANTI_GRAVITY_ACTIVE` is used without the
-safe-bench macro.
+When AltHold V2 or LAND V2 owns vertical thrust, Anti-Gravity yields and its
+gain demand returns to neutral. Yaw receives neither Anti-Gravity P boost nor
+I acceleration.
 
-`ESPFC_SAFE_BENCH_BUILD` keeps the mixer math running but prevents the motor
-and servo drivers from being initialized or attached. This validation firmware
-is therefore intended only for non-actuating bench observation, not flight.
+The controller uses the existing PT2-filtered throttle-transient detector.
+Roll and pitch receive the calculated P multiplier and additive I-term
+accelerator. The configured `antiGravityGain` remains the runtime gain input.
 
-The ordinary ESP32 firmware remains non-authoritative for Anti-Gravity at this milestone. There is now one Anti-Gravity controller algorithm; the compile-time authority gate decides whether its P/I demand reaches the rate PID.
+## Production build
 
-## Validation build
+The standard project target:
 
-PlatformIO environment:
+```
+esp32
+```
+
+defines `ESPFC_ANTI_GRAVITY_ACTIVE` together with the active Assisted V2
+controller flags. This is the motor-driving production path; there is no
+SAFE_BENCH requirement around Anti-Gravity authority.
+
+Turning the feature/mode off still leaves the controller compiled but inactive,
+so `ratePidApplied` remains false and the normal rate PID is used unchanged.
+
+## Non-actuating bench build
+
+The validation target remains:
 
 ```
 esp32_antigravity_bench
 ```
 
-GitHub Actions publishes the matching firmware as:
+It defines both `ESPFC_ANTI_GRAVITY_ACTIVE` and
+`ESPFC_SAFE_BENCH_BUILD`. The same Anti-Gravity math runs, but
+`ESPFC_SAFE_BENCH_BUILD` prevents the motor and servo drivers from being
+initialized or attached.
+
+GitHub Actions publishes the matching validation firmware as:
 
 ```
 esp32_antigravity_validation_<commit>
 ```
 
-## Controller behavior under the bench gate
-
-When Anti-Gravity is enabled by either the Anti-Gravity feature or mode and
-manual throttle owns the vertical output:
-
-- throttle-transient demand is calculated with the existing PT2-filtered
-  Betaflight-style detector;
-- roll and pitch receive the calculated P boost;
-- roll and pitch receive the additive I-term accelerator;
-- yaw receives neither Anti-Gravity P boost nor I acceleration;
-- Anti-Gravity yields when Assisted V2 owns vertical thrust or receiver input
-  is unhealthy.
-
-The active bench path uses the same configured `antiGravityGain` and the
-existing fixed cutoff/P-gain constants already used by the controller diagnostics.
+The `native_assisted_v2_active` unit-test environment also compiles the
+production Anti-Gravity authority path without SAFE_BENCH, alongside the active
+Angle/AltHold/LAND controller policy.
 
 ## DEBUG_ANTI_GRAVITY
-
-The existing fields remain:
 
 | field | meaning |
 | ---: | --- |
@@ -58,15 +69,10 @@ The existing fields remain:
 | debug[1] | filtered throttle derivative x100 |
 | debug[2] | pitch-equivalent I gain multiplier x1000 |
 | debug[3] | pitch P gain multiplier x1000 |
-
-The active bench build adds:
-
-| field | meaning |
-| ---: | --- |
 | debug[4] | Anti-Gravity rate-PID application active (0/1) |
 | debug[5] | gain-scaled filtered derivative x100 |
 | debug[6] | additive I accelerator x1000 |
 
-A useful first validation is to confirm that `debug[4]` changes only during
-an Anti-Gravity transient, that debug gain values return toward their neutral
-state after the transient, and that the ESC/servo drivers remain unattached.
+For validation, `debug[4]` should become 1 only during an accepted
+Anti-Gravity transient and should remain 0 whenever Anti-Gravity is disabled,
+receiver input is unhealthy, or Assisted V2 owns vertical thrust.

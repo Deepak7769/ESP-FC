@@ -1,13 +1,13 @@
 #pragma once
 
 // -----------------------------------------------------------------------------
-// Assisted-mode V2 feature selection.
+// Assisted-mode V2 production feature selection.
 //
-// ANGLE V2 is now the only Angle controller and is always compiled.
-// AltHold V2 and LAND V2 remain feature-gated until their production
-// activation is completed.
+// ANGLE V2 is the only Angle controller and is always compiled.
+// ESPFC_ASSISTED_V2_ACTIVE promotes AltHold V2 and LAND V2 to the
+// authoritative vertical/failsafe controllers. The standard ESP32 production
+// environment defines this macro.
 //
-// ESPFC_ASSISTED_V2_ACTIVE enables the production AltHold/LAND path.
 // A motor-driving AltHold/LAND build must explicitly acknowledge actuator
 // authority through ESPFC_ASSISTED_V2_OUTPUT_ACK.
 // -----------------------------------------------------------------------------
@@ -70,8 +70,8 @@
 #endif
 
 // Positive LAND V2 descent speed in m/s. The controller applies the negative
-// sign for downward motion. Production keeps the historical default unless a
-// validation/build policy explicitly selects another value.
+// sign for downward motion. The project production default is deliberately
+// conservative at 0.10 m/s unless a build policy overrides it.
 #ifndef ESPFC_LAND_V2_DESCENT_RATE_MS
 #define ESPFC_LAND_V2_DESCENT_RATE_MS 0.10f
 #endif

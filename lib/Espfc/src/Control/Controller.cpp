@@ -4,11 +4,6 @@
 #include "Utils/Math.hpp"
 #include <algorithm>
 #include <cmath>
-#if defined(ESPFC_ANTI_GRAVITY_ACTIVE) && \
-    !defined(ESPFC_SAFE_BENCH_BUILD)
-#error "ESPFC_ANTI_GRAVITY_ACTIVE requires ESPFC_SAFE_BENCH_BUILD"
-#endif
-
 namespace Espfc::Control {
 namespace {
 
@@ -160,10 +155,11 @@ updateAssistedModes();
     }
   }
 
-  // Betaflight-style Anti-Gravity demand is computed every cycle. Ordinary
-  // builds keep it diagnostic-only. ESPFC_ANTI_GRAVITY_ACTIVE may feed
-  // that demand into rate-PID math, but only in a SAFE_BENCH build where
-  // Mixer.cpp cannot attach ESC/servo outputs.
+  // Betaflight-style Anti-Gravity demand is computed every cycle. Builds with
+  // ESPFC_ANTI_GRAVITY_ACTIVE feed that demand into the roll/pitch rate PID
+  // when the runtime feature/mode is enabled and manual thrust owns the output.
+  // SAFE_BENCH builds use the same controller math while Mixer.cpp blocks
+  // physical ESC/servo attachment.
   updateAntiGravity();
 
   {
@@ -420,8 +416,8 @@ void FAST_CODE_ATTR Controller::innerLoop()
   auto& antiGravity = _model.state.antiGravity;
 
 #if defined(ESPFC_ANTI_GRAVITY_ACTIVE)
-  // The compile-time guard above requires SAFE_BENCH, so this can change only
-  // internal PID math while Mixer.cpp keeps physical outputs unattached.
+  // Active-authority builds report whether Anti-Gravity is actually modifying
+  // the roll/pitch rate PID on this controller cycle.
   antiGravity.ratePidApplied =
       antiGravity.active;
 #else
@@ -693,7 +689,7 @@ else
   {
     // Assisted vertical-controller trace. Units are chosen so Blackbox can
     // display the entire AltHold/LAND cause-and-effect chain using int16 debug
-    // channels while the SAFE_BENCH build keeps physical outputs disconnected.
+    // channels in both the active production build and SAFE_BENCH validation.
     const float verticalError =
         setpoint.rate[AXIS_THRUST] -
         altitude.vario;
@@ -999,9 +995,9 @@ void Controller::updateAntiGravity()
           _model.config
               .antiGravityGain);
 
-  // Betaflight constants define the Anti-Gravity gain demand. The demand is
-  // diagnostic in ordinary builds and is applied only when the authoritative
-  // ESPFC_ANTI_GRAVITY_ACTIVE path is compiled.
+  // Betaflight constants define the Anti-Gravity gain demand. When
+  // ESPFC_ANTI_GRAVITY_ACTIVE is compiled, innerLoop() applies the demand to
+  // roll/pitch while this remains the single detector/calculation path.
   constexpr float ANTIGRAVITY_KI =
       0.34f;
 

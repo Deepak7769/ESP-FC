@@ -3737,7 +3737,8 @@ void test_controller_land_v2_levels_and_requests_descent()
 
   TEST_ASSERT_FLOAT_WITHIN(
       0.0001f,
-      -0.50f,
+      -static_cast<float>(
+          ESPFC_LAND_V2_DESCENT_RATE_MS),
       model.state.assistedMode
           .verticalRatePilot);
 
@@ -4239,8 +4240,29 @@ void test_failsafe_land_v2_timeout_disarms()
 {
   ArduinoFakeReset();
 
+  constexpr float ENTRY_HEIGHT_M =
+      1.0f;
+
+  constexpr float RAW_TIMEOUT_S =
+      ENTRY_HEIGHT_M /
+          static_cast<float>(
+              ESPFC_LAND_V2_DESCENT_RATE_MS) +
+      10.0f;
+
+  constexpr float TIMEOUT_S =
+      RAW_TIMEOUT_S < 15.0f
+          ? 15.0f
+          : (RAW_TIMEOUT_S > 60.0f
+                 ? 60.0f
+                 : RAW_TIMEOUT_S);
+
+  constexpr uint32_t TIMEOUT_US =
+      static_cast<uint32_t>(
+          TIMEOUT_S *
+          1000000.0f);
+
   constexpr uint32_t NOW_US =
-      20000000;
+      70000000;
 
   When(
       Method(
@@ -4273,13 +4295,14 @@ void test_failsafe_land_v2_timeout_disarms()
   model.state.failsafe.landingRequested =
       true;
 
-  // Entry height 1 m produces the minimum 15 s bounded timeout.
+  // Cross the same bounded timeout that the LAND supervisor derives from
+  // the selected production descent rate.
   model.state.failsafe.landingRequestedUs =
       NOW_US -
-      16000000u;
+      TIMEOUT_US;
 
   model.state.failsafe.landingEntryHeight =
-      1.0f;
+      ENTRY_HEIGHT_M;
 
   model.state.failsafe.phase =
       FC_FAILSAFE_LANDING;

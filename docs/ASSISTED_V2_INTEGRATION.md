@@ -1,6 +1,6 @@
 # Assisted V2 integration contract
 
-This document defines the radio/channel contract and staged activation policy for
+This document defines the radio/channel contract and active-controller policy for
 Angle V2, AltHold V2, and failsafe LAND V2.
 
 ## Channel contract
@@ -17,7 +17,8 @@ ESP-FC uses logical AETR input indices after receiver mapping:
 | 5 | AUX2 | available/legacy project switch |
 | 6 | AUX3 | **raw spring-centered vertical stick for AltHold** |
 
-The production-policy validation environments compile with:
+The standard `esp32` production build and the production-policy native
+validation environment compile with:
 
 ```
 -DESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL=6
@@ -63,27 +64,39 @@ spring-stick position.
 
 ## Build policy
 
-`ESPFC_ASSISTED_V2_ACTIVE` is the common Angle + AltHold + LAND activation
-switch. A motor-driving build is rejected at compile time unless
-`ESPFC_ASSISTED_V2_OUTPUT_ACK` is also explicitly defined.
+The standard `esp32` environment is the active motor-driving target for this
+project. It defines:
 
-The repository keeps two non-hardware validation paths:
+```
+-DESPFC_ASSISTED_V2_ACTIVE
+-DESPFC_ASSISTED_V2_OUTPUT_ACK
+-DESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL=6
+-DESPFC_ANTI_GRAVITY_ACTIVE
+```
 
-- `esp32_assisted_v2_candidate`: real ESP32 compilation with
-  `ESPFC_SAFE_BENCH_BUILD`, so the ESC driver is never attached.
-- `native_assisted_v2_active`: exercises the production activation policy in
-  native unit tests, with AUX3 selected as the centered vertical-stick input.
+ANGLE V2 is always compiled and remains the authoritative Angle controller.
+`ESPFC_ASSISTED_V2_ACTIVE` promotes AltHold V2 and LAND V2 to their
+authoritative controller paths. A motor-driving Assisted V2 build still requires
+`ESPFC_ASSISTED_V2_OUTPUT_ACK`, which prevents accidental actuator authority
+in an unacknowledged build.
 
-The ordinary `esp32` environment is intentionally not converted into an
-Assisted V2 motor-driving target by these changes. Physical-actuator activation
-is a separate hardware-validation milestone rather than an accidental side
-effect of compiling the default target.
+Anti-Gravity is compiled through its active rate-PID path in the same production
+target. Runtime feature/mode state still decides whether Anti-Gravity actually
+modifies roll/pitch P/I terms, and Anti-Gravity yields whenever Assisted V2 owns
+vertical thrust.
 
-GitHub Actions also publishes the `esp32_assisted_v2_candidate` firmware as an
-`esp32_assisted_v2_validation_<commit>` artifact. It is intentionally
-non-actuating: the controller, estimator, mixer math, mode logic, and Blackbox
-paths execute, but `ESPFC_SAFE_BENCH_BUILD` prevents ESC/servo drivers from
-being attached.
+The repository keeps non-actuating validation targets:
+
+- `esp32_antigravity_bench`: active Anti-Gravity controller math with
+  `ESPFC_SAFE_BENCH_BUILD`, so ESC/servo drivers are not attached.
+- `esp32_assisted_v2_candidate`: active AltHold/LAND production-policy math
+  with `ESPFC_SAFE_BENCH_BUILD`.
+- `native_assisted_v2_active`: unit-test mirror of the standard ESP32
+  authority policy, including active Anti-Gravity, with no physical hardware.
+
+GitHub Actions publishes the two ESP32 SAFE_BENCH validation firmware artifacts
+and separately builds the standard `esp32` target, so CI checks both the
+non-actuating validation paths and the actual production compile policy.
 
 ## Blackbox validation views
 
@@ -130,8 +143,8 @@ command during non-actuating hardware validation.
 | 7 | LAND output blocked |
 | 8 | receiver channels valid |
 
-These fields are intended to make the complete command chain observable before
-physical actuator authority is enabled.
+These fields make the complete command chain observable in both the active
+production controller and the non-actuating SAFE_BENCH validation builds.
 
 ## Configuration prerequisites
 
@@ -141,19 +154,23 @@ a detected gyro/accelerometer, a detected and calibrated barometer, a valid
 motor protocol, correct receiver channel mapping, and mode conditions for
 ARM/ANGLE/ALTHOLD as desired.
 
-AUTO_LAND is not the source-code default. The default remains DROP so a saved
-configuration must explicitly select AUTO_LAND after the non-actuating
-validation path has been checked on the actual hardware.
+AUTO_LAND is not the source-code default. The default remains DROP, so a saved
+configuration must explicitly select AUTO_LAND before LAND V2 can become the
+Stage-2 failsafe procedure.
 
 ## LAND termination
 
-LAND V2 uses a build-selectable descent rate. The non-actuating ESP32
-validation environments currently select **0.10 m/s downward**. The ordinary
-production-policy default remains 0.50 m/s until the slower behavior has been
-validated. Touchdown confirmation uses near-ground altitude, low vertical
-speed, descent evidence, and a dwell period.
+LAND V2 uses a build-selectable positive descent-rate constant whose sign is
+applied downward by the controller. The project production default is currently
+**0.10 m/s downward**:
 
-The timeout uses the same selected descent-rate constant:
+```
+ESPFC_LAND_V2_DESCENT_RATE_MS = 0.10f
+```
+
+Touchdown confirmation uses near-ground altitude, low vertical speed, descent
+evidence, reduced commanded thrust, and a dwell period. The independent timeout
+uses the same selected descent-rate constant:
 
 ```
 timeout = clamp(entry_height / selected_descent_rate + 10 s, 15 s, 60 s)

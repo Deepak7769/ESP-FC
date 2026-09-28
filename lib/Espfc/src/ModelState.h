@@ -110,15 +110,15 @@ struct AntiGravityState
   float filteredDerivative = 0.0f;
 
   // Betaflight-style gain demand derived from the filtered throttle
-  // derivative. Ordinary builds keep this as diagnostics only; the explicit
-  // SAFE_BENCH validation build may apply it to internal rate-PID math.
+  // derivative. Active-authority builds apply this demand to roll/pitch rate
+  // PID math; SAFE_BENCH builds exercise the same path without ESC attachment.
   float scaledDerivative = 0.0f;
   float iAccelerator = 0.0f;
   float iMultiplier = 1.0f;
   float pMultiplier = 1.0f;
 
-  // True only when the guarded non-actuating validation build actually feeds
-  // Anti-Gravity gain into the rate PID calculation for this cycle.
+  // True when the active Anti-Gravity controller feeds gain into the
+  // roll/pitch rate PID calculation for this cycle.
   bool ratePidApplied = false;
 };
 
