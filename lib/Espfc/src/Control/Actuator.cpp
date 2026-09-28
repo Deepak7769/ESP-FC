@@ -42,13 +42,60 @@ constexpr uint8_t MODE_LOGIC_OR =
 constexpr uint8_t MODE_LOGIC_AND =
     1;
 
-bool modeConditionLinked(
+bool modeConditionHasLink(
     const ActuatorCondition& condition)
 {
   return
-      condition.linkId != 0 &&
-      condition.linkId < MODE_COUNT &&
-      condition.linkId != condition.id;
+      condition.linkId != 0;
+}
+
+bool modeHasLinkedCondition(
+    const Model& model,
+    uint8_t modeId)
+{
+  if (modeId >= MODE_COUNT)
+  {
+    return false;
+  }
+
+  for (size_t i = 0;
+       i < ACTUATOR_CONDITIONS;
+       ++i)
+  {
+    const auto& candidate =
+        model.config.conditions[i];
+
+    if (candidate.id == modeId &&
+        candidate.linkId != 0)
+    {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool modeConditionLinkValid(
+    const Model& model,
+    const ActuatorCondition& condition)
+{
+  // Betaflight rejects linked ARM rows and linked-to-linked chains. Keep the
+  // same safety invariant here at runtime so malformed/stale configuration
+  // cannot turn a linked row into an unexpected mode request.
+  if (!modeConditionHasLink(
+          condition) ||
+      condition.id >= MODE_COUNT ||
+      condition.id == MODE_ARMED ||
+      condition.linkId >= MODE_COUNT ||
+      condition.linkId == condition.id)
+  {
+    return false;
+  }
+
+  return
+      !modeHasLinkedCondition(
+          model,
+          condition.linkId);
 }
 
 void updateMasksForCondition(
@@ -233,8 +280,23 @@ int Actuator::begin()
       continue;
     }
 
+    const bool hasLink =
+        modeConditionHasLink(c);
+
     const bool linked =
-        modeConditionLinked(c);
+        hasLink &&
+        modeConditionLinkValid(
+            _model,
+            c);
+
+    // Invalid link rows are ignored as rows, rather than falling back to
+    // their AUX range. This mirrors Betaflight's configuration sanitization
+    // for linked ARM targets and linked-to-linked chains.
+    if (hasLink &&
+        !linked)
+    {
+      continue;
+    }
 
     bool rangeConfigured =
         c.min < c.max &&
@@ -581,8 +643,11 @@ void Actuator::updateModeMask()
         _model.config.conditions[i];
 
     if (condition.id >= MODE_COUNT ||
-        modeConditionLinked(condition))
+        modeConditionHasLink(
+            condition))
     {
+      // Linked rows are handled only by pass 2. Invalid links are also
+      // ignored here instead of being reinterpreted as physical AUX rows.
       continue;
     }
 
@@ -643,7 +708,8 @@ void Actuator::updateModeMask()
     const ActuatorCondition& condition =
         _model.config.conditions[i];
 
-    if (!modeConditionLinked(
+    if (!modeConditionLinkValid(
+            _model,
             condition))
     {
       continue;
