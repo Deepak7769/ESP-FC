@@ -401,7 +401,7 @@ void test_controller_angle_mode_does_not_latch_fterm_scale()
   TEST_ASSERT_TRUE(model.state.innerPid[AXIS_ROLL].fTerm < -0.001f || model.state.innerPid[AXIS_ROLL].fTerm > 0.001f);
 }
 // =========================================================
-// V2 ASSISTED MODE SHADOW TESTS
+// V2 ASSISTED MODE CONTROLLER TESTS
 // =========================================================
 
 void test_controller_angle_v2_activates_and_slews()
@@ -704,7 +704,7 @@ const auto& v2 = model.state.angleV2;
 }
 
 
-void test_controller_shadow_althold_captures_current_altitude()
+void test_controller_althold_v2_captures_current_altitude()
 {
   When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
 
@@ -743,30 +743,30 @@ void test_controller_shadow_althold_captures_current_altitude()
 
   controller.update();
 
-  const auto& shadow =
-      model.state.assistedShadow;
+  const auto& assisted =
+      model.state.assistedMode;
 
   TEST_ASSERT_TRUE(
-      shadow.altitudeActive);
+      assisted.altitudeActive);
 
   TEST_ASSERT_TRUE(
-      shadow.altitudeTargetValid);
+      assisted.altitudeTargetValid);
 
   // AltHold should capture current altitude on entry.
   TEST_ASSERT_FLOAT_WITHIN(
       0.001f,
       2.50f,
-      shadow.altitudeTarget);
+      assisted.altitudeTarget);
 
   // Centered stick means no pilot climb/descent request.
   TEST_ASSERT_FLOAT_WITHIN(
       0.001f,
       0.0f,
-      shadow.verticalRatePilot);
+      assisted.verticalRatePilot);
 }
 
 
-void test_controller_shadow_althold_center_stick_holds_target()
+void test_controller_althold_v2_center_stick_holds_target()
 {
   When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
 
@@ -804,7 +804,7 @@ void test_controller_shadow_althold_center_stick_holds_target()
   controller.update();
 
   const float initialTarget =
-      model.state.assistedShadow.altitudeTarget;
+      model.state.assistedMode.altitudeTarget;
 
   // Simulate many controller iterations with
   // centered throttle.
@@ -816,11 +816,11 @@ void test_controller_shadow_althold_center_stick_holds_target()
   TEST_ASSERT_FLOAT_WITHIN(
       0.001f,
       initialTarget,
-      model.state.assistedShadow.altitudeTarget);
+      model.state.assistedMode.altitudeTarget);
 }
 
 
-void test_controller_shadow_althold_climb_command_moves_target_up()
+void test_controller_althold_v2_climb_command_moves_target_up()
 {
   When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
 
@@ -858,26 +858,26 @@ void test_controller_shadow_althold_climb_command_moves_target_up()
 
   controller.update();
 
-  const auto& shadow =
-      model.state.assistedShadow;
+  const auto& assisted =
+      model.state.assistedMode;
 
   TEST_ASSERT_TRUE(
-      shadow.altitudeActive);
+      assisted.altitudeActive);
 
   TEST_ASSERT_TRUE(
-      shadow.verticalRatePilot > 0.0f);
+      assisted.verticalRatePilot > 0.0f);
 
   // Positive climb command must move the altitude
   // target upward.
   TEST_ASSERT_TRUE(
-      shadow.altitudeTarget > 2.0f);
+      assisted.altitudeTarget > 2.0f);
 
   TEST_ASSERT_TRUE(
-      shadow.verticalRateTarget > 0.0f);
+      assisted.verticalRateTarget > 0.0f);
 }
 
 
-void test_controller_shadow_althold_descent_command_moves_target_down()
+void test_controller_althold_v2_descent_command_moves_target_down()
 {
   When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
 
@@ -914,24 +914,24 @@ void test_controller_shadow_althold_descent_command_moves_target_down()
 
   controller.update();
 
-  const auto& shadow =
-      model.state.assistedShadow;
+  const auto& assisted =
+      model.state.assistedMode;
 
   TEST_ASSERT_TRUE(
-      shadow.altitudeActive);
+      assisted.altitudeActive);
 
   TEST_ASSERT_TRUE(
-      shadow.verticalRatePilot < 0.0f);
+      assisted.verticalRatePilot < 0.0f);
 
   TEST_ASSERT_TRUE(
-      shadow.altitudeTarget < 2.0f);
+      assisted.altitudeTarget < 2.0f);
 
   TEST_ASSERT_TRUE(
-      shadow.verticalRateTarget < 0.0f);
+      assisted.verticalRateTarget < 0.0f);
 }
 
 
-void test_controller_shadow_althold_stops_when_estimator_unhealthy()
+void test_controller_althold_v2_stops_when_estimator_unhealthy()
 {
   When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
 
@@ -969,10 +969,10 @@ void test_controller_shadow_althold_stops_when_estimator_unhealthy()
   controller.update();
 
   TEST_ASSERT_TRUE(
-      model.state.assistedShadow.altitudeActive);
+      model.state.assistedMode.altitudeActive);
 
   TEST_ASSERT_TRUE(
-      model.state.assistedShadow.altitudeTargetValid);
+      model.state.assistedMode.altitudeTargetValid);
 
   // Simulate loss of reliable vertical estimate.
   model.state.altitude.healthy =
@@ -981,14 +981,14 @@ void test_controller_shadow_althold_stops_when_estimator_unhealthy()
   controller.update();
 
   TEST_ASSERT_FALSE(
-      model.state.assistedShadow.altitudeActive);
+      model.state.assistedMode.altitudeActive);
 
   TEST_ASSERT_FALSE(
-      model.state.assistedShadow.altitudeTargetValid);
+      model.state.assistedMode.altitudeTargetValid);
 }
 
 
-void test_controller_shadow_althold_vertical_accel_limit()
+void test_controller_althold_v2_vertical_accel_limit()
 {
   When(Method(ArduinoFake(), micros)).AlwaysReturn(0);
 
@@ -1026,12 +1026,12 @@ void test_controller_shadow_althold_vertical_accel_limit()
   controller.update();
 
   const float firstVzTarget =
-      model.state.assistedShadow.verticalRateTarget;
+      model.state.assistedMode.verticalRateTarget;
 
   controller.update();
 
   const float secondVzTarget =
-      model.state.assistedShadow.verticalRateTarget;
+      model.state.assistedMode.verticalRateTarget;
 
   const float change =
       secondVzTarget -
@@ -1049,7 +1049,7 @@ void test_controller_shadow_althold_vertical_accel_limit()
       change < 0.1f);
 }
 
-void test_controller_shadow_althold_target_is_bounded()
+void test_controller_althold_v2_target_is_bounded()
 {
   When(
       Method(
@@ -1117,7 +1117,7 @@ void test_controller_shadow_althold_target_is_bounded()
   }
 
   const float descentTarget =
-      model.state.assistedShadow
+      model.state.assistedMode
           .altitudeTarget;
 
   // Current altitude = 2 m.
@@ -1142,7 +1142,7 @@ void test_controller_shadow_althold_target_is_bounded()
   controller.update();
 
   TEST_ASSERT_FALSE(
-      model.state.assistedShadow
+      model.state.assistedMode
           .altitudeActive);
 
 
@@ -1166,7 +1166,7 @@ void test_controller_shadow_althold_target_is_bounded()
   }
 
   const float climbTarget =
-      model.state.assistedShadow
+      model.state.assistedMode
           .altitudeTarget;
 
   // Current altitude = 2 m.
@@ -1179,7 +1179,7 @@ void test_controller_shadow_althold_target_is_bounded()
       climbTarget >=
       1.999f);
 }
-void test_controller_shadow_althold_full_climb_rate_scaling()
+void test_controller_althold_v2_full_climb_rate_scaling()
 {
   When(
       Method(
@@ -1273,11 +1273,11 @@ void test_controller_shadow_althold_full_climb_rate_scaling()
   controller.update();
 
   TEST_ASSERT_TRUE(
-      model.state.assistedShadow
+      model.state.assistedMode
           .altitudeActive);
 
   TEST_ASSERT_TRUE(
-      model.state.assistedShadow
+      model.state.assistedMode
           .altitudeTargetValid);
 // Full climb command is 1.5 m/s.
 //
@@ -1292,7 +1292,7 @@ const float expectedTarget =
 TEST_ASSERT_FLOAT_WITHIN(
     0.00002f,
     expectedTarget,
-    model.state.assistedShadow
+    model.state.assistedMode
         .altitudeTarget);
 
 }
@@ -2684,7 +2684,7 @@ void test_actuator_angle_fault_requires_switch_cycle()
       model.isModeActive(
           MODE_ANGLE));
 }
-void test_controller_althold_v2_shadow_does_not_drive_thrust()
+void test_controller_althold_v2_inactive_build_does_not_drive_thrust()
 {
   When(
       Method(
@@ -2742,9 +2742,9 @@ void test_controller_althold_v2_shadow_does_not_drive_thrust()
 
   controller.update();
 
-  // V2 should still run in shadow.
+  // V2 should still run in assisted.
   TEST_ASSERT_TRUE(
-      model.state.assistedShadow
+      model.state.assistedMode
           .altitudeActive);
 
   // But actual thrust setpoint must remain manual.
@@ -2837,12 +2837,12 @@ void test_controller_althold_v2_active_path_is_bumpless_and_corrective()
   controller.update();
 
   TEST_ASSERT_TRUE(
-      model.state.assistedShadow
+      model.state.assistedMode
           .altitudeActive);
 
   TEST_ASSERT_FLOAT_WITHIN(
       0.0001f,
-      model.state.assistedShadow
+      model.state.assistedMode
           .verticalRateTarget,
       model.state.setpoint.rate[
           AXIS_THRUST]);
@@ -2869,12 +2869,12 @@ void test_controller_althold_v2_active_path_is_bumpless_and_corrective()
   }
 
   TEST_ASSERT_TRUE(
-      model.state.assistedShadow
+      model.state.assistedMode
           .verticalRateCorrection >
       0.0f);
 
   TEST_ASSERT_TRUE(
-      model.state.assistedShadow
+      model.state.assistedMode
           .verticalRateTarget >
       0.0f);
 
@@ -3313,7 +3313,7 @@ void test_controller_althold_v2_uses_dedicated_centered_stick_channel()
   TEST_ASSERT_FLOAT_WITHIN(
       0.0001f,
       0.0f,
-      model.state.assistedShadow
+      model.state.assistedMode
           .verticalRatePilot);
 
   // Moving only the raw centered channel must command climb even though the
@@ -3325,7 +3325,7 @@ void test_controller_althold_v2_uses_dedicated_centered_stick_channel()
   controller.update();
 
   TEST_ASSERT_TRUE(
-      model.state.assistedShadow
+      model.state.assistedMode
           .verticalRatePilot >
       0.0f);
 }
@@ -3701,10 +3701,10 @@ void test_controller_land_v2_levels_and_requests_descent()
   model.state.failsafe.landingRequested =
       true;
 
-  model.state.failsafe.landingShadowActive =
+  model.state.failsafe.landingActive =
       true;
 
-  model.state.failsafe.landingShadowOutputBlocked =
+  model.state.failsafe.landingOutputBlocked =
       false;
 
   model.state.failsafe.phase =
@@ -3720,7 +3720,7 @@ void test_controller_land_v2_levels_and_requests_descent()
      model.state.angleV2.active);
 
   TEST_ASSERT_TRUE(
-      model.state.assistedShadow
+      model.state.assistedMode
           .altitudeActive);
 
   // LAND owns the reference: zero attitude and a fixed
@@ -3738,11 +3738,11 @@ void test_controller_land_v2_levels_and_requests_descent()
   TEST_ASSERT_FLOAT_WITHIN(
       0.0001f,
       -0.50f,
-      model.state.assistedShadow
+      model.state.assistedMode
           .verticalRatePilot);
 
   TEST_ASSERT_TRUE(
-      model.state.assistedShadow
+      model.state.assistedMode
           .verticalRateTarget <
       0.0f);
 
@@ -3813,10 +3813,10 @@ void test_controller_land_v2_requires_supervisor_authorization()
   model.state.failsafe.landingRequested =
       true;
 
-  model.state.failsafe.landingShadowActive =
+  model.state.failsafe.landingActive =
       false;
 
-  model.state.failsafe.landingShadowOutputBlocked =
+  model.state.failsafe.landingOutputBlocked =
       true;
 
   model.state.failsafe.phase =
@@ -3836,7 +3836,7 @@ void test_controller_land_v2_requires_supervisor_authorization()
      model.state.angleV2.active);
 
   TEST_ASSERT_FALSE(
-      model.state.assistedShadow
+      model.state.assistedMode
           .altitudeActive);
 
   TEST_ASSERT_TRUE(
@@ -3891,7 +3891,7 @@ void test_failsafe_land_v2_bad_estimator_falls_back_to_disarm()
   Actuator actuator(
       model);
 
-  actuator.updateFailsafeLandShadow();
+  actuator.updateFailsafeLand();
 
   TEST_ASSERT_FALSE(
       model.isModeActive(
@@ -3903,11 +3903,11 @@ void test_failsafe_land_v2_bad_estimator_falls_back_to_disarm()
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowFault);
+          .landingFault);
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowOutputBlocked);
+          .landingOutputBlocked);
 }
 
 void test_failsafe_land_v2_touchdown_dwell_disarms()
@@ -3979,7 +3979,7 @@ void test_failsafe_land_v2_touchdown_dwell_disarms()
   Actuator actuator(
       model);
 
-  actuator.updateFailsafeLandShadow();
+  actuator.updateFailsafeLand();
 
   TEST_ASSERT_FALSE(
       model.isModeActive(
@@ -3995,7 +3995,7 @@ void test_failsafe_land_v2_touchdown_dwell_disarms()
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowOutputBlocked);
+          .landingOutputBlocked);
 }
 
 void test_failsafe_land_v2_touchdown_candidate_has_hysteresis()
@@ -4066,7 +4066,7 @@ void test_failsafe_land_v2_touchdown_candidate_has_hysteresis()
   Actuator actuator(
       model);
 
-  actuator.updateFailsafeLandShadow();
+  actuator.updateFailsafeLand();
 
   TEST_ASSERT_TRUE(
       model.isModeActive(
@@ -4145,7 +4145,7 @@ void test_failsafe_land_v2_low_entry_thrust_prevents_hover_false_touchdown()
   Actuator actuator(
       model);
 
-  actuator.updateFailsafeLandShadow();
+  actuator.updateFailsafeLand();
 
   TEST_ASSERT_TRUE(
       model.isModeActive(
@@ -4220,7 +4220,7 @@ void test_failsafe_land_v2_near_ground_hover_does_not_disarm()
   Actuator actuator(
       model);
 
-  actuator.updateFailsafeLandShadow();
+  actuator.updateFailsafeLand();
 
   TEST_ASSERT_TRUE(
       model.isModeActive(
@@ -4291,7 +4291,7 @@ void test_failsafe_land_v2_timeout_disarms()
   Actuator actuator(
       model);
 
-  actuator.updateFailsafeLandShadow();
+  actuator.updateFailsafeLand();
 
   TEST_ASSERT_FALSE(
       model.isModeActive(
@@ -4303,11 +4303,11 @@ void test_failsafe_land_v2_timeout_disarms()
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowFault);
+          .landingFault);
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowOutputBlocked);
+          .landingOutputBlocked);
 
   TEST_ASSERT_EQUAL(
       FC_FAILSAFE_LANDED,
@@ -6636,15 +6636,15 @@ void test_failsafe_auto_land_request_is_recorded_but_disarms()
 
 TEST_ASSERT_FALSE(
     model.state.failsafe
-        .landingShadowEstimatorHealthy);
+        .landingEstimatorHealthy);
 
 TEST_ASSERT_FALSE(
     model.state.failsafe
-        .landingShadowEligible);
+        .landingEligible);
 
 TEST_ASSERT_TRUE(
     model.state.failsafe
-        .landingShadowOutputBlocked);
+        .landingOutputBlocked);
 
   TEST_ASSERT_EQUAL_UINT32(
       2000000,
@@ -6694,7 +6694,7 @@ TEST_ASSERT_TRUE(
 #endif
 }
 
-void test_failsafe_auto_land_shadow_rejects_bad_estimator()
+void test_failsafe_auto_land_v2_rejects_bad_estimator()
 {
   ArduinoFakeReset();
 
@@ -6752,35 +6752,35 @@ void test_failsafe_auto_land_shadow_rejects_bad_estimator()
 
   // Actuator performs the actual continuous
   // estimator-health evaluation.
-  actuator.updateFailsafeLandShadow();
+  actuator.updateFailsafeLand();
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
-          .landingShadowEstimatorHealthy);
+          .landingEstimatorHealthy);
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
-          .landingShadowEligible);
+          .landingEligible);
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
-          .landingShadowActive);
+          .landingActive);
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
-          .landingShadowLevelRequested);
+          .landingLevelRequested);
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
-          .landingShadowDescentRequested);
+          .landingDescentRequested);
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowFault);
+          .landingFault);
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowOutputBlocked);
+          .landingOutputBlocked);
 
   // Current dry-run fallback still disarms.
   TEST_ASSERT_FALSE(
@@ -6817,7 +6817,7 @@ void test_failsafe_drop_does_not_request_land()
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
-          .landingShadowEligible);
+          .landingEligible);
 
   TEST_ASSERT_FALSE(
       model.isModeActive(
@@ -6842,7 +6842,7 @@ void test_failsafe_invalid_procedure_sanitizes_to_drop()
       model.config.failsafe.procedure);
 }
 
-void test_failsafe_land_shadow_healthy_is_non_actuating()
+void test_failsafe_land_v2_healthy_is_non_actuating()
 {
   ArduinoFakeReset();
 
@@ -6897,37 +6897,37 @@ void test_failsafe_land_shadow_healthy_is_non_actuating()
   Actuator actuator(
       model);
 
-  actuator.updateFailsafeLandShadow();
+  actuator.updateFailsafeLand();
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowEstimatorHealthy);
+          .landingEstimatorHealthy);
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowEligible);
+          .landingEligible);
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowActive);
+          .landingActive);
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowLevelRequested);
+          .landingLevelRequested);
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowDescentRequested);
+          .landingDescentRequested);
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
-          .landingShadowFault);
+          .landingFault);
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowOutputBlocked);
+          .landingOutputBlocked);
 
-  // LAND shadow must not change actual thrust.
+  // Non-actuating LAND validation must not change actual thrust.
   TEST_ASSERT_FLOAT_WITHIN(
       0.0001f,
       OUTPUT_THRUST,
@@ -7008,19 +7008,19 @@ void test_new_arm_clears_previous_land_latch()
   model.state.failsafe.landingRequested =
       true;
 
-  model.state.failsafe.landingShadowActive =
+  model.state.failsafe.landingActive =
       true;
 
-  model.state.failsafe.landingShadowEligible =
+  model.state.failsafe.landingEligible =
       true;
 
-  model.state.failsafe.landingShadowFault =
+  model.state.failsafe.landingFault =
       true;
 
   model.state.failsafe.landingRequestedUs =
       123456;
 
-  model.state.failsafe.landingShadowLastUpdateUs =
+  model.state.failsafe.landingLastUpdateUs =
       123500;
 
   model.state.failsafe.landingTouchdownCandidate =
@@ -7052,31 +7052,31 @@ void test_new_arm_clears_previous_land_latch()
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
-          .landingShadowEstimatorHealthy);
+          .landingEstimatorHealthy);
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
-          .landingShadowEligible);
+          .landingEligible);
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
-          .landingShadowActive);
+          .landingActive);
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
-          .landingShadowLevelRequested);
+          .landingLevelRequested);
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
-          .landingShadowDescentRequested);
+          .landingDescentRequested);
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
-          .landingShadowFault);
+          .landingFault);
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowOutputBlocked);
+          .landingOutputBlocked);
 
   TEST_ASSERT_EQUAL_UINT32(
       0,
@@ -7086,7 +7086,7 @@ void test_new_arm_clears_previous_land_latch()
   TEST_ASSERT_EQUAL_UINT32(
       0,
       model.state.failsafe
-          .landingShadowLastUpdateUs);
+          .landingLastUpdateUs);
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
@@ -7181,20 +7181,20 @@ void test_failsafe_land_fault_survives_request_termination()
   model.state.failsafe.landingRequested =
       false;
 
-  model.state.failsafe.landingShadowFault =
+  model.state.failsafe.landingFault =
       true;
 
   Actuator actuator(
       model);
 
-  actuator.updateFailsafeLandShadow();
+  actuator.updateFailsafeLand();
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowFault);
+          .landingFault);
 }
 
-void test_failsafe_land_shadow_fault_latches()
+void test_failsafe_land_v2_fault_latches()
 {
   ArduinoFakeReset();
 
@@ -7230,35 +7230,35 @@ void test_failsafe_land_shadow_fault_latches()
   model.state.altitude.healthy =
       false;
 
-  actuator.updateFailsafeLandShadow();
+  actuator.updateFailsafeLand();
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowFault);
+          .landingFault);
 
   TEST_ASSERT_FALSE(
       model.state.failsafe
-          .landingShadowEstimatorHealthy);
+          .landingEstimatorHealthy);
 
   // Estimator later recovers.
   model.state.altitude.healthy =
       true;
 
-  actuator.updateFailsafeLandShadow();
+  actuator.updateFailsafeLand();
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowEstimatorHealthy);
+          .landingEstimatorHealthy);
 
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowEligible);
+          .landingEligible);
 
   // Historical fault remains latched for this LAND
   // lifecycle.
   TEST_ASSERT_TRUE(
       model.state.failsafe
-          .landingShadowFault);
+          .landingFault);
 }
 
 void test_actuator_missing_aux_channel_cannot_activate_mode()
@@ -7861,17 +7861,17 @@ RUN_TEST(
 RUN_TEST(
     test_controller_angle_v2_active_path_is_bumpless_and_negative_feedback);
 
-RUN_TEST(test_controller_shadow_althold_captures_current_altitude);
-RUN_TEST(test_controller_shadow_althold_center_stick_holds_target);
-RUN_TEST(test_controller_shadow_althold_climb_command_moves_target_up);
-RUN_TEST(test_controller_shadow_althold_descent_command_moves_target_down);
-RUN_TEST(test_controller_shadow_althold_stops_when_estimator_unhealthy);
-RUN_TEST(test_controller_shadow_althold_vertical_accel_limit);
+RUN_TEST(test_controller_althold_v2_captures_current_altitude);
+RUN_TEST(test_controller_althold_v2_center_stick_holds_target);
+RUN_TEST(test_controller_althold_v2_climb_command_moves_target_up);
+RUN_TEST(test_controller_althold_v2_descent_command_moves_target_down);
+RUN_TEST(test_controller_althold_v2_stops_when_estimator_unhealthy);
+RUN_TEST(test_controller_althold_v2_vertical_accel_limit);
 RUN_TEST(
-    test_controller_shadow_althold_target_is_bounded);
+    test_controller_althold_v2_target_is_bounded);
 
 // Additional V2 regression tests
-RUN_TEST(test_controller_shadow_althold_full_climb_rate_scaling);
+RUN_TEST(test_controller_althold_v2_full_climb_rate_scaling);
 RUN_TEST(test_actuator_althold_fault_requires_switch_cycle);
 RUN_TEST(test_actuator_angle_fault_requires_switch_cycle);
 #if defined(ESPFC_SAFE_BENCH_BUILD)
@@ -7883,7 +7883,7 @@ RUN_TEST(
   // Final assisted-mode architecture regression tests
 #if !defined(ESPFC_ALTHOLD_V2_ACTIVE)
 RUN_TEST(
-    test_controller_althold_v2_shadow_does_not_drive_thrust);
+    test_controller_althold_v2_inactive_build_does_not_drive_thrust);
 #endif
 
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
@@ -8046,7 +8046,7 @@ RUN_TEST(
     test_failsafe_land_fault_survives_request_termination);
 
 RUN_TEST(
-    test_failsafe_land_shadow_fault_latches);
+    test_failsafe_land_v2_fault_latches);
 RUN_TEST(
     test_failsafe_default_procedure_is_drop);
 
@@ -8054,7 +8054,7 @@ RUN_TEST(
     test_failsafe_auto_land_request_is_recorded_but_disarms);
 
 RUN_TEST(
-    test_failsafe_auto_land_shadow_rejects_bad_estimator);
+    test_failsafe_auto_land_v2_rejects_bad_estimator);
 
 RUN_TEST(
     test_failsafe_drop_does_not_request_land);
@@ -8063,7 +8063,7 @@ RUN_TEST(
     test_failsafe_invalid_procedure_sanitizes_to_drop);
 
 RUN_TEST(
-    test_failsafe_land_shadow_healthy_is_non_actuating);
+    test_failsafe_land_v2_healthy_is_non_actuating);
 
 RUN_TEST(
     test_box_failsafe_with_valid_rx_still_runs_stage2);

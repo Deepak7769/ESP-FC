@@ -33,7 +33,7 @@ private:
   // feature-gated through AssistedModeV2.h.
   void updateAssistedModes();
 
-  float calculatePilotClimbRateShadow() const;
+  float calculatePilotClimbRate() const;
   void updateAntiGravity();
 
   // Core controller dependencies.
@@ -49,14 +49,14 @@ private:
   bool _angleV2WasActive = false;
 
   // AltHold V2 transition state.
-  bool _shadowAltWasActive = false;
+  bool _altHoldWasActive = false;
 
   // Tracks ownership of thrust output so AltHold V2
   // can enter without a thrust discontinuity.
   bool _altHoldV2OutputWasActive = false;
 
-  float _shadowAltitudeTarget = 0.0f;
-  float _shadowVzTarget = 0.0f;
+  float _altHoldAltitudeTarget = 0.0f;
+  float _altHoldVerticalRateTarget = 0.0f;
 
   uint32_t _assistedLastUpdateUs = 0;
 };

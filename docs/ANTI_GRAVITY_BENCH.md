@@ -16,7 +16,7 @@ safe-bench macro.
 and servo drivers from being initialized or attached. This validation firmware
 is therefore intended only for non-actuating bench observation, not flight.
 
-The ordinary ESP32 firmware remains non-authoritative for Anti-Gravity at this milestone. The controller implementation is no longer a separate shadow algorithm: the same Anti-Gravity calculation is used, and only the compile-time authority gate decides whether its P/I demand reaches the rate PID.
+The ordinary ESP32 firmware remains non-authoritative for Anti-Gravity at this milestone. The controller implementation is uses one controller algorithm: the same Anti-Gravity calculation is used, and only the compile-time authority gate decides whether its P/I demand reaches the rate PID.
 
 ## Validation build
 
@@ -46,7 +46,7 @@ manual throttle owns the vertical output:
   is unhealthy.
 
 The active bench path uses the same configured `antiGravityGain` and the
-existing fixed cutoff/P-gain constants already used by the shadow diagnostics.
+existing fixed cutoff/P-gain constants already used by the controller diagnostics.
 
 ## DEBUG_ANTI_GRAVITY
 

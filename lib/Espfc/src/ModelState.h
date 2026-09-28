@@ -192,41 +192,39 @@ public:
   // -----------------------------------------------------
   // FAILSAFE LAND V2 SUPERVISOR STATE
   //
-  // Ordinary builds keep this state diagnostic-only.
-  // ESPFC_LAND_V2_ACTIVE_TEST may consume the requests,
-  // but that build is compile-time locked to
-  // ESPFC_SAFE_BENCH_BUILD so physical ESC attachment is
-  // still blocked.
+  // Runtime state for the LAND V2 supervisor. Controller authority and
+  // physical output attachment are controlled independently by the selected
+  // build policy.
   // -----------------------------------------------------
 
   bool landingRequested{false};
 
-  bool landingShadowEligible{false};
+  bool landingEligible{false};
 
-  bool landingShadowEstimatorHealthy{false};
+  bool landingEstimatorHealthy{false};
 
-  // True while the dry-run LAND supervisor considers
-  // the request healthy enough to continue.
-  bool landingShadowActive{false};
+  // True while the LAND V2 supervisor considers the request healthy enough
+  // to continue.
+  bool landingActive{false};
 
-  // These are requests only. They do not modify
-  // Controller setpoints or motor outputs.
-  bool landingShadowLevelRequested{false};
-  bool landingShadowDescentRequested{false};
+  // Requests consumed by the authoritative LAND V2 controller path when
+  // LAND has control authority.
+  bool landingLevelRequested{false};
+  bool landingDescentRequested{false};
 
   // Latches when LAND was requested but the required
   // estimator state is not healthy.
-  bool landingShadowFault{false};
+  bool landingFault{false};
 
   // Logical controller-ownership interlock. This remains
   // true in ordinary builds. The guarded active-validation
   // build clears it only while LAND owns the controller;
   // ESPFC_SAFE_BENCH_BUILD independently blocks the ESCs.
-  bool landingShadowOutputBlocked{true};
+  bool landingOutputBlocked{true};
 
   uint32_t landingRequestedUs{0};
 
-  uint32_t landingShadowLastUpdateUs{0};
+  uint32_t landingLastUpdateUs{0};
 
   // LAND V2 touchdown confirmation. A low vertical-speed
   // observation must persist for a dwell interval before
@@ -506,10 +504,9 @@ struct AngleV2State
 };
 
 
-struct AssistedModeShadowState
+struct AssistedModeState
 {
-  // AltHold/LAND V2 state remains here while those
-  // controllers are still feature-gated.
+  // Runtime controller state shared by AltHold V2 and LAND V2.
 
   float altitudeTarget{0.0f};
 
@@ -676,7 +673,7 @@ struct ModelState
   AltitudeState altitude;
 
   AngleV2State angleV2;
-  AssistedModeShadowState assistedShadow;
+  AssistedModeState assistedMode;
 
   SetpointState setpoint;
 

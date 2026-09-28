@@ -341,7 +341,7 @@ int Actuator::update()
   updateModeMask();
   updateArmed();
 
-  updateFailsafeLandShadow();
+  updateFailsafeLand();
 
   updateAirMode();
   updateScaler();
@@ -996,7 +996,7 @@ bool Actuator::altitudeEstimateHealthy() const
           altitude.vario);
 }
 
-void Actuator::updateFailsafeLandShadow()
+void Actuator::updateFailsafeLand()
 {
   auto& failsafe =
       _model.state.failsafe;
@@ -1019,7 +1019,7 @@ void Actuator::updateFailsafeLandShadow()
   // The logical LAND controller starts blocked. It is cleared only while a
   // healthy active LAND request owns the controller. Safe-bench builds still
   // block physical ESC attachment independently in Mixer.cpp.
-  failsafe.landingShadowOutputBlocked =
+  failsafe.landingOutputBlocked =
       true;
 
   // -----------------------------------------------------
@@ -1028,25 +1028,25 @@ void Actuator::updateFailsafeLandShadow()
 
   if (!failsafe.landingRequested)
   {
-    failsafe.landingShadowEstimatorHealthy =
+    failsafe.landingEstimatorHealthy =
         false;
 
-    failsafe.landingShadowEligible =
+    failsafe.landingEligible =
         false;
 
-    failsafe.landingShadowActive =
+    failsafe.landingActive =
         false;
 
-    failsafe.landingShadowLevelRequested =
+    failsafe.landingLevelRequested =
         false;
 
-    failsafe.landingShadowDescentRequested =
+    failsafe.landingDescentRequested =
         false;
 
-    // landingShadowFault is a lifecycle diagnostic latch. It is cleared when
+    // landingFault is a lifecycle diagnostic latch. It is cleared when
     // a new LAND request begins or when a new arm starts, not merely because
     // the request has just terminated after timeout/estimator failure.
-    failsafe.landingShadowLastUpdateUs =
+    failsafe.landingLastUpdateUs =
         0;
 
     failsafe.landingTouchdownCandidate =
@@ -1064,40 +1064,40 @@ void Actuator::updateFailsafeLandShadow()
     const bool estimatorHealthy =
         altitudeEstimateHealthy();
 
-    failsafe.landingShadowEstimatorHealthy =
+    failsafe.landingEstimatorHealthy =
         estimatorHealthy;
 
-    failsafe.landingShadowEligible =
+    failsafe.landingEligible =
         failsafe.rxEverValid &&
         estimatorHealthy;
 
-    failsafe.landingShadowActive =
-        failsafe.landingShadowEligible;
+    failsafe.landingActive =
+        failsafe.landingEligible;
 
-    failsafe.landingShadowLevelRequested =
-        failsafe.landingShadowActive;
+    failsafe.landingLevelRequested =
+        failsafe.landingActive;
 
-    failsafe.landingShadowDescentRequested =
-        failsafe.landingShadowActive;
+    failsafe.landingDescentRequested =
+        failsafe.landingActive;
 
-    if (!failsafe.landingShadowEligible)
+    if (!failsafe.landingEligible)
     {
-      failsafe.landingShadowFault =
+      failsafe.landingFault =
           true;
     }
 
-    failsafe.landingShadowLastUpdateUs =
+    failsafe.landingLastUpdateUs =
         now;
 
 #if defined(ESPFC_LAND_V2_ACTIVE)
     if (activeLandRequest)
     {
-      if (!failsafe.landingShadowEligible)
+      if (!failsafe.landingEligible)
       {
         // An automatic descent without a trustworthy
         // attitude/altitude estimate is not allowed.
         // The active validation path falls back to DROP.
-        failsafe.landingShadowOutputBlocked =
+        failsafe.landingOutputBlocked =
             true;
 
         failsafe.landingTouchdownCandidate =
@@ -1109,13 +1109,13 @@ void Actuator::updateFailsafeLandShadow()
         failsafe.landingRequested =
             false;
 
-        failsafe.landingShadowActive =
+        failsafe.landingActive =
             false;
 
-        failsafe.landingShadowLevelRequested =
+        failsafe.landingLevelRequested =
             false;
 
-        failsafe.landingShadowDescentRequested =
+        failsafe.landingDescentRequested =
             false;
 
         failsafe.phase =
@@ -1128,7 +1128,7 @@ void Actuator::updateFailsafeLandShadow()
       {
         // Logical controller authority is enabled. Physical actuation still
         // depends on the selected build policy and Mixer configuration.
-        failsafe.landingShadowOutputBlocked =
+        failsafe.landingOutputBlocked =
             false;
 
         // -------------------------------------------------
@@ -1330,22 +1330,22 @@ void Actuator::updateFailsafeLandShadow()
 
         if (landingTimedOut)
         {
-          failsafe.landingShadowFault =
+          failsafe.landingFault =
               true;
 
           failsafe.landingRequested =
               false;
 
-          failsafe.landingShadowActive =
+          failsafe.landingActive =
               false;
 
-          failsafe.landingShadowLevelRequested =
+          failsafe.landingLevelRequested =
               false;
 
-          failsafe.landingShadowDescentRequested =
+          failsafe.landingDescentRequested =
               false;
 
-          failsafe.landingShadowOutputBlocked =
+          failsafe.landingOutputBlocked =
               true;
 
           failsafe.landingTouchdownCandidate =
@@ -1385,16 +1385,16 @@ void Actuator::updateFailsafeLandShadow()
             failsafe.landingRequested =
                 false;
 
-            failsafe.landingShadowActive =
+            failsafe.landingActive =
                 false;
 
-            failsafe.landingShadowLevelRequested =
+            failsafe.landingLevelRequested =
                 false;
 
-            failsafe.landingShadowDescentRequested =
+            failsafe.landingDescentRequested =
                 false;
 
-            failsafe.landingShadowOutputBlocked =
+            failsafe.landingOutputBlocked =
                 true;
 
             failsafe.phase =
@@ -1439,22 +1439,22 @@ void Actuator::updateFailsafeLandShadow()
         failsafe.landingRequested ? 1 : 0;
 
     _model.state.debug[4] =
-        failsafe.landingShadowEstimatorHealthy
+        failsafe.landingEstimatorHealthy
             ? 1
             : 0;
 
     _model.state.debug[5] =
-        failsafe.landingShadowEligible
+        failsafe.landingEligible
             ? 1
             : 0;
 
     _model.state.debug[6] =
-        failsafe.landingShadowActive
+        failsafe.landingActive
             ? 1
             : 0;
 
     _model.state.debug[7] =
-        failsafe.landingShadowOutputBlocked
+        failsafe.landingOutputBlocked
             ? 1
             : 0;
   }
@@ -1521,31 +1521,31 @@ void Actuator::updateArmed()
       failsafe.landingRequested =
           false;
 
-      failsafe.landingShadowEstimatorHealthy =
+      failsafe.landingEstimatorHealthy =
           false;
 
-      failsafe.landingShadowEligible =
+      failsafe.landingEligible =
           false;
 
-      failsafe.landingShadowActive =
+      failsafe.landingActive =
           false;
 
-      failsafe.landingShadowLevelRequested =
+      failsafe.landingLevelRequested =
           false;
 
-      failsafe.landingShadowDescentRequested =
+      failsafe.landingDescentRequested =
           false;
 
-      failsafe.landingShadowFault =
+      failsafe.landingFault =
           false;
 
-      failsafe.landingShadowOutputBlocked =
+      failsafe.landingOutputBlocked =
           true;
 
       failsafe.landingRequestedUs =
           0;
 
-      failsafe.landingShadowLastUpdateUs =
+      failsafe.landingLastUpdateUs =
           0;
 
       failsafe.landingTouchdownCandidate =

@@ -29,8 +29,8 @@ bool landingV2OwnsControl(
       failsafe.landingRequested &&
       failsafe.phase ==
           FC_FAILSAFE_LANDING &&
-      failsafe.landingShadowActive &&
-      !failsafe.landingShadowOutputBlocked;
+      failsafe.landingActive &&
+      !failsafe.landingOutputBlocked;
 }
 
 #endif
@@ -76,16 +76,16 @@ int Controller::begin()
 _angleV2WasActive =
     false;
 
-_shadowAltWasActive =
+_altHoldWasActive =
     false;
 
 _altHoldV2OutputWasActive =
     false;
 
-_shadowAltitudeTarget =
+_altHoldAltitudeTarget =
     0.0f;
 
-_shadowVzTarget =
+_altHoldVerticalRateTarget =
     0.0f;
 
 _assistedLastUpdateUs =
@@ -103,8 +103,8 @@ _model.state.antiGravity =
 _model.state.angleV2 =
     AngleV2State{};
 
-_model.state.assistedShadow =
-    AssistedModeShadowState{};
+_model.state.assistedMode =
+    AssistedModeState{};
 
   return 1;
 }
@@ -343,7 +343,7 @@ else
 
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
   const bool altHoldV2Active =
-      _model.state.assistedShadow.altitudeActive &&
+      _model.state.assistedMode.altitudeActive &&
       (_model.isModeActive(MODE_ALTHOLD) ||
        landingV2Requested);
 #else
@@ -359,7 +359,7 @@ else
   {
     _model.state.setpoint.rate[
         AXIS_THRUST] =
-        _model.state.assistedShadow
+        _model.state.assistedMode
             .verticalRateTarget;
   }
 #if defined(ESPFC_LAND_V2_ACTIVE)
@@ -549,7 +549,7 @@ constexpr bool landingV2Requested =
   #endif
 
 const bool altHoldV2OutputActive =
-    _model.state.assistedShadow.altitudeActive &&
+    _model.state.assistedMode.altitudeActive &&
     (_model.isModeActive(MODE_ALTHOLD) ||
      landingV2Requested);
 #else
@@ -764,7 +764,7 @@ else
           uint16_t{1} << 0;
     }
 
-    if (_model.state.assistedShadow
+    if (_model.state.assistedMode
             .altitudeActive)
     {
       flags |=
@@ -798,14 +798,14 @@ else
     }
 
     if (_model.state.failsafe
-            .landingShadowActive)
+            .landingActive)
     {
       flags |=
           uint16_t{1} << 6;
     }
 
     if (_model.state.failsafe
-            .landingShadowOutputBlocked)
+            .landingOutputBlocked)
     {
       flags |=
           uint16_t{1} << 7;
@@ -1097,7 +1097,7 @@ void Controller::updateAntiGravity()
 }
 
 
-float Controller::calculatePilotClimbRateShadow() const
+float Controller::calculatePilotClimbRate() const
 {
   constexpr float DEADBAND =
       0.10f;
@@ -1165,8 +1165,8 @@ void Controller::updateAssistedModes()
 auto& angleV2 =
     _model.state.angleV2;
 
-auto& shadow =
-    _model.state.assistedShadow;
+auto& assisted =
+    _model.state.assistedMode;
 
   const auto& attitude =
       _model.state.attitude;
@@ -1217,7 +1217,7 @@ const bool attitudeFresh =
 const auto& baro =
     _model.state.baro;
 
-const bool shadowBaroFresh =
+const bool assistedBaroFresh =
     baro.sampleValid &&
     static_cast<uint32_t>(
         now -
@@ -1379,7 +1379,7 @@ const bool altActive =
      landingV2Requested) &&
     altitude.healthy &&
     attitudeFresh &&
-    shadowBaroFresh;
+    assistedBaroFresh;
 
   constexpr float LAND_DESCENT_RATE_MS =
       -0.50f;
@@ -1387,20 +1387,20 @@ const bool altActive =
   const float pilotVz =
       landingV2Requested
           ? LAND_DESCENT_RATE_MS
-          : calculatePilotClimbRateShadow();
+          : calculatePilotClimbRate();
 
   if (altActive &&
-      !_shadowAltWasActive)
+      !_altHoldWasActive)
   {
     // Capture current estimated altitude.
-    _shadowAltitudeTarget =
+    _altHoldAltitudeTarget =
         altitude.height;
 
     // Begin from current vertical velocity.
-    _shadowVzTarget =
+    _altHoldVerticalRateTarget =
         altitude.vario;
 
-    shadow.altitudeTargetValid =
+    assisted.altitudeTargetValid =
         true;
   }
 
@@ -1429,7 +1429,7 @@ const bool altActive =
       ALTITUDE_KP; // 2.0 m
 
   // Integrate pilot climb/descent command.
-  _shadowAltitudeTarget +=
+  _altHoldAltitudeTarget +=
       pilotVz * dt;
 
   // Keep the requested altitude inside the useful
@@ -1443,14 +1443,14 @@ const bool altActive =
       altitude.height +
       MAX_TARGET_ERROR_M;
 
-  _shadowAltitudeTarget =
+  _altHoldAltitudeTarget =
       std::clamp(
-          _shadowAltitudeTarget,
+          _altHoldAltitudeTarget,
           minAltitudeTarget,
           maxAltitudeTarget);
 
   const float altitudeError =
-      _shadowAltitudeTarget -
+      _altHoldAltitudeTarget -
       altitude.height;
 
   const float velocityCorrection =
@@ -1481,53 +1481,53 @@ const bool altActive =
         VERTICAL_ACCEL_LIMIT_MSS *
         dt;
 
-    _shadowVzTarget +=
+    _altHoldVerticalRateTarget +=
         std::clamp(
             requestedVz -
-                _shadowVzTarget,
+                _altHoldVerticalRateTarget,
             -maxVzStep,
             maxVzStep);
 
-    shadow.altitudeTarget =
-        _shadowAltitudeTarget;
+    assisted.altitudeTarget =
+        _altHoldAltitudeTarget;
 
-    shadow.verticalRatePilot =
+    assisted.verticalRatePilot =
         pilotVz;
 
-    shadow.verticalRateCorrection =
+    assisted.verticalRateCorrection =
         velocityCorrection;
 
-    shadow.verticalRateTarget =
-        _shadowVzTarget;
+    assisted.verticalRateTarget =
+        _altHoldVerticalRateTarget;
   }
   else
   {
-    shadow.altitudeTarget =
+    assisted.altitudeTarget =
         altitude.height;
 
-    shadow.verticalRatePilot =
+    assisted.verticalRatePilot =
         0.0f;
 
-    shadow.verticalRateCorrection =
+    assisted.verticalRateCorrection =
         0.0f;
 
-    shadow.verticalRateTarget =
+    assisted.verticalRateTarget =
         altitude.vario;
 
-    shadow.altitudeTargetValid =
+    assisted.altitudeTargetValid =
         false;
 
-    _shadowAltitudeTarget =
+    _altHoldAltitudeTarget =
         altitude.height;
 
-    _shadowVzTarget =
+    _altHoldVerticalRateTarget =
         altitude.vario;
   }
 
-  shadow.altitudeActive =
+  assisted.altitudeActive =
       altActive;
 
-  _shadowAltWasActive =
+  _altHoldWasActive =
       altActive;
 
 
@@ -1549,7 +1549,7 @@ const bool altActive =
     _model.state.debug[1] =
         std::clamp(
             lrintf(
-                shadow.altitudeTarget *
+                assisted.altitudeTarget *
                 100.0f),
             -32000l,
             32000l);
@@ -1565,7 +1565,7 @@ const bool altActive =
     _model.state.debug[3] =
         std::clamp(
             lrintf(
-                shadow.verticalRateTarget *
+                assisted.verticalRateTarget *
                 100.0f),
             -32000l,
             32000l);
@@ -1573,7 +1573,7 @@ const bool altActive =
     _model.state.debug[4] =
         std::clamp(
             lrintf(
-                shadow.verticalRatePilot *
+                assisted.verticalRatePilot *
                 100.0f),
             -32000l,
             32000l);

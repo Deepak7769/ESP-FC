@@ -64,10 +64,10 @@ int Input::begin()
     _model.state.failsafe.landingRequested =
       false;
 
-  _model.state.failsafe.landingShadowEligible =
+  _model.state.failsafe.landingEligible =
       false;
 
-  _model.state.failsafe.landingShadowEstimatorHealthy =
+  _model.state.failsafe.landingEstimatorHealthy =
       false;
 
   _model.state.failsafe.landingRequestedUs =
@@ -82,22 +82,22 @@ int Input::begin()
   _model.state.failsafe.landingEntryThrust =
       0.0f;
 
-    _model.state.failsafe.landingShadowActive =
+    _model.state.failsafe.landingActive =
       false;
 
-  _model.state.failsafe.landingShadowLevelRequested =
+  _model.state.failsafe.landingLevelRequested =
       false;
 
-  _model.state.failsafe.landingShadowDescentRequested =
+  _model.state.failsafe.landingDescentRequested =
       false;
 
-  _model.state.failsafe.landingShadowFault =
+  _model.state.failsafe.landingFault =
       false;
 
-  _model.state.failsafe.landingShadowOutputBlocked =
+  _model.state.failsafe.landingOutputBlocked =
       true;
 
-  _model.state.failsafe.landingShadowLastUpdateUs =
+  _model.state.failsafe.landingLastUpdateUs =
       0;
 
   _model.state.failsafe.landingTouchdownCandidate =
@@ -856,28 +856,28 @@ void FAST_CODE_ATTR Input::failsafeStage2()
           _model.state.output.ch[
               AXIS_THRUST];
 
-      failsafe.landingShadowEstimatorHealthy =
+      failsafe.landingEstimatorHealthy =
           false;
 
-      failsafe.landingShadowEligible =
+      failsafe.landingEligible =
           false;
 
-      failsafe.landingShadowActive =
+      failsafe.landingActive =
           false;
 
-      failsafe.landingShadowLevelRequested =
+      failsafe.landingLevelRequested =
           false;
 
-      failsafe.landingShadowDescentRequested =
+      failsafe.landingDescentRequested =
           false;
 
-      failsafe.landingShadowFault =
+      failsafe.landingFault =
           false;
 
-      failsafe.landingShadowOutputBlocked =
+      failsafe.landingOutputBlocked =
           true;
 
-      failsafe.landingShadowLastUpdateUs =
+      failsafe.landingLastUpdateUs =
           0;
 
       failsafe.landingTouchdownCandidate =
@@ -899,31 +899,31 @@ void FAST_CODE_ATTR Input::failsafeStage2()
     failsafe.landingRequested =
         false;
 
-    failsafe.landingShadowEstimatorHealthy =
+    failsafe.landingEstimatorHealthy =
         false;
 
-    failsafe.landingShadowEligible =
+    failsafe.landingEligible =
         false;
 
-    failsafe.landingShadowActive =
+    failsafe.landingActive =
         false;
 
-    failsafe.landingShadowLevelRequested =
+    failsafe.landingLevelRequested =
         false;
 
-    failsafe.landingShadowDescentRequested =
+    failsafe.landingDescentRequested =
         false;
 
-    failsafe.landingShadowFault =
+    failsafe.landingFault =
         false;
 
-    failsafe.landingShadowOutputBlocked =
+    failsafe.landingOutputBlocked =
         true;
 
     failsafe.landingRequestedUs =
         0;
 
-    failsafe.landingShadowLastUpdateUs =
+    failsafe.landingLastUpdateUs =
         0;
 
     failsafe.landingTouchdownCandidate =
