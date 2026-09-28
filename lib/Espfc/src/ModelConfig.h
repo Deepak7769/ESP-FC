@@ -81,6 +81,8 @@ enum FlightMode {
   MODE_FAILSAFE,
   MODE_BLACKBOX,
   MODE_BLACKBOX_ERASE,
+  // Appended intentionally: preserve all existing stored mode IDs.
+  MODE_ANTI_GRAVITY,
   MODE_COUNT,
 };
 
