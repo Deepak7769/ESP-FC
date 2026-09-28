@@ -46,10 +46,22 @@
 #endif
 // Channel index carrying a spring-centered vertical-stick command for AltHold.
 // 3 == the normal throttle channel and preserves existing bench/test behavior.
-// A production radio integration can override this with an unused AUX channel
-// carrying the raw centered stick (the current project uses AUX3 / index 6).
+// The production controller must explicitly provide a separate centered
+// vertical command; the current project uses AUX3 / input index 6.
+#if defined(ESPFC_ASSISTED_V2_ACTIVE) && \
+    !defined(ESPFC_SAFE_BENCH_BUILD) && \
+    !defined(ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL)
+#error "Production Assisted V2 requires an explicit centered AltHold stick channel"
+#endif
+
 #ifndef ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL
 #define ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL 3
+#endif
+
+#if defined(ESPFC_ASSISTED_V2_ACTIVE) && \
+    !defined(ESPFC_SAFE_BENCH_BUILD) && \
+    ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL == 3
+#error "Production Assisted V2 cannot use the stateful throttle channel as the centered AltHold stick"
 #endif
 
 #if ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL < 0 || \
