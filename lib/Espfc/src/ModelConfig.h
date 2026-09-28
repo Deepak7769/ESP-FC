@@ -606,6 +606,16 @@ struct RpmFilterConfig
   uint8_t fade = 30;
 };
 
+enum CurrentMeterSource : int8_t
+{
+  CURRENT_METER_NONE = 0,
+  CURRENT_METER_ADC = 1,
+  CURRENT_METER_VIRTUAL = 2,
+  CURRENT_METER_ESC = 3,
+  CURRENT_METER_MSP = 4,
+  CURRENT_METER_COUNT
+};
+
 struct VBatConfig
 {
   int16_t cellWarning = 350;
@@ -617,7 +627,11 @@ struct VBatConfig
 
 struct IBatConfig
 {
-  int8_t source = 0;
+  // Values follow Betaflight currentMeterSource_e so Configurator/MSP source
+  // selection stays interoperable. ESP-FC currently implements NONE, ADC and
+  // MSP. MSP is the intended bridge for an INA219 connected to a companion
+  // processor.
+  int8_t source = CURRENT_METER_NONE;
   int16_t scale = 100;
   int16_t offset = 0;
 };
