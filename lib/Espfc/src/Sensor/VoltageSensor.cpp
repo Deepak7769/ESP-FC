@@ -1,4 +1,5 @@
 #include "VoltageSensor.hpp"
+#include "Hal/Time.hpp"
 
 #include <algorithm>
 
@@ -10,6 +11,11 @@ int VoltageSensor::begin()
 {
   _model.state.battery.timer.setRate(100);
   _model.state.battery.samples = 50;
+
+  _model.state.battery.mspCurrentCentiAmps = 0;
+  _model.state.battery.mspMahDrawn = 0;
+  _model.state.battery.mspCurrentLastUpdateUs = 0;
+  _model.state.battery.mspCurrentValid = false;
 
   reload(MODEL_CHANGE_FILTER);
 
@@ -95,28 +101,131 @@ int VoltageSensor::readVbat()
 
 int VoltageSensor::readIbat()
 {
-#ifdef ESPFC_ADC_1
- if (_model.config.ibat.source != 1 ||
-    _model.config.pin[PIN_INPUT_ADC_1] == -1)
-{
-  return 0;
-}
+  auto& battery =
+      _model.state.battery;
 
-  _model.state.battery.rawCurrent = analogRead(_model.config.pin[PIN_INPUT_ADC_1]);
-  float volts = _iFilterFast.update(_model.state.battery.rawCurrent * ESPFC_ADC_SCALE);
-  float milivolts = volts * 1000.0f;
-
-  volts += _model.config.ibat.offset * 0.001f;
-  volts *= _model.config.ibat.scale * 0.1f;
-
-  _model.state.battery.currentUnfiltered = volts;
-  _model.state.battery.current = _iFilter.update(_model.state.battery.currentUnfiltered);
-
-  if (_model.config.debug.mode == DEBUG_CURRENT_SENSOR)
+  if (_model.config.ibat.source ==
+      CURRENT_METER_MSP)
   {
-    _model.state.debug[0] = lrintf(milivolts);
-    _model.state.debug[1] = std::clamp<long>(lrintf(_model.state.battery.currentUnfiltered * 100.0f), 0L, 32000L);
-    _model.state.debug[2] = _model.state.battery.rawCurrent;
+    constexpr uint32_t MSP_CURRENT_STALE_US =
+        500000;
+
+    const uint32_t now =
+        micros();
+
+    const bool fresh =
+        battery.mspCurrentValid &&
+        static_cast<uint32_t>(
+            now -
+            battery.mspCurrentLastUpdateUs) <
+            MSP_CURRENT_STALE_US;
+
+    if (!fresh)
+    {
+      // Never keep publishing an old companion current indefinitely. Current
+      // telemetry is deliberately fail-silent and has no control authority.
+      battery.currentUnfiltered =
+          0.0f;
+
+      battery.current =
+          _iFilter.update(
+              0.0f);
+
+      return 0;
+    }
+
+    const float amps =
+        static_cast<float>(
+            battery.mspCurrentCentiAmps) *
+        0.01f;
+
+    battery.rawCurrent =
+        battery.mspCurrentCentiAmps;
+
+    battery.currentUnfiltered =
+        amps;
+
+    battery.current =
+        _iFilter.update(
+            amps);
+
+    if (_model.config.debug.mode ==
+        DEBUG_CURRENT_SENSOR)
+    {
+      _model.state.debug[0] =
+          battery.mspCurrentCentiAmps;
+
+      _model.state.debug[1] =
+          std::clamp<long>(
+              lrintf(
+                  battery.current *
+                  100.0f),
+              -32000L,
+              32000L);
+
+      _model.state.debug[2] =
+          static_cast<uint16_t>(
+              battery.mspMahDrawn);
+    }
+
+    return 1;
+  }
+
+#ifdef ESPFC_ADC_1
+  if (_model.config.ibat.source !=
+          CURRENT_METER_ADC ||
+      _model.config.pin[
+          PIN_INPUT_ADC_1] == -1)
+  {
+    return 0;
+  }
+
+  battery.rawCurrent =
+      analogRead(
+          _model.config.pin[
+              PIN_INPUT_ADC_1]);
+
+  float volts =
+      _iFilterFast.update(
+          battery.rawCurrent *
+          ESPFC_ADC_SCALE);
+
+  const float milivolts =
+      volts *
+      1000.0f;
+
+  volts +=
+      _model.config.ibat.offset *
+      0.001f;
+
+  volts *=
+      _model.config.ibat.scale *
+      0.1f;
+
+  battery.currentUnfiltered =
+      volts;
+
+  battery.current =
+      _iFilter.update(
+          battery.currentUnfiltered);
+
+  if (_model.config.debug.mode ==
+      DEBUG_CURRENT_SENSOR)
+  {
+    _model.state.debug[0] =
+        lrintf(
+            milivolts);
+
+    _model.state.debug[1] =
+        std::clamp<long>(
+            lrintf(
+                battery.currentUnfiltered *
+                100.0f),
+            -32000L,
+            32000L);
+
+    _model.state.debug[2] =
+        battery.rawCurrent;
   }
 
   return 1;
