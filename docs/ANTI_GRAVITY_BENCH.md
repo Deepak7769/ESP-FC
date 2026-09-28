@@ -9,7 +9,7 @@ The active validation path is compiled only when both:
 - `ESPFC_ANTI_GRAVITY_ACTIVE`
 - `ESPFC_SAFE_BENCH_BUILD`
 
-are defined. Compilation fails if the active-test macro is used without the
+are defined. Compilation fails if `ESPFC_ANTI_GRAVITY_ACTIVE` is used without the
 safe-bench macro.
 
 `ESPFC_SAFE_BENCH_BUILD` keeps the mixer math running but prevents the motor
