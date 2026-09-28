@@ -9,7 +9,8 @@ The mini, DIY, Low cost, ESP32 based, high performance flight controller for hob
 * PPM, SBUS, IBUS and CRSF Receivers
 * Builtin ESP-NOW receiver and WiFi configuration [read more...](/docs/wireless.md)
 * SPI and I2C gyro modules support (MPU6050, MPU9250, ICM20602, ICM42688, BMI160)
-* Flight modes (ACRO, ANGLE, AIRMODE)
+* Flight modes (ACRO, ANGLE V2, AIRMODE, ALTHOLD V2; failsafe LAND V2 controller implemented)
+* Anti-Gravity feature/mode, MSP configuration and Blackbox diagnostics
 * Frames (Quad X)
 * Betaflight configuration tool compatible (v10.10)
 * Configurable Gyro Filters (LPF, Dynamic Notches, dTerm, RPM)
@@ -32,9 +33,22 @@ In this repository you can find firmware code that allows you to build your own 
  * [Wiring](/docs/wiring.md)
  * [CLI Commands](/docs/cli.md)
  * [MSP Companion Current Meter](/docs/MSP_CURRENT_METER.md)
+ * [Assisted V2 integration and validation status](/docs/ASSISTED_V2_INTEGRATION.md)
  * [WIFI and ESP-NOW Receiver](/docs/wireless.md)
 
 Join our **[Discord Channel](https://discord.gg/jhyPPM5UEH)** to get help
+
+# Current software validation status
+
+The current Assisted V2 implementation is treated as **software-validated** in this repository:
+
+* **ANGLE V2** — implemented and covered by native/controller regression tests.
+* **ALTHOLD V2** — implemented, including centered-stick handling, estimator health gates, bumpless controller entry, and vertical PID ownership tests.
+* **Failsafe LAND V2** — implemented, including supervisor authorization, estimator-fault fallback, touchdown dwell/hysteresis, timeout termination, and receiver-recovery behavior tests.
+* **Anti-Gravity** — feature/mode/MSP/configuration path and transient detector are implemented and regression-tested; the current controller effect remains diagnostic/shadow-only.
+* **MSP current meter / INA219 companion path** — implemented with freshness timeout, source sanitization, one-way companion push, and regression coverage.
+
+The corresponding native tests and ESP32 Assisted V2 validation targets are part of the automated test/build workflow.
 
 # Quick Start
 
@@ -111,7 +125,6 @@ You can also join our [Discord Channel](https://discord.gg/jhyPPM5UEH)
 
 ## Todo
 
-* Altitude Hold
 * GPS Navigation
 * MS5611 barometer
 * Balancing robot controller
