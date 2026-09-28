@@ -859,6 +859,19 @@ if (config.vbat.resDiv == 0)
   config.vbat.resDiv = 1;
 }
 
+switch (config.ibat.source)
+{
+  case CURRENT_METER_NONE:
+  case CURRENT_METER_ADC:
+  case CURRENT_METER_MSP:
+    break;
+
+  default:
+    config.ibat.source =
+        CURRENT_METER_NONE;
+    break;
+}
+
 for (size_t i = 0; i < 3; i++)
 {
   config.input.rateLimit[i] =
