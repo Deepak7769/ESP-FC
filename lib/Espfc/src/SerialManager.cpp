@@ -1,6 +1,7 @@
 #include "SerialManager.h"
 #include "Debug_Espfc.h"
 #include "Device/SerialDeviceAdapter.h"
+#include "Hal/Time.hpp"
 #include "Stream/Printer.hpp"
 #if defined(ESPFC_SERIAL_USB_REENUMERATE)
 #include "Hal/Gpio.hpp"
@@ -192,6 +193,27 @@ int FAST_CODE_ATTR SerialManager::update()
     if (sc.functionMask & SERIAL_FUNCTION_MSP)
     {
       processMsp(ss);
+
+      if (_model.config.ibat.source ==
+          CURRENT_METER_MSP)
+      {
+        const uint32_t now =
+            micros();
+
+        if (static_cast<int32_t>(
+                now -
+                _mspCurrentRequestAt[
+                    _current]) >= 0)
+        {
+          _mspCurrentRequestAt[
+              _current] =
+              now +
+              100000u; // 10 Hz, matching Betaflight CURRENT_METER_MSP
+
+          _msp.requestCurrentMeter(
+              *ss.stream);
+        }
+      }
     }
     if(sc.functionMask & SERIAL_FUNCTION_TELEMETRY_FRSKY && _model.state.telemetryTimer.check())
     {
@@ -237,11 +259,32 @@ void SerialManager::processMsp(SerialPortState& ss)
     bool consumed = _msp.parse(*c, ss.mspRequest);
     if(consumed)
     {
-      if(ss.mspRequest.isReady() && ss.mspRequest.isCmd())
+      if(ss.mspRequest.isReady())
       {
-        _msp.processCommand(ss.mspRequest, ss.mspResponse, *ss.stream);
-        _msp.sendResponse(ss.mspResponse, *ss.stream);
-        _msp.postCommand();
+        if(ss.mspRequest.isCmd())
+        {
+          _msp.processCommand(
+              ss.mspRequest,
+              ss.mspResponse,
+              *ss.stream);
+
+          _msp.sendResponse(
+              ss.mspResponse,
+              *ss.stream);
+
+          _msp.postCommand();
+        }
+        else
+        {
+          // Replies are normally ignored by an FC acting as an MSP server,
+          // except for Betaflight CURRENT_METER_MSP where MSP_ANALOG replies
+          // carry external current/consumption telemetry.
+          _msp.processReply(
+              ss.mspRequest);
+        }
+
+        // A reply must reset the parser too; otherwise it remains stuck in
+        // MSP_STATE_RECEIVED and cannot accept the next frame.
         ss.mspRequest = {};
         ss.mspResponse = {};
       }
