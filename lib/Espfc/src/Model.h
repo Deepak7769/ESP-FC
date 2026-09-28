@@ -707,6 +707,26 @@ if (config.antiGravityConfigTag !=
   config.antiGravityGain =
       ModelConfig::ANTI_GRAVITY_GAIN_DEFAULT;
 
+  // MODE_ANTI_GRAVITY was previously outside MODE_COUNT. If a legacy EEPROM
+  // happened to contain that numeric value in an ignored/stale row, do not
+  // reinterpret it as a newly-live switch or linked mode after this upgrade.
+  for (size_t i = 0;
+       i < ACTUATOR_CONDITIONS;
+       ++i)
+  {
+    auto& condition =
+        config.conditions[i];
+
+    if (condition.id ==
+            MODE_ANTI_GRAVITY ||
+        condition.linkId ==
+            MODE_ANTI_GRAVITY)
+    {
+      condition =
+          ActuatorCondition{};
+    }
+  }
+
   config.antiGravityConfigTag =
       ModelConfig::ANTI_GRAVITY_CONFIG_TAG;
 }
