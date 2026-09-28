@@ -45,6 +45,14 @@ Unsupported source IDs sanitize back to `NONE`.
 The serial port receiving the companion frames must have the MSP function
 enabled. USB VCP remains available for Configurator independently.
 
+The current-meter stream must **not** be interleaved onto a port that is already
+carrying an RC receiver protocol such as iBUS, SBUS, or CRSF. ESP-FC gives
+`SERIAL_FUNCTION_RX_SERIAL` ownership of that stream, so MSP frames on the same
+wire would be ignored or would disturb receiver framing. Use a dedicated MSP
+serial input for this bridge. On hardware where the companion-to-FC UART is
+already the RC link, keep current telemetry disabled until a separate MSP path
+or a receiver-native telemetry transport is provided.
+
 ## Freshness contract
 
 A received current sample is valid for 500 ms. If no new sample arrives within
