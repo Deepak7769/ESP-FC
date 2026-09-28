@@ -812,6 +812,9 @@ struct SimplifiedTuningConfig
 class ModelConfig
 {
   public:
+    static constexpr uint8_t ANTI_GRAVITY_GAIN_DEFAULT = 80;
+    static constexpr uint16_t ANTI_GRAVITY_CONFIG_TAG = 0xA647;
+
     // inputs and sensors
     GyroConfig gyro;
     AccelConfig accel;
@@ -950,8 +953,8 @@ class ModelConfig
     // sizeof(ModelConfig) therefore stay stable across this firmware update.
     // The tag detects old EEPROM images whose padding did not contain a valid
     // Anti-Gravity setting.
-    uint8_t antiGravityGain = 80;
-    uint16_t antiGravityConfigTag = 0xA647;
+    uint8_t antiGravityGain = ANTI_GRAVITY_GAIN_DEFAULT;
+    uint16_t antiGravityConfigTag = ANTI_GRAVITY_CONFIG_TAG;
 
     ModelConfig()
     {
