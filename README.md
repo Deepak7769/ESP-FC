@@ -145,4 +145,4 @@ SOFTWARE.
 If you like this project and you want it to be still developed, you can support me a little.
 
 * BTC: 1Lopez7yPtbyjfLGe892JfheDFJMMt43tW
-* LTC: LV3G3sJxz9AYpDMYUpx6b5m8K7YvX3ak
+* LTC: LV3G3sJxz9AYpDMYUp8e1LCmerFYxVY3ak
