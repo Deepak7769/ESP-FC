@@ -96,6 +96,16 @@ class BuzzerState
     int32_t beeperMask;
 };
 
+struct AntiGravityState
+{
+  bool active = false;
+  float throttle = 0.0f;
+  float derivative = 0.0f;
+  float filteredDerivative = 0.0f;
+  float iMultiplier = 1.0f;
+  float pMultiplier = 1.0f;
+};
+
 class BatteryState
 {
   public:
@@ -666,6 +676,7 @@ struct ModelState
   Connect::StatusLed led;
 
   BatteryState battery;
+  AntiGravityState antiGravity;
 
   MixerConfig currentMixer;
   MixerConfig customMixer;
