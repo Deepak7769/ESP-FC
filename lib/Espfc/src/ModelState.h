@@ -134,6 +134,16 @@ class BatteryState
     float percentage;
     int8_t cells;
     int8_t samples;
+
+    // Betaflight CURRENT_METER_MSP bridge. A companion processor (for
+    // example one reading an INA219) can answer MSP_ANALOG and provide the
+    // FC with current/consumption telemetry without coupling that sensor to
+    // the flight-control loops.
+    int16_t mspCurrentCentiAmps = 0;
+    uint16_t mspMahDrawn = 0;
+    uint32_t mspCurrentLastUpdateUs = 0;
+    bool mspCurrentValid = false;
+
     Utils::Timer timer;
 };
 
