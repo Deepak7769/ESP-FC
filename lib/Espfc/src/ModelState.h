@@ -96,6 +96,25 @@ class BuzzerState
     int32_t beeperMask;
 };
 
+struct AntiGravityState
+{
+  bool enabled = false;
+  bool active = false;
+
+  // Normalized manual throttle, 0..1.
+  float throttle = 0.0f;
+
+  // Raw and filtered throttle derivative used by Betaflight-style
+  // anti-gravity detection.
+  float derivative = 0.0f;
+  float filteredDerivative = 0.0f;
+
+  // Diagnostic-only gain multipliers. They are intentionally not applied to
+  // the motor-driving PID path.
+  float iMultiplier = 1.0f;
+  float pMultiplier = 1.0f;
+};
+
 class BatteryState
 {
   public:
@@ -666,6 +685,7 @@ struct ModelState
   Connect::StatusLed led;
 
   BatteryState battery;
+  AntiGravityState antiGravity;
 
   MixerConfig currentMixer;
   MixerConfig customMixer;
