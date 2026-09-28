@@ -34,11 +34,16 @@ private:
   void updateAssistedModes();
 
   float calculatePilotClimbRateShadow() const;
+  void updateAntiGravityShadow();
 
   // Core controller dependencies.
   Model& _model;
   Rates _rates;
   Utils::Filter _speedFilter;
+  Utils::Filter _antiGravityFilter;
+
+  bool _antiGravityPrimed = false;
+  float _antiGravityPrevThrottle = 0.0f;
 
   // Angle V2 transition state.
   bool _angleV2WasActive = false;
