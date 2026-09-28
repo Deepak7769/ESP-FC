@@ -1903,6 +1903,82 @@ void test_controller_anti_gravity_shadow_tracks_manual_throttle_transient()
 }
 
 
+void test_controller_anti_gravity_shadow_can_be_enabled_by_mode()
+{
+  ArduinoFakeReset();
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          2150000);
+
+  Model model;
+
+  model.config.featureMask &=
+      ~FEATURE_ANTI_GRAVITY;
+
+  model.state.gyro.clock =
+      1000;
+
+  model.config.gyro.dlpf =
+      GYRO_DLPF_256;
+
+  model.config.loopSync =
+      1;
+
+  model.config.mixerSync =
+      1;
+
+  model.config.mixer.type =
+      FC_MIXER_QUADX;
+
+  model.begin();
+
+  Controller controller(
+      model);
+
+  controller.begin();
+
+  model.state.input.channelsValid =
+      true;
+
+  model.state.input.rxLoss =
+      false;
+
+  model.state.input.rxFailSafe =
+      false;
+
+  model.state.input.ch[
+      AXIS_THRUST] =
+      -1.0f;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ANTI_GRAVITY);
+
+  controller.update();
+
+  TEST_ASSERT_TRUE(
+      model.state.antiGravity.enabled);
+
+  // Entry is primed without a synthetic derivative spike.
+  TEST_ASSERT_FALSE(
+      model.state.antiGravity.active);
+
+  model.state.input.ch[
+      AXIS_THRUST] =
+      0.0f;
+
+  controller.update();
+
+  TEST_ASSERT_TRUE(
+      model.state.antiGravity.derivative >
+      0.0f);
+}
+
+
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
 
 void test_controller_anti_gravity_shadow_yields_to_assisted_vertical_control()
@@ -2130,6 +2206,10 @@ void test_voltage_sensor_reads_fresh_msp_current_and_rejects_stale_data()
       0.0f,
       model.state.battery
           .currentUnfiltered);
+
+  TEST_ASSERT_FALSE(
+      model.state.battery
+          .mspCurrentValid);
 }
 
 
@@ -7416,6 +7496,7 @@ RUN_TEST(
   RUN_TEST(test_actuator_mode_link_rejects_linked_source_chain);
   RUN_TEST(test_actuator_mode_logic_and_requires_all_ranges);
   RUN_TEST(test_controller_anti_gravity_shadow_tracks_manual_throttle_transient);
+  RUN_TEST(test_controller_anti_gravity_shadow_can_be_enabled_by_mode);
   RUN_TEST(test_msp_current_meter_reply_updates_battery_state);
   RUN_TEST(test_voltage_sensor_reads_fresh_msp_current_and_rejects_stale_data);
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
