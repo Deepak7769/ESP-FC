@@ -698,21 +698,22 @@ config.controller.tpaBreakpoint =
         1000,
         1999);
 
-config.controller.antiGravityGain =
-    std::clamp<uint8_t>(
-        config.controller.antiGravityGain,
-        0,
-        250);
+// Anti-Gravity uses bytes that were legacy tail padding. Treat an absent tag
+// as an old EEPROM image and initialize those bytes deterministically instead
+// of accepting arbitrary historical padding as a gain value.
+if (config.antiGravityConfigTag !=
+    0xA647)
+{
+  config.antiGravityGain =
+      80;
 
-config.controller.antiGravityCutoffHz =
-    std::clamp<uint8_t>(
-        config.controller.antiGravityCutoffHz,
-        2,
-        50);
+  config.antiGravityConfigTag =
+      0xA647;
+}
 
-config.controller.antiGravityPGain =
+config.antiGravityGain =
     std::clamp<uint8_t>(
-        config.controller.antiGravityPGain,
+        config.antiGravityGain,
         0,
         250);
 
