@@ -1,5 +1,6 @@
 #include "Connect/MspProcessor.hpp"
 #include "Hardware.h"
+#include "Hal/Time.hpp"
 #include "Model.h"
 #include "ModelConfig.h"
 #include "Stream/Printer.hpp"
@@ -128,12 +129,19 @@ static int8_t toIbatSource(uint8_t t)
 {
   switch (t)
   {
-    case 0:
-      return 0; // none
-    case 1:
-      return 1; // internal adc
+    case CURRENT_METER_NONE:
+      return CURRENT_METER_NONE;
+
+    case CURRENT_METER_ADC:
+      return CURRENT_METER_ADC;
+
+    case CURRENT_METER_MSP:
+      return CURRENT_METER_MSP;
+
+    // VIRTUAL and ESC are Betaflight IDs, but ESP-FC has no implementation
+    // for those sources yet. Do not silently retain an unsupported source.
     default:
-      return 0;
+      return CURRENT_METER_NONE;
   }
 }
 
@@ -197,6 +205,50 @@ bool MspProcessor::parse(char c, MspMessage& msg)
 
   return !msg.isIdle();
 }
+
+void MspProcessor::processReply(MspMessage& m)
+{
+  // Betaflight CURRENT_METER_MSP consumes the standard MSP_ANALOG reply.
+  // This lets a companion processor publish INA219-derived current using the
+  // same payload and units as a Betaflight MSP current meter.
+  if (m.cmd != MSP_ANALOG ||
+      _model.config.ibat.source !=
+          CURRENT_METER_MSP ||
+      m.remain() < 7)
+  {
+    return;
+  }
+
+  // Legacy voltage is part of MSP_ANALOG but ESP-FC keeps voltage-source
+  // selection independent from current-source selection.
+  m.readU8();
+
+  const uint16_t mAhDrawn =
+      m.readU16();
+
+  // RSSI is not owned by the current-meter bridge.
+  m.readU16();
+
+  const int16_t currentCentiAmps =
+      static_cast<int16_t>(
+          m.readU16());
+
+  auto& battery =
+      _model.state.battery;
+
+  battery.mspCurrentCentiAmps =
+      currentCentiAmps;
+
+  battery.mspMahDrawn =
+      mAhDrawn;
+
+  battery.mspCurrentLastUpdateUs =
+      micros();
+
+  battery.mspCurrentValid =
+      true;
+}
+
 
 void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWritable& s)
 {
@@ -421,7 +473,7 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
 
     case MSP_ANALOG:
       r.writeU8(toVbatVoltageLegacy(_model.state.battery.voltage)); // voltage in 0.1V
-      r.writeU16(0);                                                // mah drawn
+      r.writeU16(_model.state.battery.mspMahDrawn);                 // mAh drawn
       r.writeU16(_model.getRssi());                                 // rssi
       r.writeU16(toIbatCurrent(_model.state.battery.current));      // amperage in 0.01A
       r.writeU16(toVbatVoltage(_model.state.battery.voltage));      // voltage in 0.01V
@@ -471,8 +523,8 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
 
       // battery state
       r.writeU8(toVbatVoltageLegacy(_model.state.battery.voltage)); // in 0.1V steps
-      r.writeU16(0);                                                // milliamp hours drawn from battery
-      r.writeU16(toIbatCurrent(_model.state.battery.current)); // send current in 0.01 A steps, range is -320A to 320A
+      r.writeU16(_model.state.battery.mspMahDrawn);                 // milliamp hours drawn from battery
+      r.writeU16(toIbatCurrent(_model.state.battery.current));      // send current in 0.01 A steps, range is -320A to 320A
 
       // battery alerts
       r.writeU8(0);
