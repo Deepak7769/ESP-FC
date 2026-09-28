@@ -2742,7 +2742,7 @@ void test_controller_althold_v2_inactive_build_does_not_drive_thrust()
 
   controller.update();
 
-  // V2 should still run in assisted.
+  // V2 controller state should still update without output authority.
   TEST_ASSERT_TRUE(
       model.state.assistedMode
           .altitudeActive);

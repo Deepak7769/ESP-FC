@@ -16,7 +16,7 @@ safe-bench macro.
 and servo drivers from being initialized or attached. This validation firmware
 is therefore intended only for non-actuating bench observation, not flight.
 
-The ordinary ESP32 firmware remains non-authoritative for Anti-Gravity at this milestone. The controller implementation is uses one controller algorithm: the same Anti-Gravity calculation is used, and only the compile-time authority gate decides whether its P/I demand reaches the rate PID.
+The ordinary ESP32 firmware remains non-authoritative for Anti-Gravity at this milestone. There is now one Anti-Gravity controller algorithm; the compile-time authority gate decides whether its P/I demand reaches the rate PID.
 
 ## Validation build
 
