@@ -14,6 +14,7 @@ public:
   MspProcessor(Model& model);
   bool parse(char c, MspMessage& msg);
   void processCommand(MspMessage& m, MspResponse& r, Stream::ReadWritable& s);
+  void processReply(MspMessage& m);
   void processEsc4way();
   void processRestart();
   void serializeFlashData(MspResponse& r, uint32_t address, const uint16_t size, bool useLegacyFormat,
