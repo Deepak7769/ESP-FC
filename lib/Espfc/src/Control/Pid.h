@@ -46,7 +46,9 @@ public:
     float setpoint,
     float measure,
     float tpaFactor = 1.0f,
-    bool tpaP = true);
+    bool tpaP = true,
+    float pMultiplier = 1.0f,
+    float iGainAdd = 0.0f);
   void resetIterm();
 
   float rate;

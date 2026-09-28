@@ -4,6 +4,11 @@
 #include "Utils/Math.hpp"
 #include <algorithm>
 #include <cmath>
+#if defined(ESPFC_ANTI_GRAVITY_ACTIVE_TEST) && \
+    !defined(ESPFC_SAFE_BENCH_BUILD)
+#error "ESPFC_ANTI_GRAVITY_ACTIVE_TEST requires ESPFC_SAFE_BENCH_BUILD"
+#endif
+
 namespace Espfc::Control {
 namespace {
 
@@ -155,9 +160,10 @@ updateAssistedModes();
     }
   }
 
-  // Betaflight-style anti-gravity transient detection is maintained as a
-  // diagnostic/shadow path. It intentionally does not scale the motor-driving
-  // PID terms.
+  // Betaflight-style Anti-Gravity demand is computed every cycle. Ordinary
+  // builds keep it diagnostic-only. ESPFC_ANTI_GRAVITY_ACTIVE_TEST may feed
+  // that demand into rate-PID math, but only in a SAFE_BENCH build where
+  // Mixer.cpp cannot attach ESC/servo outputs.
   updateAntiGravityShadow();
 
   {
@@ -411,6 +417,42 @@ void FAST_CODE_ATTR Controller::innerLoop()
 
   auto& innerPid = _model.state.innerPid;
   auto& output = _model.state.output;
+  auto& antiGravity = _model.state.antiGravity;
+
+#if defined(ESPFC_ANTI_GRAVITY_ACTIVE_TEST)
+  // The compile-time guard above requires SAFE_BENCH, so this can change only
+  // internal PID math while Mixer.cpp keeps physical outputs unattached.
+  antiGravity.ratePidApplied =
+      antiGravity.active;
+#else
+  antiGravity.ratePidApplied =
+      false;
+#endif
+
+  if (_model.config.debug.mode ==
+      DEBUG_ANTI_GRAVITY)
+  {
+    _model.state.debug[4] =
+        antiGravity.ratePidApplied
+            ? 1
+            : 0;
+
+    _model.state.debug[5] =
+        std::clamp<long>(
+            lrintf(
+                antiGravity.scaledDerivative *
+                100.0f),
+            -32000L,
+            32000L);
+
+    _model.state.debug[6] =
+        std::clamp<long>(
+            lrintf(
+                antiGravity.iAccelerator *
+                1000.0f),
+            -32000L,
+            32000L);
+  }
 
  for (size_t i = 0;
      i < AXIS_COUNT_RPY;
@@ -421,6 +463,51 @@ void FAST_CODE_ATTR Controller::innerLoop()
 
   const float fScale =
       pid.fScale;
+
+  float antiGravityPMultiplier =
+      1.0f;
+
+  float antiGravityIAccelerator =
+      0.0f;
+
+#if defined(ESPFC_ANTI_GRAVITY_ACTIVE_TEST)
+  // Match Betaflight's current axis policy: Anti-Gravity boosts P and I on
+  // roll/pitch, while yaw receives neither Anti-Gravity I acceleration nor P
+  // boost. P boost is attenuated above 50 deg/s of commanded axis rate.
+  if (antiGravity.active &&
+      i < AXIS_YAW)
+  {
+    const float axisRateDps =
+        std::fabs(
+            Utils::toDeg(
+                setpoint.rate[i]));
+
+    const float setpointAttenuator =
+        std::max(
+            axisRateDps /
+                50.0f,
+            1.0f);
+
+    constexpr float
+        ANTIGRAVITY_KP =
+            0.0034f;
+
+    const float pGain =
+        (static_cast<float>(
+             ControllerConfig::ANTI_GRAVITY_P_GAIN) /
+         100.0f) *
+        ANTIGRAVITY_KP;
+
+    antiGravityPMultiplier =
+        1.0f +
+        (antiGravity.scaledDerivative /
+         setpointAttenuator) *
+            pGain;
+
+    antiGravityIAccelerator =
+        antiGravity.iAccelerator;
+  }
+#endif
 
 const bool assistedAttitudeRateOwned =
     _model.state.angleV2.active;
@@ -438,7 +525,9 @@ const bool assistedAttitudeRateOwned =
         setpoint.rate[i],
         _model.state.gyro.adc[i],
         tpaFactor,
-        tpaP);
+        tpaP,
+        antiGravityPMultiplier,
+        antiGravityIAccelerator);
 
   
   pid.fScale =
@@ -760,6 +849,10 @@ void Controller::updateAntiGravityShadow()
   auto& antiGravity =
       _model.state.antiGravity;
 
+  // Authoritative application is decided later inside innerLoop().
+  antiGravity.ratePidApplied =
+      false;
+
   antiGravity.enabled =
       _model.isFeatureActive(
           FEATURE_ANTI_GRAVITY) ||
@@ -792,6 +885,12 @@ void Controller::updateAntiGravityShadow()
         0.0f;
 
     antiGravity.filteredDerivative =
+        0.0f;
+
+    antiGravity.scaledDerivative =
+        0.0f;
+
+    antiGravity.iAccelerator =
         0.0f;
 
     antiGravity.iMultiplier =
@@ -836,6 +935,12 @@ void Controller::updateAntiGravityShadow()
         0.0f;
 
     antiGravity.filteredDerivative =
+        0.0f;
+
+    antiGravity.scaledDerivative =
+        0.0f;
+
+    antiGravity.iAccelerator =
         0.0f;
 
     antiGravity.iMultiplier =
@@ -911,6 +1016,12 @@ void Controller::updateAntiGravityShadow()
   const float itermAccelerator =
       scaledDerivative *
       ANTIGRAVITY_KI;
+
+  antiGravity.scaledDerivative =
+      scaledDerivative;
+
+  antiGravity.iAccelerator =
+      itermAccelerator;
 
   antiGravity.iMultiplier =
       pitchKi > 0.000001f

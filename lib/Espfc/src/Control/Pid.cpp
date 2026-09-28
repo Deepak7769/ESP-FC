@@ -28,7 +28,9 @@ float FAST_CODE_ATTR Pid::update(
     float setpoint,
     float measurement,
     float tpaFactor,
-    bool tpaP)
+    bool tpaP,
+    float pMultiplier,
+    float iGainAdd)
 {
   error = setpoint - measurement;
    const float tpa =
@@ -43,9 +45,20 @@ float FAST_CODE_ATTR Pid::update(
 {
   pTerm *= tpa;
 }
+
+  // Optional P boost used by the guarded Anti-Gravity bench path.
+  pTerm *= std::max(pMultiplier, 0.0f);
+
   // I-term
   iTermError = error;
-  if (Ki > 0.f && iScale > 0.f)
+
+  // Anti-Gravity uses an additive I coefficient, matching the
+  // (Ki + itermAccelerator) structure used by Betaflight.
+  const float effectiveIGain =
+      Ki * iScale +
+      std::max(iGainAdd, 0.0f);
+
+  if (effectiveIGain > 0.f)
   {
     if (!outputSaturated)
     {
@@ -58,7 +71,7 @@ float FAST_CODE_ATTR Pid::update(
         itermRelaxFactor = std::max(0.0f, 1.0f - std::abs(Utils::toDeg(itermRelaxBase)) * 0.025f);
         if (!incrementOnly || increasing) iTermError *= itermRelaxFactor;
       }
-      iTerm += Ki * iScale * iTermError * dt;
+      iTerm += effectiveIGain * iTermError * dt;
       iTerm = std::clamp(iTerm, iLimitLow, iLimitHigh);
     }
   }

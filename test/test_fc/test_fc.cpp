@@ -2103,6 +2103,61 @@ void test_controller_anti_gravity_shadow_tracks_manual_throttle_transient()
   TEST_ASSERT_TRUE(
       model.state.antiGravity.pMultiplier >=
       1.0f);
+
+#if defined(ESPFC_ANTI_GRAVITY_ACTIVE_TEST)
+  TEST_ASSERT_TRUE(
+      model.state.antiGravity.ratePidApplied);
+
+  TEST_ASSERT_TRUE(
+      model.state.antiGravity.iAccelerator >
+      0.0f);
+#else
+  TEST_ASSERT_FALSE(
+      model.state.antiGravity.ratePidApplied);
+#endif
+}
+
+
+void test_pid_antigravity_gain_inputs_scale_p_and_add_i()
+{
+  Espfc::Control::Pid pid;
+
+  pid.rate = 1000.0f;
+  pid.Kp = 1.0f;
+  pid.Ki = 1.0f;
+  pid.Kd = 0.0f;
+  pid.Kf = 0.0f;
+  pid.pScale = 1.0f;
+  pid.iScale = 1.0f;
+  pid.iLimitLow = -10.0f;
+  pid.iLimitHigh = 10.0f;
+  pid.oLimitLow = -10.0f;
+  pid.oLimitHigh = 10.0f;
+  pid.begin();
+
+  const float output =
+      pid.update(
+          1.0f,
+          0.0f,
+          1.0f,
+          true,
+          2.0f,
+          0.5f);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      2.0f,
+      pid.pTerm);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      0.0015f,
+      pid.iTerm);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.0001f,
+      2.0015f,
+      output);
 }
 
 
@@ -7957,6 +8012,7 @@ RUN_TEST(
   RUN_TEST(test_model_sanitize_preserves_new_antigravity_mode_rows);
   RUN_TEST(test_model_sanitize_preserves_valid_antigravity_gain);
   RUN_TEST(test_controller_anti_gravity_shadow_tracks_manual_throttle_transient);
+  RUN_TEST(test_pid_antigravity_gain_inputs_scale_p_and_add_i);
   RUN_TEST(test_controller_anti_gravity_shadow_can_be_enabled_by_mode);
   RUN_TEST(test_msp_current_meter_reply_is_ignored_when_source_is_not_msp);
   RUN_TEST(test_msp_current_meter_short_reply_is_ignored);
