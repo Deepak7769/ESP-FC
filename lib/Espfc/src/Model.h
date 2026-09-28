@@ -702,13 +702,13 @@ config.controller.tpaBreakpoint =
 // as an old EEPROM image and initialize those bytes deterministically instead
 // of accepting arbitrary historical padding as a gain value.
 if (config.antiGravityConfigTag !=
-    0xA647)
+    ModelConfig::ANTI_GRAVITY_CONFIG_TAG)
 {
   config.antiGravityGain =
-      80;
+      ModelConfig::ANTI_GRAVITY_GAIN_DEFAULT;
 
   config.antiGravityConfigTag =
-      0xA647;
+      ModelConfig::ANTI_GRAVITY_CONFIG_TAG;
 }
 
 config.antiGravityGain =
