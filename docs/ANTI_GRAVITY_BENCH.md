@@ -1,12 +1,12 @@
 # Anti-Gravity non-actuating bench validation
 
-This is the first active Anti-Gravity validation stage.
+This is the authoritative Anti-Gravity controller implementation validation stage.
 
 ## Safety boundary
 
 The active validation path is compiled only when both:
 
-- `ESPFC_ANTI_GRAVITY_ACTIVE_TEST`
+- `ESPFC_ANTI_GRAVITY_ACTIVE`
 - `ESPFC_SAFE_BENCH_BUILD`
 
 are defined. Compilation fails if the active-test macro is used without the
@@ -16,8 +16,7 @@ safe-bench macro.
 and servo drivers from being initialized or attached. This validation firmware
 is therefore intended only for non-actuating bench observation, not flight.
 
-The ordinary ESP32 firmware remains unchanged by this milestone: Anti-Gravity
-continues to run as a diagnostic/shadow calculation there.
+The ordinary ESP32 firmware remains non-authoritative for Anti-Gravity at this milestone. The controller implementation is no longer a separate shadow algorithm: the same Anti-Gravity calculation is used, and only the compile-time authority gate decides whether its P/I demand reaches the rate PID.
 
 ## Validation build
 

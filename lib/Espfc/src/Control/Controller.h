@@ -34,7 +34,7 @@ private:
   void updateAssistedModes();
 
   float calculatePilotClimbRateShadow() const;
-  void updateAntiGravityShadow();
+  void updateAntiGravity();
 
   // Core controller dependencies.
   Model& _model;

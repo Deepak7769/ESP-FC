@@ -2019,7 +2019,7 @@ void test_model_sanitize_preserves_valid_antigravity_gain()
 }
 
 
-void test_controller_anti_gravity_shadow_tracks_manual_throttle_transient()
+void test_controller_anti_gravity_tracks_manual_throttle_transient()
 {
   ArduinoFakeReset();
 
@@ -2104,7 +2104,7 @@ void test_controller_anti_gravity_shadow_tracks_manual_throttle_transient()
       model.state.antiGravity.pMultiplier >=
       1.0f);
 
-#if defined(ESPFC_ANTI_GRAVITY_ACTIVE_TEST)
+#if defined(ESPFC_ANTI_GRAVITY_ACTIVE)
   TEST_ASSERT_TRUE(
       model.state.antiGravity.ratePidApplied);
 
@@ -2161,7 +2161,7 @@ void test_pid_antigravity_gain_inputs_scale_p_and_add_i()
 }
 
 
-void test_controller_anti_gravity_shadow_can_be_enabled_by_mode()
+void test_controller_anti_gravity_can_be_enabled_by_mode()
 {
   ArduinoFakeReset();
 
@@ -2239,7 +2239,7 @@ void test_controller_anti_gravity_shadow_can_be_enabled_by_mode()
 
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
 
-void test_controller_anti_gravity_shadow_yields_to_assisted_vertical_control()
+void test_controller_anti_gravity_yields_to_assisted_vertical_control()
 {
   ArduinoFakeReset();
 
@@ -8011,16 +8011,16 @@ RUN_TEST(
   RUN_TEST(test_model_sanitize_scrubs_legacy_antigravity_mode_rows);
   RUN_TEST(test_model_sanitize_preserves_new_antigravity_mode_rows);
   RUN_TEST(test_model_sanitize_preserves_valid_antigravity_gain);
-  RUN_TEST(test_controller_anti_gravity_shadow_tracks_manual_throttle_transient);
+  RUN_TEST(test_controller_anti_gravity_tracks_manual_throttle_transient);
   RUN_TEST(test_pid_antigravity_gain_inputs_scale_p_and_add_i);
-  RUN_TEST(test_controller_anti_gravity_shadow_can_be_enabled_by_mode);
+  RUN_TEST(test_controller_anti_gravity_can_be_enabled_by_mode);
   RUN_TEST(test_msp_current_meter_reply_is_ignored_when_source_is_not_msp);
   RUN_TEST(test_msp_current_meter_short_reply_is_ignored);
   RUN_TEST(test_model_sanitize_preserves_msp_current_source);
   RUN_TEST(test_msp_current_meter_reply_updates_battery_state);
   RUN_TEST(test_voltage_sensor_reads_fresh_msp_current_and_rejects_stale_data);
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
-  RUN_TEST(test_controller_anti_gravity_shadow_yields_to_assisted_vertical_control);
+  RUN_TEST(test_controller_anti_gravity_yields_to_assisted_vertical_control);
 #endif
   RUN_TEST(test_actuator_no_receiver_cannot_activate_aux_mode);
   RUN_TEST(test_actuator_gps_arming_block_clears_when_feature_disabled);

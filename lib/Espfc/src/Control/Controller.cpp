@@ -4,9 +4,9 @@
 #include "Utils/Math.hpp"
 #include <algorithm>
 #include <cmath>
-#if defined(ESPFC_ANTI_GRAVITY_ACTIVE_TEST) && \
+#if defined(ESPFC_ANTI_GRAVITY_ACTIVE) && \
     !defined(ESPFC_SAFE_BENCH_BUILD)
-#error "ESPFC_ANTI_GRAVITY_ACTIVE_TEST requires ESPFC_SAFE_BENCH_BUILD"
+#error "ESPFC_ANTI_GRAVITY_ACTIVE requires ESPFC_SAFE_BENCH_BUILD"
 #endif
 
 namespace Espfc::Control {
@@ -161,10 +161,10 @@ updateAssistedModes();
   }
 
   // Betaflight-style Anti-Gravity demand is computed every cycle. Ordinary
-  // builds keep it diagnostic-only. ESPFC_ANTI_GRAVITY_ACTIVE_TEST may feed
+  // builds keep it diagnostic-only. ESPFC_ANTI_GRAVITY_ACTIVE may feed
   // that demand into rate-PID math, but only in a SAFE_BENCH build where
   // Mixer.cpp cannot attach ESC/servo outputs.
-  updateAntiGravityShadow();
+  updateAntiGravity();
 
   {
     Utils::Stats::Measure measure(_model.state.stats, COUNTER_INNER_PID);
@@ -419,7 +419,7 @@ void FAST_CODE_ATTR Controller::innerLoop()
   auto& output = _model.state.output;
   auto& antiGravity = _model.state.antiGravity;
 
-#if defined(ESPFC_ANTI_GRAVITY_ACTIVE_TEST)
+#if defined(ESPFC_ANTI_GRAVITY_ACTIVE)
   // The compile-time guard above requires SAFE_BENCH, so this can change only
   // internal PID math while Mixer.cpp keeps physical outputs unattached.
   antiGravity.ratePidApplied =
@@ -470,7 +470,7 @@ void FAST_CODE_ATTR Controller::innerLoop()
   float antiGravityIAccelerator =
       0.0f;
 
-#if defined(ESPFC_ANTI_GRAVITY_ACTIVE_TEST)
+#if defined(ESPFC_ANTI_GRAVITY_ACTIVE)
   // Match Betaflight's current axis policy: Anti-Gravity boosts P and I on
   // roll/pitch, while yaw receives neither Anti-Gravity I acceleration nor P
   // boost. P boost is attenuated above 50 deg/s of commanded axis rate.
@@ -844,7 +844,7 @@ else
     _model.state.debug[3] = lrintf(innerPid[AXIS_ROLL].iTerm * 1000.0f);
   }
 }
-void Controller::updateAntiGravityShadow()
+void Controller::updateAntiGravity()
 {
   auto& antiGravity =
       _model.state.antiGravity;
@@ -999,8 +999,9 @@ void Controller::updateAntiGravityShadow()
           _model.config
               .antiGravityGain);
 
-  // Betaflight constants are used only to report the equivalent gain demand.
-  // These multipliers are not applied to the active flight PID path.
+  // Betaflight constants define the Anti-Gravity gain demand. The demand is
+  // diagnostic in ordinary builds and is applied only when the authoritative
+  // ESPFC_ANTI_GRAVITY_ACTIVE path is compiled.
   constexpr float ANTIGRAVITY_KI =
       0.34f;
 
