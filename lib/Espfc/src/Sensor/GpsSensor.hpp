@@ -18,6 +18,9 @@ public:
 
 private:
   void calculateHomeVector() const;
+  void updateSolutionFreshness(uint32_t now) const;
+  void markSolutionFresh(uint32_t now) const;
+  void refreshSatelliteSummary() const;
 
   enum State
   {
@@ -102,6 +105,7 @@ private:
 
   static constexpr uint32_t TIMEOUT = 300000;
   static constexpr uint32_t DETECT_TIMEOUT = 2200000;
+  static constexpr uint32_t SOLUTION_TIMEOUT = 1500000;
 
   Model& _model;
 

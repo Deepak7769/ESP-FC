@@ -71,6 +71,8 @@ int GpsSensor::update()
 
   if (!updated) handle();
 
+  updateSolutionFreshness(micros());
+
   return 1;
 }
 
@@ -719,6 +721,66 @@ void GpsSensor::configureGnss()
   _model.logger.logln(written);
 }
 
+void GpsSensor::markSolutionFresh(uint32_t now) const
+{
+  _model.state.gps.lastSolutionUs = now;
+  _model.state.gps.solutionFresh = true;
+}
+
+void GpsSensor::updateSolutionFreshness(uint32_t now) const
+{
+  auto& gps = _model.state.gps;
+
+  if (!gps.solutionFresh)
+  {
+    return;
+  }
+
+  if (static_cast<uint32_t>(now - gps.lastSolutionUs) <= SOLUTION_TIMEOUT)
+  {
+    return;
+  }
+
+  // Preserve the last coordinates for diagnostics, but explicitly invalidate
+  // the navigation solution so stale data cannot masquerade as a current fix.
+  gps.solutionFresh = false;
+  gps.fix = false;
+  gps.fixType = 0;
+  gps.numSats = 0;
+  gps.usedSats = 0;
+  gps.distanceToHome = 0.0f;
+  gps.directionToHome = 0.0f;
+}
+
+void GpsSensor::refreshSatelliteSummary() const
+{
+  auto& gps = _model.state.gps;
+
+  uint8_t used = 0;
+  uint8_t maxCno = 0;
+
+  const size_t count =
+      std::min<size_t>(gps.numCh, SAT_MAX);
+
+  for (size_t i = 0; i < count; ++i)
+  {
+    const auto& sv = gps.svinfo[i];
+
+    if (sv.quality.svUsed)
+    {
+      ++used;
+    }
+
+    maxCno =
+        std::max<uint8_t>(
+            maxCno,
+            sv.cno);
+  }
+
+  gps.usedSats = used;
+  gps.maxCno = maxCno;
+}
+
 void GpsSensor::calculateHomeVector() const
 {
   if (!_model.state.gps.isHomeValid())
@@ -814,9 +876,10 @@ void GpsSensor::handleNavPvt() const
     _model.state.gps.dateTime.msec = msec;
   }
 
-  uint32_t now = micros();
+  const uint32_t now = micros();
   _model.state.gps.interval = now - _model.state.gps.lastMsgTs;
   _model.state.gps.lastMsgTs = now;
+  markSolutionFresh(now);
 
   calculateHomeVector();
 }
@@ -840,6 +903,7 @@ void GpsSensor::handleNavPosLlh() const
   const uint32_t now = micros();
   _model.state.gps.interval = now - _model.state.gps.lastMsgTs;
   _model.state.gps.lastMsgTs = now;
+  markSolutionFresh(now);
 
   calculateHomeVector();
 }
@@ -869,6 +933,8 @@ void GpsSensor::handleNavSol() const
     _model.state.gps.accuracy.horizontal =
         std::min<uint32_t>(m.pAcc, UINT32_MAX / 10u) * 10u;
   }
+
+  markSolutionFresh(micros());
 }
 
 void GpsSensor::handleNavVelNed() const
@@ -949,6 +1015,8 @@ void GpsSensor::handleNavSvInfo() const
       _model.state.gps.svinfo[i] = GpsSatelite{};
     }
   }
+
+  refreshSatelliteSummary();
 }
 
 void GpsSensor::handleNavSat() const
@@ -982,6 +1050,8 @@ void GpsSensor::handleNavSat() const
       _model.state.gps.svinfo[i] = GpsSatelite{};
     }
   }
+
+  refreshSatelliteSummary();
 }
 
 void GpsSensor::handleVersion() const

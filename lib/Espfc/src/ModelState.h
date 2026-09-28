@@ -637,12 +637,16 @@ struct GpsState
   uint8_t fixType = 0;
   uint8_t numSats = 0;
   uint8_t numCh = 0;
+  uint8_t usedSats = 0;
+  uint8_t maxCno = 0;
   bool present = false;
   bool frameError = false;
   bool wasLocked = false;
   bool homeSet = false;
-  uint32_t interval;
-  uint32_t lastMsgTs;
+  bool solutionFresh = false;
+  uint32_t interval = 0;
+  uint32_t lastMsgTs = 0;
+  uint32_t lastSolutionUs = 0;
   GpsSupportState support;
   GpsPosition location;
   GpsVelocity velocity;
@@ -652,7 +656,7 @@ struct GpsState
   GpsSatelite svinfo[SAT_MAX];
   float distanceToHome = 0;
   float directionToHome = 0;
-  bool isHomeValid() const { return homeSet && fix && fixType >= 2; }
+  bool isHomeValid() const { return homeSet && solutionFresh && fix && fixType >= 2; }
 };
 
 // runtime data
