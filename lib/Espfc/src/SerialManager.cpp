@@ -195,8 +195,16 @@ int FAST_CODE_ATTR SerialManager::update()
       processMsp(ss);
 
       if (_model.config.ibat.source ==
-          CURRENT_METER_MSP)
+              CURRENT_METER_MSP &&
+          sc.id !=
+              SERIAL_ID_USB_VCP &&
+          sc.id !=
+              SERIAL_ID_NONE)
       {
+        // CURRENT_METER_MSP is an FC-initiated request/response bridge. Never
+        // inject those requests onto USB VCP, where Betaflight Configurator is
+        // normally the MSP master. Dedicated UART/soft-serial MSP ports remain
+        // eligible for a companion processor carrying INA219 telemetry.
         const uint32_t now =
             micros();
 
