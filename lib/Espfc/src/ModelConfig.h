@@ -632,7 +632,8 @@ struct IBatConfig
   // Values follow Betaflight currentMeterSource_e so Configurator/MSP source
   // selection stays interoperable. ESP-FC currently implements NONE, ADC and
   // MSP. MSP is the intended bridge for an INA219 connected to a companion
-  // processor.
+  // processor. The companion may push MSP_ANALOG replies over an RX-only link;
+  // FC-originated polling is a separate compile-time opt-in.
   int8_t source = CURRENT_METER_NONE;
   int16_t scale = 100;
   int16_t offset = 0;
