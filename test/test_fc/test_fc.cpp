@@ -1873,6 +1873,112 @@ void test_model_sanitize_migrates_legacy_antigravity_tail()
 }
 
 
+void test_model_sanitize_scrubs_legacy_antigravity_mode_rows()
+{
+  Model model;
+
+  model.config.antiGravityConfigTag =
+      0;
+
+  model.config.conditions[0].id =
+      MODE_ANTI_GRAVITY;
+
+  model.config.conditions[0].ch =
+      AXIS_AUX_1;
+
+  model.config.conditions[0].min =
+      1200;
+
+  model.config.conditions[0].max =
+      1800;
+
+  model.config.conditions[1].id =
+      MODE_ANGLE;
+
+  model.config.conditions[1].linkId =
+      MODE_ANTI_GRAVITY;
+
+  model.config.conditions[1].min =
+      1200;
+
+  model.config.conditions[1].max =
+      1800;
+
+  model.sanitize();
+
+  TEST_ASSERT_EQUAL_UINT8(
+      MODE_ARMED,
+      model.config.conditions[0].id);
+
+  TEST_ASSERT_EQUAL_INT16(
+      900,
+      model.config.conditions[0].min);
+
+  TEST_ASSERT_EQUAL_INT16(
+      900,
+      model.config.conditions[0].max);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      0,
+      model.config.conditions[0].linkId);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      MODE_ARMED,
+      model.config.conditions[1].id);
+
+  TEST_ASSERT_EQUAL_INT16(
+      900,
+      model.config.conditions[1].min);
+
+  TEST_ASSERT_EQUAL_INT16(
+      900,
+      model.config.conditions[1].max);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      0,
+      model.config.conditions[1].linkId);
+}
+
+
+void test_model_sanitize_preserves_new_antigravity_mode_rows()
+{
+  Model model;
+
+  model.config.antiGravityConfigTag =
+      ModelConfig::ANTI_GRAVITY_CONFIG_TAG;
+
+  model.config.conditions[0].id =
+      MODE_ANTI_GRAVITY;
+
+  model.config.conditions[0].ch =
+      AXIS_AUX_2;
+
+  model.config.conditions[0].min =
+      1300;
+
+  model.config.conditions[0].max =
+      1700;
+
+  model.sanitize();
+
+  TEST_ASSERT_EQUAL_UINT8(
+      MODE_ANTI_GRAVITY,
+      model.config.conditions[0].id);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      AXIS_AUX_2,
+      model.config.conditions[0].ch);
+
+  TEST_ASSERT_EQUAL_INT16(
+      1300,
+      model.config.conditions[0].min);
+
+  TEST_ASSERT_EQUAL_INT16(
+      1700,
+      model.config.conditions[0].max);
+}
+
+
 void test_model_sanitize_preserves_valid_antigravity_gain()
 {
   Model model;
@@ -7689,6 +7795,8 @@ RUN_TEST(
   RUN_TEST(test_actuator_mode_logic_and_requires_all_ranges);
   RUN_TEST(test_model_config_antigravity_tail_layout_stays_packed);
   RUN_TEST(test_model_sanitize_migrates_legacy_antigravity_tail);
+  RUN_TEST(test_model_sanitize_scrubs_legacy_antigravity_mode_rows);
+  RUN_TEST(test_model_sanitize_preserves_new_antigravity_mode_rows);
   RUN_TEST(test_model_sanitize_preserves_valid_antigravity_gain);
   RUN_TEST(test_controller_anti_gravity_shadow_tracks_manual_throttle_transient);
   RUN_TEST(test_controller_anti_gravity_shadow_can_be_enabled_by_mode);
