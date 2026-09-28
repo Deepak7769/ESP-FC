@@ -43,8 +43,10 @@ private:
   Output::OutputIBUS _ibus;
   Sensor::GpsSensor _gps;
 
-  // Per-port schedule for Betaflight CURRENT_METER_MSP polling.
+#if defined(ESPFC_MSP_CURRENT_METER_POLLING)
+  // Per-port schedule used only by explicitly bidirectional builds.
   uint32_t _mspCurrentRequestAt[SERIAL_UART_COUNT] = {};
+#endif
 #ifdef ESPFC_SERIAL_SOFT_0_WIFI
   Wireless _wireless;
 #endif
