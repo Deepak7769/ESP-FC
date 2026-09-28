@@ -1561,7 +1561,7 @@ constexpr int REQUIRED_PID_BYTES =
       r.writeU8(_model.config.level.angleLimit); // levelAngleLimit;
       r.writeU8(0);                              // was pidProfile.levelSensitivity
       r.writeU16(0);                             // itermThrottleThreshold;
-      r.writeU16(_model.config.controller.antiGravityGain); // anti_gravity_gain
+      r.writeU16(_model.config.antiGravityGain); // anti_gravity_gain
       r.writeU16(0);
       r.writeU8(0);                                  // iterm rotation
       r.writeU8(0);                                  // smart feed forward
@@ -1622,7 +1622,7 @@ constexpr int REQUIRED_PID_BYTES =
       if (m.remain() >= 4)
       {
         m.readU16(); // itermThrottleThreshold;
-        _model.config.controller.antiGravityGain =
+        _model.config.antiGravityGain =
             std::clamp<uint16_t>(
                 m.readU16(),
                 0,
