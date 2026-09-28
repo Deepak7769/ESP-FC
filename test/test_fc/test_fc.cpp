@@ -3062,6 +3062,127 @@ void test_actuator_althold_v2_invalid_pilot_channel_exits_and_latches()
           MODE_ALTHOLD));
 }
 
+void test_controller_althold_v2_debug_exposes_vertical_control_chain()
+{
+  ArduinoFakeReset();
+
+  constexpr uint32_t NOW_US =
+      1450000;
+
+  When(
+      Method(
+          ArduinoFake(),
+          micros))
+      .AlwaysReturn(
+          NOW_US);
+
+  Model model;
+
+  model.state.gyro.clock =
+      1000;
+
+  model.config.gyro.dlpf =
+      GYRO_DLPF_256;
+
+  model.config.loopSync =
+      1;
+
+  model.config.mixerSync =
+      1;
+
+  model.config.mixer.type =
+      FC_MIXER_QUADX;
+
+  model.config.debug.mode =
+      DEBUG_AUTOPILOT_PID;
+
+  model.begin();
+
+  Controller controller(
+      model);
+
+  controller.begin();
+
+  setHealthyAssistedEstimatorState(
+      model,
+      NOW_US);
+
+  model.state.altitude.height =
+      2.0f;
+
+  model.state.altitude.vario =
+      0.15f;
+
+  model.state.altitude.healthy =
+      true;
+
+  model.state.altitude.baroAccepted =
+      true;
+
+  model.state.altitude.lastUpdateUs =
+      NOW_US;
+
+  model.state.input.ch[
+      AXIS_THRUST] =
+      0.30f;
+
+  model.state.input.ch[
+      ALTHOLD_PILOT_CHANNEL] =
+      0.0f;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_ALTHOLD);
+
+  controller.update();
+
+  const uint16_t flags =
+      static_cast<uint16_t>(
+          model.state.debug[7]);
+
+  TEST_ASSERT_TRUE(
+      flags &
+      (uint16_t{1} << 0));
+
+  TEST_ASSERT_TRUE(
+      flags &
+      (uint16_t{1} << 1));
+
+  TEST_ASSERT_TRUE(
+      flags &
+      (uint16_t{1} << 2));
+
+  TEST_ASSERT_TRUE(
+      flags &
+      (uint16_t{1} << 3));
+
+  TEST_ASSERT_TRUE(
+      flags &
+      (uint16_t{1} << 4));
+
+  TEST_ASSERT_TRUE(
+      flags &
+      (uint16_t{1} << 8));
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          model.state.innerPid[
+              AXIS_THRUST]
+              .pTerm));
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          model.state.innerPid[
+              AXIS_THRUST]
+              .iTerm));
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          model.state.output.ch[
+              AXIS_THRUST]));
+}
+
+
 #if ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL != 3
 
 void test_controller_althold_v2_uses_dedicated_centered_stick_channel()
@@ -3479,6 +3600,9 @@ void test_controller_land_v2_levels_and_requests_descent()
   model.config.mixer.type =
       FC_MIXER_QUADX;
 
+  model.config.debug.mode =
+      DEBUG_AUTOPILOT_PID;
+
   model.begin();
 
   Controller controller(
@@ -3577,6 +3701,22 @@ void test_controller_land_v2_levels_and_requests_descent()
       std::isfinite(
           model.state.output.ch[
               AXIS_THRUST]));
+
+  const uint16_t debugFlags =
+      static_cast<uint16_t>(
+          model.state.debug[7]);
+
+  TEST_ASSERT_TRUE(
+      debugFlags &
+      (uint16_t{1} << 5));
+
+  TEST_ASSERT_TRUE(
+      debugFlags &
+      (uint16_t{1} << 6));
+
+  TEST_ASSERT_FALSE(
+      debugFlags &
+      (uint16_t{1} << 7));
 }
 
 void test_controller_land_v2_requires_supervisor_authorization()
@@ -7697,6 +7837,9 @@ RUN_TEST(
 
 RUN_TEST(
     test_actuator_althold_v2_requires_centered_pilot_stick_on_entry);
+
+RUN_TEST(
+    test_controller_althold_v2_debug_exposes_vertical_control_chain);
 
 #if ESPFC_ALTHOLD_V2_CENTERED_STICK_CHANNEL >= 4
 RUN_TEST(
