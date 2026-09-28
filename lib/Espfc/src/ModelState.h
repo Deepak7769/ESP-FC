@@ -109,10 +109,15 @@ struct AntiGravityState
   float derivative = 0.0f;
   float filteredDerivative = 0.0f;
 
-  // Diagnostic-only gain multipliers. They are intentionally not applied to
-  // the motor-driving PID path.
+  // Computed gain multipliers. Normal firmware keeps these diagnostic-only.
+  // The dedicated non-actuating Anti-Gravity active-test build may apply them
+  // to the rate PID while ESPFC_SAFE_BENCH_BUILD blocks physical ESC output.
   float iMultiplier = 1.0f;
   float pMultiplier = 1.0f;
+
+  // True only when this cycle's computed multipliers were applied to the
+  // rate PID. This remains false in normal production builds.
+  bool appliedToPid = false;
 };
 
 class BatteryState
