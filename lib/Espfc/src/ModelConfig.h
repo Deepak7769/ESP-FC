@@ -731,13 +731,10 @@ struct ControllerConfig
   int8_t tpaScale = 10;
   int16_t tpaBreakpoint = 1650;
 
-  // Betaflight-compatible anti-gravity profile values.
-  // Runtime integration is kept non-actuating in this project: the controller
-  // computes and exposes the transient boost diagnostics without modifying
-  // flight PID authority.
-  uint8_t antiGravityGain = 80;
-  uint8_t antiGravityCutoffHz = 5;
-  uint8_t antiGravityPGain = 100;
+  // Keep fixed Betaflight-style filter/P defaults out of persistent storage.
+  // This avoids shifting the legacy ModelConfig binary layout.
+  static constexpr uint8_t ANTI_GRAVITY_CUTOFF_HZ = 5;
+  static constexpr uint8_t ANTI_GRAVITY_P_GAIN = 100;
 };
 
 struct VtxConfig
@@ -947,6 +944,14 @@ class ModelConfig
     uint8_t rescueConfigDelay = 30;
     int16_t boardAlignment[3] = {0, 0, 0};
     char modelName[MODEL_NAME_LEN + 1];
+
+    // These three bytes deliberately occupy the tail padding that followed
+    // modelName in the legacy ModelConfig layout. Existing field offsets and
+    // sizeof(ModelConfig) therefore stay stable across this firmware update.
+    // The tag detects old EEPROM images whose padding did not contain a valid
+    // Anti-Gravity setting.
+    uint8_t antiGravityGain = 80;
+    uint16_t antiGravityConfigTag = 0xA647;
 
     ModelConfig()
     {
