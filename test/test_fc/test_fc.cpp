@@ -13,11 +13,13 @@
 #include "Model.h"
 #include "Output/Mixer.h"
 #include "Utils/Timer.h"
+#include "msp/msp_protocol.h"
 
 #include <ArduinoFake.h>
 #include <Gps.hpp>
 #include <unity.h>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
