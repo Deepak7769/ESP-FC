@@ -194,6 +194,7 @@ int FAST_CODE_ATTR SerialManager::update()
     {
       processMsp(ss);
 
+#if defined(ESPFC_MSP_CURRENT_METER_POLLING)
       if (_model.config.ibat.source ==
               CURRENT_METER_MSP &&
           sc.id !=
@@ -201,10 +202,9 @@ int FAST_CODE_ATTR SerialManager::update()
           sc.id !=
               SERIAL_ID_NONE)
       {
-        // CURRENT_METER_MSP is an FC-initiated request/response bridge. Never
-        // inject those requests onto USB VCP, where Betaflight Configurator is
-        // normally the MSP master. Dedicated UART/soft-serial MSP ports remain
-        // eligible for a companion processor carrying INA219 telemetry.
+        // Optional bidirectional mode. The project hardware can run the current
+        // bridge RX-only, so polling is deliberately opt-in. When enabled,
+        // never inject FC-originated MSP requests onto Configurator USB.
         const uint32_t now =
             micros();
 
@@ -222,6 +222,7 @@ int FAST_CODE_ATTR SerialManager::update()
               *ss.stream);
         }
       }
+#endif
     }
     if(sc.functionMask & SERIAL_FUNCTION_TELEMETRY_FRSKY && _model.state.telemetryTimer.check())
     {
