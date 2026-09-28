@@ -1482,6 +1482,336 @@ void test_actuator_althold_fault_requires_switch_cycle()
 
 
 
+void test_actuator_mode_link_activates_target_without_aux_range()
+{
+  Model model;
+
+  model.state.input.channelsValid =
+      true;
+
+  model.state.input.rxLoss =
+      false;
+
+  model.state.input.channelCount =
+      AXIS_AUX_2 + 1;
+
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1500;
+
+  // Source mode: BUZZER from AUX1.
+  auto& source =
+      model.config.conditions[0];
+
+  source.id =
+      MODE_BUZZER;
+
+  source.ch =
+      AXIS_AUX_1;
+
+  source.min =
+      1200;
+
+  source.max =
+      1800;
+
+  // Target mode: BLACKBOX linked to BUZZER. No AUX range is configured.
+  auto& linked =
+      model.config.conditions[1];
+
+  linked.id =
+      MODE_BLACKBOX;
+
+  linked.min =
+      900;
+
+  linked.max =
+      900;
+
+  linked.logicMode =
+      0;
+
+  linked.linkId =
+      MODE_BUZZER;
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+
+  TEST_ASSERT_TRUE(
+      model.state.mode.maskPresent &
+      (uint32_t{1} <<
+       MODE_BLACKBOX));
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_BUZZER));
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_BLACKBOX));
+
+  // Turning the source mode off also clears the linked target.
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1000;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_BUZZER));
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_BLACKBOX));
+}
+
+
+void test_actuator_mode_logic_and_requires_all_ranges()
+{
+  Model model;
+
+  model.state.input.channelsValid =
+      true;
+
+  model.state.input.rxLoss =
+      false;
+
+  model.state.input.channelCount =
+      AXIS_AUX_2 + 1;
+
+  auto& first =
+      model.config.conditions[0];
+
+  first.id =
+      MODE_BUZZER;
+
+  first.ch =
+      AXIS_AUX_1;
+
+  first.min =
+      1200;
+
+  first.max =
+      1800;
+
+  first.logicMode =
+      1;
+
+  auto& second =
+      model.config.conditions[1];
+
+  second.id =
+      MODE_BUZZER;
+
+  second.ch =
+      AXIS_AUX_2;
+
+  second.min =
+      1200;
+
+  second.max =
+      1800;
+
+  second.logicMode =
+      1;
+
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1500;
+
+  model.state.input.us[
+      AXIS_AUX_2] =
+      1000;
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+  actuator.updateModeMask();
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_BUZZER));
+
+  model.state.input.us[
+      AXIS_AUX_2] =
+      1500;
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_BUZZER));
+}
+
+
+void test_actuator_mode_link_cannot_target_arm()
+{
+  Model model;
+
+  model.state.input.channelsValid =
+      true;
+
+  model.state.input.rxLoss =
+      false;
+
+  model.state.input.channelCount =
+      AXIS_AUX_1 + 1;
+
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1500;
+
+  auto& source =
+      model.config.conditions[0];
+
+  source.id =
+      MODE_BUZZER;
+
+  source.ch =
+      AXIS_AUX_1;
+
+  source.min =
+      1200;
+
+  source.max =
+      1800;
+
+  auto& linkedArm =
+      model.config.conditions[1];
+
+  linkedArm.id =
+      MODE_ARMED;
+
+  linkedArm.min =
+      900;
+
+  linkedArm.max =
+      900;
+
+  linkedArm.linkId =
+      MODE_BUZZER;
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+
+  TEST_ASSERT_FALSE(
+      model.state.mode.maskPresent &
+      (uint32_t{1} <<
+       MODE_ARMED));
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_BUZZER));
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_ARMED));
+}
+
+
+void test_actuator_mode_link_rejects_linked_source_chain()
+{
+  Model model;
+
+  model.state.input.channelsValid =
+      true;
+
+  model.state.input.rxLoss =
+      false;
+
+  model.state.input.channelCount =
+      AXIS_AUX_1 + 1;
+
+  model.state.input.us[
+      AXIS_AUX_1] =
+      1500;
+
+  auto& source =
+      model.config.conditions[0];
+
+  source.id =
+      MODE_BUZZER;
+
+  source.ch =
+      AXIS_AUX_1;
+
+  source.min =
+      1200;
+
+  source.max =
+      1800;
+
+  auto& middle =
+      model.config.conditions[1];
+
+  middle.id =
+      MODE_BLACKBOX;
+
+  middle.min =
+      900;
+
+  middle.max =
+      900;
+
+  middle.linkId =
+      MODE_BUZZER;
+
+  auto& chained =
+      model.config.conditions[2];
+
+  chained.id =
+      MODE_BLACKBOX_ERASE;
+
+  chained.min =
+      900;
+
+  chained.max =
+      900;
+
+  chained.linkId =
+      MODE_BLACKBOX;
+
+  Actuator actuator(
+      model);
+
+  actuator.begin();
+
+  TEST_ASSERT_TRUE(
+      model.state.mode.maskPresent &
+      (uint32_t{1} <<
+       MODE_BLACKBOX));
+
+  TEST_ASSERT_FALSE(
+      model.state.mode.maskPresent &
+      (uint32_t{1} <<
+       MODE_BLACKBOX_ERASE));
+
+  actuator.updateModeMask();
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_BUZZER));
+
+  TEST_ASSERT_TRUE(
+      model.isModeActive(
+          MODE_BLACKBOX));
+
+  TEST_ASSERT_FALSE(
+      model.isModeActive(
+          MODE_BLACKBOX_ERASE));
+}
+
+
 void test_actuator_angle_fault_requires_switch_cycle()
 {
   When(Method(ArduinoFake(), micros)).AlwaysReturn(50000);
@@ -6760,6 +7090,10 @@ RUN_TEST(
   RUN_TEST(test_actuator_missing_aux_channel_does_not_apply_scaler);
   RUN_TEST(
     test_actuator_angle_v2_scaler_updates_selected_axis);
+  RUN_TEST(test_actuator_mode_link_activates_target_without_aux_range);
+  RUN_TEST(test_actuator_mode_link_cannot_target_arm);
+  RUN_TEST(test_actuator_mode_link_rejects_linked_source_chain);
+  RUN_TEST(test_actuator_mode_logic_and_requires_all_ranges);
   RUN_TEST(test_actuator_no_receiver_cannot_activate_aux_mode);
   RUN_TEST(test_actuator_gps_arming_block_clears_when_feature_disabled);
   RUN_TEST(test_ppm_only_publishes_complete_stable_frames);
