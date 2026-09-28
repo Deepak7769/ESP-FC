@@ -4,19 +4,22 @@ This is the authoritative Anti-Gravity controller implementation validation stag
 
 ## Safety boundary
 
-The active validation path is compiled only when both:
+The active validation path is compiled when:
 
-- `ESPFC_ANTI_GRAVITY_ACTIVE`
 - `ESPFC_SAFE_BENCH_BUILD`
 
-are defined. Compilation fails if the active-test macro is used without the
-safe-bench macro.
+is defined.
 
-`ESPFC_SAFE_BENCH_BUILD` keeps the mixer math running but prevents the motor
-and servo drivers from being initialized or attached. This validation firmware
-is therefore intended only for non-actuating bench observation, not flight.
+`ESPFC_SAFE_BENCH_BUILD` is the single compile-time authority gate for
+Anti-Gravity validation. It allows the calculated Anti-Gravity P/I demand to
+reach the rate PID while keeping the mixer math running and preventing the
+motor and servo drivers from being initialized or attached. This validation
+firmware is therefore intended only for non-actuating bench observation, not
+flight.
 
-The ordinary ESP32 firmware remains non-authoritative for Anti-Gravity at this milestone. There is now one Anti-Gravity controller algorithm; the compile-time authority gate decides whether its P/I demand reaches the rate PID.
+The ordinary ESP32 firmware remains non-authoritative for Anti-Gravity at this
+milestone. Runtime enablement still comes from the Anti-Gravity feature or mode;
+the bench flag decides whether that demand is permitted to reach the rate PID.
 
 ## Validation build
 
@@ -59,7 +62,7 @@ The existing fields remain:
 | debug[2] | pitch-equivalent I gain multiplier x1000 |
 | debug[3] | pitch P gain multiplier x1000 |
 
-The active bench build adds:
+The SAFE_BENCH authority path adds:
 
 | field | meaning |
 | ---: | --- |
