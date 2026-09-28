@@ -2255,78 +2255,7 @@ void MspProcessor::requestCurrentMeter(Stream::ReadWritable& s)
           MSP_ANALOG);
 
   const uint8_t frame[] = {
-      static_cast<uint8_t>('void MspProcessor::postCommand()
-{
-  if (!_postCommand) return;
-  auto cb = _postCommand;
-  _postCommand = {};
-  cb();
-}
-
-bool MspProcessor::debugSkip(uint8_t cmd)
-{
-  // return true;
-  // return false;
-  if (cmd == MSP_STATUS) return true;
-  if (cmd == MSP_STATUS_EX) return true;
-  if (cmd == MSP_BOXNAMES) return true;
-  if (cmd == MSP_ANALOG) return true;
-  if (cmd == MSP_ATTITUDE) return true;
-  if (cmd == MSP_ALTITUDE) return true;
-  if (cmd == MSP_RC) return true;
-  if (cmd == MSP_RAW_IMU) return true;
-  if (cmd == MSP_MOTOR) return true;
-  if (cmd == MSP_SERVO) return true;
-  if (cmd == MSP_BATTERY_STATE) return true;
-  if (cmd == MSP_VOLTAGE_METERS) return true;
-  if (cmd == MSP_CURRENT_METERS) return true;
-  return false;
-}
-
-void MspProcessor::debugMessage(const MspMessage& m)
-{
-  if (debugSkip(m.cmd)) return;
-  auto* dev = _model.getSerialStream(SERIAL_FUNCTION_TELEMETRY_HOTT);
-  if (!dev) return;
-
-  Stream::Printer s{*dev};
-
-  s.print(m.dir == MSP_TYPE_REPLY ? '>' : '<');
-  s.print(m.cmd);
-  s.print('.');
-  s.print(m.expected);
-  s.print(' ');
-  for (size_t i = 0; i < m.expected; i++)
-  {
-    s.print(m.buffer[i], HEX);
-    s.print(' ');
-  }
-  s.println();
-}
-
-void MspProcessor::debugResponse(const MspResponse& r)
-{
-  if (debugSkip(r.cmd)) return;
-  auto* dev = _model.getSerialStream(SERIAL_FUNCTION_TELEMETRY_HOTT);
-  if (!dev) return;
-
-  Stream::Printer s{*dev};
-
-  s.print(r.result == 1 ? '>' : (r.result == -1 ? '!' : '@'));
-  s.print(r.cmd);
-  s.print('.');
-  s.print(r.len);
-  s.print(' ');
-  for (size_t i = 0; i < r.len; i++)
-  {
-    s.print(r.data[i], HEX);
-    s.print(' ');
-  }
-  s.println();
-}
-
-} // namespace Espfc::Connect
-),
+      static_cast<uint8_t>('$'),
       static_cast<uint8_t>('M'),
       static_cast<uint8_t>('<'),
       0,
