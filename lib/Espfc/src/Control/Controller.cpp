@@ -627,7 +627,9 @@ void Controller::updateAntiGravityShadow()
 
   antiGravity.enabled =
       _model.isFeatureActive(
-          FEATURE_ANTI_GRAVITY);
+          FEATURE_ANTI_GRAVITY) ||
+      _model.isModeActive(
+          MODE_ANTI_GRAVITY);
 
   const auto& input =
       _model.state.input;
