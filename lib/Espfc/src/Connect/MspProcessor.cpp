@@ -187,6 +187,7 @@ static uint16_t toIbatCurrent(float current)
 }
 
 constexpr uint8_t MSP_PASSTHROUGH_ESC_4WAY = 0xff;
+constexpr uint8_t MSP_VTX_TYPE_SMARTAUDIO = 3;
 
 // FC version reported over MSP, mirrors Betaflight 2026.6 CalVer for configurator compatibility
 constexpr uint8_t MSP_FC_VERSION_YEAR = 2026 - 2000;
@@ -2535,7 +2536,7 @@ constexpr int REQUIRED_PID_BYTES =
       }
       else
       {
-        r.writeU8(3 /* SMARTAUDIO */);               // vtx type unknown
+        r.writeU8(MSP_VTX_TYPE_SMARTAUDIO);          // SmartAudio
         r.writeU8(_model.config.vtx.band);           // band
         r.writeU8(_model.config.vtx.channel);        // channel
         r.writeU8(_model.config.vtx.power);          // power
@@ -2550,6 +2551,33 @@ constexpr int REQUIRED_PID_BYTES =
       r.writeU8(0);  // vtx table bands
       r.writeU8(0);  // vtx table channels
       r.writeU8(0);  // vtx power levels
+      break;
+
+    case MSP2_GET_VTX_DEVICE_STATUS:
+      // Mirror Betaflight's vtxCommonSerializeDeviceStatus() field order for
+      // the subset ESP-FC can actually observe. No VTX table or custom status
+      // data is fabricated.
+      if (_model.state.vtx.active)
+      {
+        r.writeU8(MSP_VTX_TYPE_SMARTAUDIO);   // device type
+        r.writeU8(1);                         // device ready
+
+        r.writeU8(1);                         // band/channel available
+        r.writeU8(_model.config.vtx.band);
+        r.writeU8(_model.config.vtx.channel);
+
+        r.writeU8(1);                         // power index available
+        r.writeU8(_model.config.vtx.power);
+
+        r.writeU8(0);                         // frequency not available
+        r.writeU16(0);
+
+        r.writeU8(0);                         // status flags not available
+        r.writeU32(0);
+
+        r.writeU8(0);                         // power-level table count
+        r.writeU8(0);                         // custom device status unavailable
+      }
       break;
 
     case MSP_SET_VTX_CONFIG: {

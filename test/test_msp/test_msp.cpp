@@ -1223,6 +1223,102 @@ void test_msp_unsupported_configurator_subsystems_fail_explicitly()
       ledSetResponse.result);
 }
 
+
+void test_msp2_vtx_device_status_reports_only_observable_smartaudio_state()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  MspMessage get;
+  get.cmd =
+      MSP2_GET_VTX_DEVICE_STATUS;
+
+  MspResponse absent;
+  processor.processCommand(
+      get,
+      absent,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      1,
+      absent.result);
+
+  TEST_ASSERT_EQUAL_UINT16(
+      0,
+      absent.len);
+
+  model.state.vtx.active =
+      true;
+
+  model.config.vtx.band =
+      3;
+
+  model.config.vtx.channel =
+      5;
+
+  model.config.vtx.power =
+      2;
+
+  MspMessage activeGet;
+  activeGet.cmd =
+      MSP2_GET_VTX_DEVICE_STATUS;
+
+  MspResponse active;
+  processor.processCommand(
+      activeGet,
+      active,
+      stream);
+
+  TEST_ASSERT_EQUAL_UINT16(
+      17,
+      active.len);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      3,
+      active.data[0]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      1,
+      active.data[1]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      1,
+      active.data[2]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      3,
+      active.data[3]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      5,
+      active.data[4]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      1,
+      active.data[5]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      2,
+      active.data[6]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      0,
+      active.data[7]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      0,
+      active.data[10]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      0,
+      active.data[15]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      0,
+      active.data[16]);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -1252,5 +1348,6 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp_sensor_config_rejects_unimplemented_sensor_selectors_atomically);
   RUN_TEST(test_msp_sensor_alignment_rejects_custom_offsets_without_partial_write);
   RUN_TEST(test_msp_unsupported_configurator_subsystems_fail_explicitly);
+  RUN_TEST(test_msp2_vtx_device_status_reports_only_observable_smartaudio_state);
   return UNITY_END();
 }

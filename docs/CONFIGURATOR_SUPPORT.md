@@ -142,7 +142,10 @@ unsupported on the standard target.
 ## VTX, telemetry, OSD and LEDs
 
 - SmartAudio band/channel/power/low-power control remains the implemented VTX
-  subset.
+  subset. `MSP2_GET_VTX_DEVICE_STATUS` now reports detected SmartAudio
+  readiness plus the configured band/channel/power using Betaflight's common
+  device-status field order; unavailable frequency/status/table/custom fields
+  are explicitly marked unavailable.
 - Full Betaflight VTX-table/custom-frequency/pit-frequency behavior is not
   claimed unless a real runtime consumer exists.
 - FrSky serial selection currently routes to ESP-FC text telemetry rather than
