@@ -308,7 +308,7 @@ void test_cli_uint16_param_roundtrip()
   const auto result = stream.str();
   TEST_ASSERT_NOT_EQUAL(
       std::string::npos,
-      result.find("compat_failsafe_throttle = 1234"));
+      result.find("set compat_failsafe_throttle 1234"));
 }
 
 int main(int argc, char** argv)
