@@ -2648,10 +2648,15 @@ constexpr int REQUIRED_PID_BYTES =
       }
       // 1.42
       r.writeU16(0); // pit mode freq
-      r.writeU8(0);  // vtx table available (no)
-      r.writeU8(0);  // vtx table bands
-      r.writeU8(0);  // vtx table channels
-      r.writeU8(0);  // vtx power levels
+      const auto& compatVtx =
+          _model.config.compat.vtxTable;
+      const bool tableAvailable =
+          compatVtx.bands > 0 &&
+          compatVtx.channels > 0;
+      r.writeU8(tableAvailable ? 1 : 0);
+      r.writeU8(compatVtx.bands);
+      r.writeU8(compatVtx.channels);
+      r.writeU8(compatVtx.powerLevels)
       break;
 
     case MSP2_GET_VTX_DEVICE_STATUS:
@@ -2970,18 +2975,495 @@ constexpr int REQUIRED_PID_BYTES =
     case MSP2_MOTOR_OUTPUT_REORDERING:
     case MSP2_SET_MOTOR_OUTPUT_REORDERING:
     case MSP2_SEND_DSHOT_COMMAND:
-    case MSP2_GET_OSD_WARNINGS:
-    case MSP2_GET_LED_STRIP_CONFIG_VALUES:
-    case MSP2_SET_LED_STRIP_CONFIG_VALUES:
+    case MSP_GPS_RESCUE: {
+      const auto& cfg =
+          _model.config.compat.gpsRescue;
+
+      r.writeU16(cfg.maxAngle);
+      r.writeU16(cfg.returnAltitudeM);
+      r.writeU16(cfg.descentDistanceM);
+      r.writeU16(cfg.groundSpeedCmS);
+      r.writeU16(cfg.throttleMin);
+      r.writeU16(cfg.throttleMax);
+      r.writeU16(cfg.hoverThrottle);
+      r.writeU8(cfg.sanityChecks);
+      r.writeU8(cfg.minSats);
+      r.writeU16(cfg.ascendRate);
+      r.writeU16(cfg.descendRate);
+      r.writeU8(cfg.allowArmingWithoutFix);
+      r.writeU8(cfg.altitudeMode);
+      r.writeU16(cfg.minStartDistM);
+      r.writeU16(cfg.initialClimbM);
+      break;
+    }
+
+    case MSP_SET_GPS_RESCUE: {
+      const size_t payloadSize =
+          m.remain();
+
+      // Betaflight API layouts accepted here:
+      // 1.42 base=16, 1.43=22, 1.44=24, 1.46+=26 bytes.
+      if (payloadSize != 16 &&
+          payloadSize != 22 &&
+          payloadSize != 24 &&
+          payloadSize != 26)
+      {
+        r.result = -1;
+        break;
+      }
+
+      CompatGpsRescueConfig next =
+          _model.config.compat.gpsRescue;
+
+      next.maxAngle = m.readU16();
+      next.returnAltitudeM = m.readU16();
+      next.descentDistanceM = m.readU16();
+      next.groundSpeedCmS = m.readU16();
+      next.throttleMin = m.readU16();
+      next.throttleMax = m.readU16();
+      next.hoverThrottle = m.readU16();
+      next.sanityChecks = m.readU8();
+      next.minSats = m.readU8();
+
+      if (payloadSize >= 22)
+      {
+        next.ascendRate = m.readU16();
+        next.descendRate = m.readU16();
+        next.allowArmingWithoutFix = m.readU8() ? 1 : 0;
+        next.altitudeMode = m.readU8();
+      }
+
+      if (payloadSize >= 24)
+      {
+        next.minStartDistM = m.readU16();
+      }
+
+      if (payloadSize >= 26)
+      {
+        next.initialClimbM = m.readU16();
+      }
+
+      const bool valid =
+          next.maxAngle <= 60 &&
+          next.returnAltitudeM >= 5 &&
+          next.returnAltitudeM <= 1000 &&
+          next.descentDistanceM >= 5 &&
+          next.descentDistanceM <= 500 &&
+          next.groundSpeedCmS <= 3000 &&
+          next.throttleMin >= 1000 &&
+          next.throttleMin <= 2000 &&
+          next.throttleMax >= next.throttleMin &&
+          next.throttleMax <= 2000 &&
+          next.hoverThrottle >= next.throttleMin &&
+          next.hoverThrottle <= next.throttleMax &&
+          next.minSats <= 32 &&
+          next.ascendRate >= 50 &&
+          next.ascendRate <= 2500 &&
+          next.descendRate >= 25 &&
+          next.descendRate <= 500 &&
+          next.minStartDistM <= 1000 &&
+          next.initialClimbM <= 1000;
+
+      if (!valid)
+      {
+        r.result = -1;
+        break;
+      }
+
+      _model.config.compat.gpsRescue =
+          next;
+      break;
+    }
+
+    case MSP_GPS_RESCUE_PIDS: {
+      const auto& cfg =
+          _model.config.compat.gpsRescue;
+
+      r.writeU16(cfg.altitudeP);
+      r.writeU16(cfg.altitudeI);
+      r.writeU16(cfg.altitudeD);
+      r.writeU16(cfg.positionP);
+      r.writeU16(cfg.positionI);
+      r.writeU16(cfg.positionD);
+      r.writeU16(cfg.yawP);
+      break;
+    }
+
+    case MSP_SET_GPS_RESCUE_PIDS: {
+      if (m.remain() != 14)
+      {
+        r.result = -1;
+        break;
+      }
+
+      auto& cfg =
+          _model.config.compat.gpsRescue;
+
+      cfg.altitudeP = m.readU16();
+      cfg.altitudeI = m.readU16();
+      cfg.altitudeD = m.readU16();
+      cfg.positionP = m.readU16();
+      cfg.positionI = m.readU16();
+      cfg.positionD = m.readU16();
+      cfg.yawP = m.readU16();
+      break;
+    }
+
+    case MSP2_GET_LED_STRIP_CONFIG_VALUES: {
+      const auto& cfg =
+          _model.config.compat.ledStrip;
+
+      r.writeU8(cfg.brightness);
+      r.writeU16(cfg.rainbowDelta);
+      r.writeU16(cfg.rainbowFreq);
+      break;
+    }
+
+    case MSP2_SET_LED_STRIP_CONFIG_VALUES: {
+      if (m.remain() != 5)
+      {
+        r.result = -1;
+        break;
+      }
+
+      auto& cfg =
+          _model.config.compat.ledStrip;
+
+      cfg.brightness =
+          m.readU8();
+
+      cfg.rainbowDelta =
+          m.readU16();
+
+      cfg.rainbowFreq =
+          m.readU16();
+
+      break;
+    }
+
+    case MSP_VTXTABLE_BAND: {
+      auto& table =
+          _model.config.compat.vtxTable;
+
+      if (m.remain() != 1)
+      {
+        r.result = -1;
+        break;
+      }
+
+      const uint8_t band =
+          m.readU8();
+
+      if (band == 0 ||
+          band > table.bands ||
+          band > COMPAT_VTX_MAX_BANDS)
+      {
+        r.result = -1;
+        break;
+      }
+
+      const size_t index =
+          band - 1;
+
+      r.writeU8(band);
+      r.writeU8(COMPAT_VTX_BAND_NAME_LENGTH);
+
+      for (size_t i = 0;
+           i < COMPAT_VTX_BAND_NAME_LENGTH;
+           ++i)
+      {
+        r.writeU8(
+            static_cast<uint8_t>(
+                table.bandNames[index][i]));
+      }
+
+      r.writeU8(
+          static_cast<uint8_t>(
+              table.bandLetters[index]));
+
+      r.writeU8(
+          table.isFactoryBand[index] ? 1 : 0);
+
+      r.writeU8(
+          table.channels);
+
+      for (size_t i = 0;
+           i < table.channels;
+           ++i)
+      {
+        r.writeU16(
+            table.frequency[index][i]);
+      }
+
+      break;
+    }
+
+    case MSP_SET_VTXTABLE_BAND: {
+      auto& table =
+          _model.config.compat.vtxTable;
+
+      if (m.remain() < 5)
+      {
+        r.result = -1;
+        break;
+      }
+
+      const uint8_t band =
+          m.readU8();
+
+      const uint8_t nameLength =
+          m.readU8();
+
+      if (band == 0 ||
+          band > COMPAT_VTX_MAX_BANDS ||
+          m.remain() <
+              static_cast<int>(nameLength) + 3)
+      {
+        r.result = -1;
+        break;
+      }
+
+      char name[
+          COMPAT_VTX_BAND_NAME_LENGTH] = {};
+
+      for (size_t i = 0;
+           i < nameLength;
+           ++i)
+      {
+        const uint8_t value =
+            m.readU8();
+
+        if (i <
+            COMPAT_VTX_BAND_NAME_LENGTH)
+        {
+          name[i] =
+              static_cast<char>(
+                  value);
+        }
+      }
+
+      const char letter =
+          static_cast<char>(
+              m.readU8());
+
+      const uint8_t factory =
+          m.readU8() ? 1 : 0;
+
+      const uint8_t channelCount =
+          m.readU8();
+
+      if (channelCount >
+              COMPAT_VTX_MAX_CHANNELS ||
+          m.remain() !=
+              static_cast<int>(
+                  channelCount *
+                  sizeof(uint16_t)))
+      {
+        r.result = -1;
+        break;
+      }
+
+      uint16_t frequencies[
+          COMPAT_VTX_MAX_CHANNELS] = {};
+
+      for (size_t i = 0;
+           i < channelCount;
+           ++i)
+      {
+        frequencies[i] =
+            m.readU16();
+      }
+
+      const size_t index =
+          band - 1;
+
+      for (size_t i = 0;
+           i < COMPAT_VTX_BAND_NAME_LENGTH;
+           ++i)
+      {
+        table.bandNames[index][i] =
+            name[i];
+      }
+
+      table.bandLetters[index] =
+          letter;
+
+      table.isFactoryBand[index] =
+          factory;
+
+      for (size_t i = 0;
+           i < COMPAT_VTX_MAX_CHANNELS;
+           ++i)
+      {
+        table.frequency[index][i] =
+            i < channelCount
+                ? frequencies[i]
+                : 0;
+      }
+
+      table.bands =
+          std::max<uint8_t>(
+              table.bands,
+              band);
+
+      table.channels =
+          std::max<uint8_t>(
+              table.channels,
+              channelCount);
+
+      break;
+    }
+
+    case MSP_VTXTABLE_POWERLEVEL: {
+      auto& table =
+          _model.config.compat.vtxTable;
+
+      if (m.remain() != 1)
+      {
+        r.result = -1;
+        break;
+      }
+
+      const uint8_t level =
+          m.readU8();
+
+      if (level == 0 ||
+          level > table.powerLevels ||
+          level > COMPAT_VTX_MAX_POWER_LEVELS)
+      {
+        r.result = -1;
+        break;
+      }
+
+      const size_t index =
+          level - 1;
+
+      r.writeU8(level);
+      r.writeU16(
+          table.powerValues[index]);
+      r.writeU8(
+          COMPAT_VTX_POWER_LABEL_LENGTH);
+
+      for (size_t i = 0;
+           i < COMPAT_VTX_POWER_LABEL_LENGTH;
+           ++i)
+      {
+        r.writeU8(
+            static_cast<uint8_t>(
+                table.powerLabels[index][i]));
+      }
+
+      break;
+    }
+
+    case MSP_SET_VTXTABLE_POWERLEVEL: {
+      auto& table =
+          _model.config.compat.vtxTable;
+
+      if (m.remain() < 4)
+      {
+        r.result = -1;
+        break;
+      }
+
+      const uint8_t level =
+          m.readU8();
+
+      const uint16_t value =
+          m.readU16();
+
+      const uint8_t labelLength =
+          m.readU8();
+
+      if (level == 0 ||
+          level > COMPAT_VTX_MAX_POWER_LEVELS ||
+          m.remain() !=
+              static_cast<int>(
+                  labelLength))
+      {
+        r.result = -1;
+        break;
+      }
+
+      char label[
+          COMPAT_VTX_POWER_LABEL_LENGTH] = {};
+
+      for (size_t i = 0;
+           i < labelLength;
+           ++i)
+      {
+        const uint8_t c =
+            m.readU8();
+
+        if (i <
+            COMPAT_VTX_POWER_LABEL_LENGTH)
+        {
+          label[i] =
+              static_cast<char>(
+                  c);
+        }
+      }
+
+      const size_t index =
+          level - 1;
+
+      table.powerValues[index] =
+          value;
+
+      for (size_t i = 0;
+           i < COMPAT_VTX_POWER_LABEL_LENGTH;
+           ++i)
+      {
+        table.powerLabels[index][i] =
+            label[i];
+      }
+
+      table.powerLevels =
+          std::max<uint8_t>(
+              table.powerLevels,
+              level);
+
+      break;
+    }
+
+    case MSP2_GET_OSD_WARNINGS: {
+      // ESP-FC has no DisplayPort/OSD renderer, but this MSP command can still
+      // expose real warning state to Configurator without fabricating a video
+      // subsystem. Betaflight's wire layout is: displayAttr + p-string.
+      const char* warning =
+          "";
+
+      if (_model.state.failsafe.phase !=
+              FC_FAILSAFE_IDLE)
+      {
+        warning =
+            "FAILSAFE";
+      }
+      else if (_model.state.pinConflict)
+      {
+        warning =
+            "PIN CONFLICT";
+      }
+      else if (_model.state.rebootRequired)
+      {
+        warning =
+            "REBOOT REQUIRED";
+      }
+      else if (_model.state.battery.warn(
+                   _model.config.vbat.cellWarning))
+      {
+        warning =
+            "LOW BATTERY";
+      }
+
+      r.writeU8(0);
+      r.writePString(warning);
+      break;
+    }
+
     case MSP2_SENSOR_OPTICALFLOW:
-    case MSP_GPS_RESCUE:
-    case MSP_SET_GPS_RESCUE:
-    case MSP_GPS_RESCUE_PIDS:
-    case MSP_SET_GPS_RESCUE_PIDS:
-    case MSP_VTXTABLE_BAND:
-    case MSP_SET_VTXTABLE_BAND:
-    case MSP_VTXTABLE_POWERLEVEL:
-    case MSP_SET_VTXTABLE_POWERLEVEL:
+      // No optical-flow hardware driver exists on the standard target. Keep
+      // this one explicit rather than returning fabricated zero sensor data.
       r.result = -1;
       break;
 
