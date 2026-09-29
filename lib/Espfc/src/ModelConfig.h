@@ -825,6 +825,67 @@ struct SimplifiedTuningConfig
   uint8_t gyroFilterMultiplier = 100;
 };
 
+// Configurator protocol/state that is safe to persist without granting
+// physical actuator authority. These structures are intentionally independent
+// from the motor/output pipeline.
+
+struct CompatGpsRescueConfig
+{
+  uint16_t maxAngle = 32;
+  uint16_t returnAltitudeM = 30;
+  uint16_t descentDistanceM = 20;
+  uint16_t groundSpeedCmS = 750;
+  uint16_t throttleMin = 1100;
+  uint16_t throttleMax = 1600;
+  uint16_t hoverThrottle = 1280;
+  uint8_t sanityChecks = 1;
+  uint8_t minSats = 8;
+  uint16_t ascendRate = 500;
+  uint16_t descendRate = 150;
+  uint8_t allowArmingWithoutFix = 0;
+  uint8_t altitudeMode = 0;
+  uint16_t minStartDistM = 15;
+  uint16_t initialClimbM = 10;
+
+  // MSP_GPS_RESCUE_PIDS payload. These are available to the non-actuating
+  // navigation diagnostics only; they are not wired to the physical mixer.
+  uint16_t altitudeP = 0;
+  uint16_t altitudeI = 0;
+  uint16_t altitudeD = 0;
+  uint16_t positionP = 0;
+  uint16_t positionI = 0;
+  uint16_t positionD = 0;
+  uint16_t yawP = 0;
+};
+
+struct CompatLedStripConfig
+{
+  uint8_t brightness = 100;
+  uint16_t rainbowDelta = 0;
+  uint16_t rainbowFreq = 0;
+};
+
+static constexpr size_t COMPAT_VTX_MAX_BANDS = 8;
+static constexpr size_t COMPAT_VTX_MAX_CHANNELS = 8;
+static constexpr size_t COMPAT_VTX_MAX_POWER_LEVELS = 5;
+static constexpr size_t COMPAT_VTX_BAND_NAME_LENGTH = 8;
+static constexpr size_t COMPAT_VTX_POWER_LABEL_LENGTH = 3;
+
+struct CompatVtxTableConfig
+{
+  uint8_t bands = 0;
+  uint8_t channels = 0;
+  uint8_t powerLevels = 0;
+
+  uint16_t frequency[COMPAT_VTX_MAX_BANDS][COMPAT_VTX_MAX_CHANNELS] = {};
+  char bandNames[COMPAT_VTX_MAX_BANDS][COMPAT_VTX_BAND_NAME_LENGTH] = {};
+  char bandLetters[COMPAT_VTX_MAX_BANDS] = {};
+  uint8_t isFactoryBand[COMPAT_VTX_MAX_BANDS] = {};
+
+  uint16_t powerValues[COMPAT_VTX_MAX_POWER_LEVELS] = {};
+  char powerLabels[COMPAT_VTX_MAX_POWER_LEVELS][COMPAT_VTX_POWER_LABEL_LENGTH] = {};
+};
+
 // Betaflight Configurator exposes a broader MSP surface than ESP-FC's active
 // controller/runtime. Keep those values persistent and round-trippable without
 // pretending that they have control authority. Fields in this structure are
@@ -912,6 +973,12 @@ struct ConfiguratorCompatConfig
   uint32_t rtcSeconds = 0;
   uint16_t rtcMillis = 0;
   uint8_t rtcValid = 0;
+
+  // Storage-format v0x04 additions. They make Configurator pages
+  // round-trippable while preserving the hard non-actuating boundary.
+  CompatGpsRescueConfig gpsRescue;
+  CompatLedStripConfig ledStrip;
+  CompatVtxTableConfig vtxTable;
 };
 
 // persistent data
