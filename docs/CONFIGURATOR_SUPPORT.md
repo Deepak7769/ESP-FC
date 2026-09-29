@@ -207,3 +207,12 @@ commands now have named error cases in `MspProcessor` rather than falling
 through the generic default. This is behaviorally the same error response, but
 it makes the compatibility boundary reviewable in source and protects against
 future placeholder responses being mistaken for implementation.
+
+
+## Contract regression
+
+CI runs `tools/check_configurator_contract.py` to ensure that the documented
+status vocabulary, shadow-mode declarations, explicitly unsupported MSP
+commands, single-battery-profile bridge, SmartAudio status surface and
+non-actuating CLI authority declaration remain present together. This catches
+source/documentation drift before a firmware artifact is produced.
