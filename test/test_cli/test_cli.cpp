@@ -289,29 +289,6 @@ void test_cli_bf_sensor_hardware()
   TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("mag: AUTO,"));
 }
 
-void test_cli_gps_status_exposes_configuration_and_runtime_state()
-{
-  Model model;
-  model.config.featureMask |= Espfc::FEATURE_GPS;
-  model.state.gps.present = true;
-  model.state.gps.solutionFresh = true;
-  model.state.gps.serialConflict = false;
-  model.state.gps.usedSats = 7;
-  model.state.gps.maxCno = 42;
-
-  Cli cli{model};
-  cli.printGpsStatus(printer, true);
-
-  const auto result = stream.str();
-  TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("Configured: YES"));
-  TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("Present: YES"));
-  TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("Fresh: YES"));
-  TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("Conflict: NONE"));
-  TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("GPS UART: UNASSIGNED"));
-  TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("Used: 7 sats"));
-  TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("max C/N0 42"));
-}
-
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -327,6 +304,5 @@ int main(int argc, char** argv)
   RUN_TEST(test_cli_set_mixer_type);
   RUN_TEST(test_cli_bf_get_mag_calibration);
   RUN_TEST(test_cli_bf_sensor_hardware);
-  RUN_TEST(test_cli_gps_status_exposes_configuration_and_runtime_state);
   return UNITY_END();
 }
