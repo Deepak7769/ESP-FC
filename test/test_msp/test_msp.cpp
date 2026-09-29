@@ -1050,6 +1050,117 @@ void test_msp_gps_config_rejects_unrepresentable_fixed_capabilities()
       model.config.gps.enableSBAS);
 }
 
+
+void test_msp_sensor_config_rejects_unimplemented_sensor_selectors_atomically()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  model.config.accel.dev =
+      GYRO_AUTO;
+
+  model.config.baro.dev =
+      BARO_NONE;
+
+  model.config.mag.dev =
+      MAG_NONE;
+
+  MspMessage set;
+  set.cmd =
+      MSP_SET_SENSOR_CONFIG;
+
+  const uint8_t data[] = {
+      1,
+      2,
+      3,
+      1,
+      0};
+
+  set.append(
+      data,
+      sizeof(data));
+
+  MspResponse response;
+  processor.processCommand(
+      set,
+      response,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      response.result);
+
+  TEST_ASSERT_EQUAL_INT8(
+      GYRO_AUTO,
+      model.config.accel.dev);
+
+  TEST_ASSERT_EQUAL_INT8(
+      BARO_NONE,
+      model.config.baro.dev);
+
+  TEST_ASSERT_EQUAL_INT8(
+      MAG_NONE,
+      model.config.mag.dev);
+}
+
+void test_msp_sensor_alignment_rejects_custom_offsets_without_partial_write()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  model.config.gyro.align =
+      ALIGN_DEFAULT;
+
+  model.config.mag.align =
+      ALIGN_DEFAULT;
+
+  MspMessage set;
+  set.cmd =
+      MSP_SET_SENSOR_ALIGNMENT;
+
+  const uint8_t prefix[] = {
+      2,
+      2,
+      3,
+      1};
+
+  set.append(
+      prefix,
+      sizeof(prefix));
+
+  appendU16(
+      set,
+      10);
+
+  appendU16(
+      set,
+      0);
+
+  appendU16(
+      set,
+      0);
+
+  MspResponse response;
+  processor.processCommand(
+      set,
+      response,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      response.result);
+
+  TEST_ASSERT_EQUAL_INT8(
+      ALIGN_DEFAULT,
+      model.config.gyro.align);
+
+  TEST_ASSERT_EQUAL_INT8(
+      ALIGN_DEFAULT,
+      model.config.mag.align);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -1076,5 +1187,7 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp2_battery_profile_rejects_unsupported_profile_fields);
   RUN_TEST(test_msp_config_setters_reject_truncated_payloads_without_mutation);
   RUN_TEST(test_msp_gps_config_rejects_unrepresentable_fixed_capabilities);
+  RUN_TEST(test_msp_sensor_config_rejects_unimplemented_sensor_selectors_atomically);
+  RUN_TEST(test_msp_sensor_alignment_rejects_custom_offsets_without_partial_write);
   return UNITY_END();
 }

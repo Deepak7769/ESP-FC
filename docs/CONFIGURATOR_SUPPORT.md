@@ -89,6 +89,12 @@ D-term dynamic-LPF exponent now round-trip as **PERSISTED ONLY** metadata where
 there is no matching runtime consumer. Existing sensor detection, calibration,
 filtering and single-gyro operation remain authoritative.
 
+The legacy sensor-selection setter is atomic: rangefinder and optical-flow
+selectors are rejected when non-zero because ESP-FC has no matching runtime
+drivers. The alignment setter likewise accepts the existing enum-based
+gyro/magnetometer alignment and single-gyro enable mask, while rejecting
+custom per-gyro Euler offsets that ESP-FC cannot represent.
+
 ## GPS
 
 - UBLOX is a **FIXED CAPABILITY** provider.

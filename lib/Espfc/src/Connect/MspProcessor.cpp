@@ -1091,22 +1091,68 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU8(0); // opticalflow 0=none
       break;
 
-    case MSP_SET_SENSOR_CONFIG:
-      _model.config.accel.dev = fromAccHw(m.readU8()); // 3 acc mpu6050
-      _model.config.baro.dev = m.readU8();             // 2 baro bmp085
-      _model.config.mag.dev = m.readU8();              // 3 mag hmc5883l
-      // 1.46
-      if (m.remain() >= 1)
+    case MSP_SET_SENSOR_CONFIG: {
+      const size_t payloadSize =
+          m.remain();
+
+      // Base layout is accel/baro/mag. API 1.46 appends both rangefinder and
+      // optical-flow selectors; a one-byte partial extension is malformed.
+      if (payloadSize < 3 ||
+          payloadSize == 4)
       {
-        m.readU8(); // rangefinder skip
+        r.result = -1;
+        break;
       }
-      if (m.remain() >= 1)
+
+      const int8_t accelDev =
+          fromAccHw(
+              m.readU8());
+
+      const int8_t baroDev =
+          static_cast<int8_t>(
+              m.readU8());
+
+      const int8_t magDev =
+          static_cast<int8_t>(
+              m.readU8());
+
+      uint8_t rangefinder =
+          0;
+
+      uint8_t opticalFlow =
+          0;
+
+      if (payloadSize >= 5)
       {
-        m.readU8(); // opticalflow skip
+        rangefinder =
+            m.readU8();
+
+        opticalFlow =
+            m.readU8();
       }
+
+      // ESP-FC has no rangefinder/optical-flow runtime. Reject non-zero
+      // selectors instead of acknowledging a setting that will disappear.
+      if (rangefinder != 0 ||
+          opticalFlow != 0)
+      {
+        r.result = -1;
+        break;
+      }
+
+      _model.config.accel.dev =
+          accelDev;
+
+      _model.config.baro.dev =
+          baroDev;
+
+      _model.config.mag.dev =
+          magDev;
+
       _model.reload();
       _model.setRebootRequired();
       break;
+    }
 
     case MSP2_SENSOR_CONFIG_ACTIVE: {
       const auto& state = _model.state;
@@ -1143,22 +1189,77 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       break;
 
     case MSP_SET_SENSOR_ALIGNMENT: {
-      uint8_t gyroAlign = m.readU8();       // gyro align
-      m.readU8();                           // discard deprecated acc align
-      _model.config.mag.align = m.readU8(); // mag align
-      // API >= 1.41 - support the gyro_to_use and alignment for gyros 1 & 2
-      if (m.remain() >= 1)
+      const size_t payloadSize =
+          m.remain();
+
+      // 3 bytes is the legacy layout, 4 adds the single-gyro enable mask,
+      // and 10 adds three custom gyro-alignment angles.
+      if (payloadSize < 3 ||
+          (payloadSize > 4 &&
+           payloadSize < 10))
       {
-        uint8_t gyroEnableMask = m.readU8(); // gyro_enable_mask
-        _model.config.gyro.dev = gyroEnableMask & 1 ? GYRO_AUTO : GYRO_NONE;
+        r.result = -1;
+        break;
       }
-      if (m.remain() >= 6)
+
+      const uint8_t gyroAlign =
+          m.readU8();
+
+      m.readU8(); // deprecated acc align
+
+      const uint8_t magAlign =
+          m.readU8();
+
+      uint8_t gyroEnableMask =
+          _model.config.gyro.dev ==
+                  GYRO_NONE
+              ? 0
+              : 1;
+
+      if (payloadSize >= 4)
       {
-        m.readU16(); // gyro 1 roll
-        m.readU16(); // gyro 1 pitch
-        m.readU16(); // gyro 1 yaw
+        gyroEnableMask =
+            m.readU8();
+
+        if (gyroEnableMask > 1)
+        {
+          r.result = -1;
+          break;
+        }
       }
-      _model.config.gyro.align = gyroAlign;
+
+      if (payloadSize >= 10)
+      {
+        const uint16_t gyroRoll =
+            m.readU16();
+
+        const uint16_t gyroPitch =
+            m.readU16();
+
+        const uint16_t gyroYaw =
+            m.readU16();
+
+        // ESP-FC currently supports enum-based alignment only. Do not accept
+        // custom Euler offsets that have no runtime backing field.
+        if (gyroRoll != 0 ||
+            gyroPitch != 0 ||
+            gyroYaw != 0)
+        {
+          r.result = -1;
+          break;
+        }
+      }
+
+      _model.config.gyro.align =
+          gyroAlign;
+
+      _model.config.mag.align =
+          magAlign;
+
+      _model.config.gyro.dev =
+          gyroEnableMask
+              ? GYRO_AUTO
+              : GYRO_NONE;
       break;
     }
 
