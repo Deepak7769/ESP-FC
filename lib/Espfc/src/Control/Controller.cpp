@@ -320,11 +320,58 @@ else
 
   if (horizon)
   {
-    _model.state.setpoint.rate[AXIS_ROLL] =
-        _model.state.shadow.horizonRateSuggestion[AXIS_ROLL];
-    _model.state.setpoint.rate[AXIS_PITCH] =
-        _model.state.shadow.horizonRateSuggestion[AXIS_PITCH];
+    const float horizonStrength =
+        std::clamp(
+            _model.state.shadow.horizonStrength,
+            0.0f,
+            1.0f);
+
+    const float angleGain =
+        static_cast<float>(
+            _model.config.pid[
+                FC_PID_LEVEL].P) *
+        0.1f;
+
+    const float currentAngleDeg[
+        AXIS_COUNT_RP] = {
+        Utils::toDeg(
+            _model.state.attitude.euler[
+                AXIS_ROLL]),
+        Utils::toDeg(
+            _model.state.attitude.euler[
+                AXIS_PITCH])
+    };
+
+    for (size_t axis = 0;
+         axis < AXIS_COUNT_RP;
+         ++axis)
+    {
+      const float acroRate =
+          calculateSetpointRate(
+              axis,
+              _model.state.input.ch[
+                  axis]);
+
+      const float acroRateDegS =
+          Utils::toDeg(
+              acroRate);
+
+      const float levelRateDegS =
+          -currentAngleDeg[axis] *
+          angleGain;
+
+      const float blendedRateDegS =
+          acroRateDegS *
+              (1.0f - horizonStrength) +
+          levelRateDegS *
+              horizonStrength;
+
+      _model.state.setpoint.rate[axis] =
+          Utils::toRad(
+              blendedRateDegS);
+    }
   }
+  else if (headfree)
   else if (headfree)
   {
     _model.state.setpoint.rate[AXIS_ROLL] =
