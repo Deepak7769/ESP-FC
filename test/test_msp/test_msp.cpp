@@ -1464,6 +1464,347 @@ void test_msp2_motor_reordering_setter_is_explicitly_unsupported()
       response.result);
 }
 
+
+void test_msp_gps_rescue_config_roundtrip_is_non_actuating()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  const SetpointState setpointBefore =
+      model.state.setpoint;
+
+  const OutputState outputBefore =
+      model.state.output;
+
+  MspMessage set;
+  set.cmd = MSP_SET_GPS_RESCUE;
+
+  appendU16(set, 35);    // max angle
+  appendU16(set, 40);    // return altitude m
+  appendU16(set, 25);    // descent distance m
+  appendU16(set, 900);   // ground speed cm/s
+  appendU16(set, 1100);  // throttle min
+  appendU16(set, 1700);  // throttle max
+  appendU16(set, 1300);  // hover throttle
+
+  const uint8_t baseTail[] = {1, 9};
+  set.append(baseTail, sizeof(baseTail));
+
+  appendU16(set, 600);   // ascend rate
+  appendU16(set, 120);   // descend rate
+
+  const uint8_t api43Tail[] = {0, 1};
+  set.append(api43Tail, sizeof(api43Tail));
+
+  appendU16(set, 20);    // min start distance
+  appendU16(set, 12);    // initial climb
+
+  MspResponse setResponse;
+  processor.processCommand(set, setResponse, stream);
+
+  TEST_ASSERT_EQUAL_INT8(1, setResponse.result);
+
+  MspMessage get;
+  get.cmd = MSP_GPS_RESCUE;
+
+  MspResponse getResponse;
+  processor.processCommand(get, getResponse, stream);
+
+  TEST_ASSERT_EQUAL_INT8(1, getResponse.result);
+  TEST_ASSERT_EQUAL_UINT16(26, getResponse.len);
+  TEST_ASSERT_EQUAL_UINT16(35, readResponseU16(getResponse, 0));
+  TEST_ASSERT_EQUAL_UINT16(40, readResponseU16(getResponse, 2));
+  TEST_ASSERT_EQUAL_UINT16(25, readResponseU16(getResponse, 4));
+  TEST_ASSERT_EQUAL_UINT16(900, readResponseU16(getResponse, 6));
+  TEST_ASSERT_EQUAL_UINT8(9, getResponse.data[15]);
+  TEST_ASSERT_EQUAL_UINT16(600, readResponseU16(getResponse, 16));
+  TEST_ASSERT_EQUAL_UINT16(120, readResponseU16(getResponse, 18));
+  TEST_ASSERT_EQUAL_UINT16(20, readResponseU16(getResponse, 22));
+  TEST_ASSERT_EQUAL_UINT16(12, readResponseU16(getResponse, 24));
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.000001f,
+      setpointBefore.rate[AXIS_ROLL],
+      model.state.setpoint.rate[AXIS_ROLL]);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.000001f,
+      setpointBefore.rate[AXIS_THRUST],
+      model.state.setpoint.rate[AXIS_THRUST]);
+
+  for (size_t i = 0; i < OUTPUT_CHANNELS; ++i)
+  {
+    TEST_ASSERT_EQUAL_INT16(
+        outputBefore.us[i],
+        model.state.output.us[i]);
+  }
+}
+
+void test_msp_gps_rescue_pid_roundtrip()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  MspMessage set;
+  set.cmd = MSP_SET_GPS_RESCUE_PIDS;
+
+  const uint16_t values[] = {
+      10, 20, 30, 40, 50, 60, 70};
+
+  for (const uint16_t value : values)
+  {
+    appendU16(set, value);
+  }
+
+  MspResponse setResponse;
+  processor.processCommand(set, setResponse, stream);
+
+  TEST_ASSERT_EQUAL_INT8(1, setResponse.result);
+
+  MspMessage get;
+  get.cmd = MSP_GPS_RESCUE_PIDS;
+
+  MspResponse getResponse;
+  processor.processCommand(get, getResponse, stream);
+
+  TEST_ASSERT_EQUAL_INT8(1, getResponse.result);
+  TEST_ASSERT_EQUAL_UINT16(14, getResponse.len);
+
+  for (size_t i = 0; i < 7; ++i)
+  {
+    TEST_ASSERT_EQUAL_UINT16(
+        values[i],
+        readResponseU16(
+            getResponse,
+            i * 2));
+  }
+}
+
+void test_msp_led_strip_value_roundtrip()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  MspMessage set;
+  set.cmd =
+      MSP2_SET_LED_STRIP_CONFIG_VALUES;
+
+  const uint8_t brightness = 77;
+  set.append(&brightness, 1);
+  appendU16(set, 1234);
+  appendU16(set, 5678);
+
+  MspResponse setResponse;
+  processor.processCommand(set, setResponse, stream);
+
+  TEST_ASSERT_EQUAL_INT8(1, setResponse.result);
+
+  MspMessage get;
+  get.cmd =
+      MSP2_GET_LED_STRIP_CONFIG_VALUES;
+
+  MspResponse getResponse;
+  processor.processCommand(get, getResponse, stream);
+
+  TEST_ASSERT_EQUAL_INT8(1, getResponse.result);
+  TEST_ASSERT_EQUAL_UINT16(5, getResponse.len);
+  TEST_ASSERT_EQUAL_UINT8(77, getResponse.data[0]);
+  TEST_ASSERT_EQUAL_UINT16(1234, readResponseU16(getResponse, 1));
+  TEST_ASSERT_EQUAL_UINT16(5678, readResponseU16(getResponse, 3));
+}
+
+void test_msp_vtx_table_band_and_power_roundtrip()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  MspMessage setBand;
+  setBand.cmd =
+      MSP_SET_VTXTABLE_BAND;
+
+  const uint8_t bandPrefix[] = {
+      1,
+      4,
+      'T',
+      'E',
+      'S',
+      'T',
+      'T',
+      1,
+      2};
+
+  setBand.append(
+      bandPrefix,
+      sizeof(bandPrefix));
+
+  appendU16(setBand, 5800);
+  appendU16(setBand, 5900);
+
+  MspResponse setBandResponse;
+  processor.processCommand(
+      setBand,
+      setBandResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      1,
+      setBandResponse.result);
+
+  MspMessage getBand;
+  getBand.cmd =
+      MSP_VTXTABLE_BAND;
+
+  const uint8_t band = 1;
+  getBand.append(&band, 1);
+
+  MspResponse getBandResponse;
+  processor.processCommand(
+      getBand,
+      getBandResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      1,
+      getBandResponse.result);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      1,
+      getBandResponse.data[0]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      COMPAT_VTX_BAND_NAME_LENGTH,
+      getBandResponse.data[1]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      2,
+      getBandResponse.data[
+          2 +
+          COMPAT_VTX_BAND_NAME_LENGTH +
+          2]);
+
+  const size_t frequencyOffset =
+      2 +
+      COMPAT_VTX_BAND_NAME_LENGTH +
+      3;
+
+  TEST_ASSERT_EQUAL_UINT16(
+      5800,
+      readResponseU16(
+          getBandResponse,
+          frequencyOffset));
+
+  TEST_ASSERT_EQUAL_UINT16(
+      5900,
+      readResponseU16(
+          getBandResponse,
+          frequencyOffset + 2));
+
+  MspMessage setPower;
+  setPower.cmd =
+      MSP_SET_VTXTABLE_POWERLEVEL;
+
+  const uint8_t powerPrefix[] = {
+      1};
+
+  setPower.append(
+      powerPrefix,
+      sizeof(powerPrefix));
+
+  appendU16(setPower, 400);
+
+  const uint8_t powerLabel[] = {
+      3,
+      '4',
+      '0',
+      '0'};
+
+  setPower.append(
+      powerLabel,
+      sizeof(powerLabel));
+
+  MspResponse setPowerResponse;
+  processor.processCommand(
+      setPower,
+      setPowerResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      1,
+      setPowerResponse.result);
+
+  MspMessage getPower;
+  getPower.cmd =
+      MSP_VTXTABLE_POWERLEVEL;
+
+  const uint8_t level = 1;
+  getPower.append(&level, 1);
+
+  MspResponse getPowerResponse;
+  processor.processCommand(
+      getPower,
+      getPowerResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      1,
+      getPowerResponse.result);
+
+  TEST_ASSERT_EQUAL_UINT16(
+      400,
+      readResponseU16(
+          getPowerResponse,
+          1));
+
+  TEST_ASSERT_EQUAL_UINT8(
+      3,
+      getPowerResponse.data[3]);
+}
+
+void test_msp_osd_warning_surface_reports_real_state_only()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  model.state.rebootRequired =
+      true;
+
+  MspMessage get;
+  get.cmd =
+      MSP2_GET_OSD_WARNINGS;
+
+  MspResponse response;
+  processor.processCommand(
+      get,
+      response,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      1,
+      response.result);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      0,
+      response.data[0]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      15,
+      response.data[1]);
+
+  const std::string warning(
+      reinterpret_cast<const char*>(
+          response.data + 2),
+      response.data[1]);
+
+  TEST_ASSERT_EQUAL_STRING(
+      "REBOOT REQUIRED",
+      warning.c_str());
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -1497,5 +1838,10 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp_tx_info_does_not_claim_hardware_rtc);
   RUN_TEST(test_msp_gps_rescue_setters_remain_blocked_for_shadow_navigation);
   RUN_TEST(test_msp2_motor_reordering_setter_is_explicitly_unsupported);
+  RUN_TEST(test_msp_gps_rescue_config_roundtrip_is_non_actuating);
+  RUN_TEST(test_msp_gps_rescue_pid_roundtrip);
+  RUN_TEST(test_msp_led_strip_value_roundtrip);
+  RUN_TEST(test_msp_vtx_table_band_and_power_roundtrip);
+  RUN_TEST(test_msp_osd_warning_surface_reports_real_state_only);
   return UNITY_END();
 }
