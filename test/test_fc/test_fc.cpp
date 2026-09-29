@@ -8104,6 +8104,252 @@ void test_model_sanitize_scrubs_invalid_mode_rows()
       model.config.conditions[1].logicMode);
 }
 
+
+void test_shadow_gps_navigation_has_no_control_authority()
+{
+  Model model;
+
+  model.state.attitude.healthy =
+      true;
+
+  model.state.attitude.euler =
+      VectorFloat(
+          Utils::toRad(3.0f),
+          Utils::toRad(-2.0f),
+          Utils::toRad(15.0f));
+
+  model.state.gps.present =
+      true;
+
+  model.state.gps.solutionFresh =
+      true;
+
+  model.state.gps.fix =
+      true;
+
+  model.state.gps.fixType =
+      3;
+
+  model.state.gps.homeSet =
+      true;
+
+  model.state.gps.location.raw.lat =
+      190000000;
+
+  model.state.gps.location.raw.lon =
+      730000000;
+
+  model.state.gps.location.home.lat =
+      190010000;
+
+  model.state.gps.location.home.lon =
+      730010000;
+
+  model.state.setpoint.rate[AXIS_ROLL] =
+      Utils::toRad(123.0f);
+
+  model.state.setpoint.rate[AXIS_PITCH] =
+      Utils::toRad(-87.0f);
+
+  model.state.setpoint.rate[AXIS_YAW] =
+      Utils::toRad(45.0f);
+
+  model.state.setpoint.rate[AXIS_THRUST] =
+      0.42f;
+
+  model.state.assistedMode.altitudeTarget =
+      12.5f;
+
+  model.state.angleV2.angleTarget[0] =
+      Utils::toRad(7.0f);
+
+  model.state.angleV2.angleTarget[1] =
+      Utils::toRad(-6.0f);
+
+  model.state.output.ch[0] =
+      0.11f;
+
+  model.state.output.ch[1] =
+      0.22f;
+
+  model.state.output.ch[2] =
+      0.33f;
+
+  model.state.output.ch[3] =
+      0.44f;
+
+  model.state.output.us[0] =
+      1111;
+
+  model.state.output.us[1] =
+      1222;
+
+  model.state.output.us[2] =
+      1333;
+
+  model.state.output.us[3] =
+      1444;
+
+  for (size_t axis = 0;
+       axis < AXIS_COUNT_RPYT;
+       ++axis)
+  {
+    model.state.innerPid[axis].pTerm =
+        1.0f + axis;
+
+    model.state.innerPid[axis].iTerm =
+        2.0f + axis;
+
+    model.state.innerPid[axis].dTerm =
+        3.0f + axis;
+
+    model.state.innerPid[axis].fTerm =
+        4.0f + axis;
+  }
+
+  const SetpointState setpointBefore =
+      model.state.setpoint;
+
+  const AngleV2State angleBefore =
+      model.state.angleV2;
+
+  const AssistedModeState assistedBefore =
+      model.state.assistedMode;
+
+  const OutputState outputBefore =
+      model.state.output;
+
+  float pBefore[AXIS_COUNT_RPYT] = {};
+  float iBefore[AXIS_COUNT_RPYT] = {};
+  float dBefore[AXIS_COUNT_RPYT] = {};
+  float fBefore[AXIS_COUNT_RPYT] = {};
+
+  for (size_t axis = 0;
+       axis < AXIS_COUNT_RPYT;
+       ++axis)
+  {
+    pBefore[axis] =
+        model.state.innerPid[axis].pTerm;
+
+    iBefore[axis] =
+        model.state.innerPid[axis].iTerm;
+
+    dBefore[axis] =
+        model.state.innerPid[axis].dTerm;
+
+    fBefore[axis] =
+        model.state.innerPid[axis].fTerm;
+  }
+
+  Control::ShadowFeatures shadow(
+      model);
+
+  shadow.begin();
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_GPS_RESCUE_SHADOW);
+
+  shadow.update();
+
+  TEST_ASSERT_TRUE(
+      model.state.shadow.authorityBlocked);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      SHADOW_NAV_RETURN_HOME,
+      model.state.shadow.navPhase);
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          model.state.shadow.targetDistanceM));
+
+  TEST_ASSERT_TRUE(
+      model.state.shadow.targetDistanceM >
+      0.0f);
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          model.state.shadow.desiredNorthMs));
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(
+          model.state.shadow.desiredEastMs));
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.000001f,
+      setpointBefore.rate[AXIS_ROLL],
+      model.state.setpoint.rate[AXIS_ROLL]);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.000001f,
+      setpointBefore.rate[AXIS_PITCH],
+      model.state.setpoint.rate[AXIS_PITCH]);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.000001f,
+      setpointBefore.rate[AXIS_YAW],
+      model.state.setpoint.rate[AXIS_YAW]);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.000001f,
+      setpointBefore.rate[AXIS_THRUST],
+      model.state.setpoint.rate[AXIS_THRUST]);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.000001f,
+      angleBefore.angleTarget[0],
+      model.state.angleV2.angleTarget[0]);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.000001f,
+      angleBefore.angleTarget[1],
+      model.state.angleV2.angleTarget[1]);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.000001f,
+      assistedBefore.altitudeTarget,
+      model.state.assistedMode.altitudeTarget);
+
+  for (size_t axis = 0;
+       axis < AXIS_COUNT_RPYT;
+       ++axis)
+  {
+    TEST_ASSERT_FLOAT_WITHIN(
+        0.000001f,
+        pBefore[axis],
+        model.state.innerPid[axis].pTerm);
+
+    TEST_ASSERT_FLOAT_WITHIN(
+        0.000001f,
+        iBefore[axis],
+        model.state.innerPid[axis].iTerm);
+
+    TEST_ASSERT_FLOAT_WITHIN(
+        0.000001f,
+        dBefore[axis],
+        model.state.innerPid[axis].dTerm);
+
+    TEST_ASSERT_FLOAT_WITHIN(
+        0.000001f,
+        fBefore[axis],
+        model.state.innerPid[axis].fTerm);
+  }
+
+  for (size_t i = 0;
+       i < OUTPUT_CHANNELS;
+       ++i)
+  {
+    TEST_ASSERT_FLOAT_WITHIN(
+        0.000001f,
+        outputBefore.ch[i],
+        model.state.output.ch[i]);
+
+    TEST_ASSERT_EQUAL_INT16(
+        outputBefore.us[i],
+        model.state.output.us[i]);
+  }
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -8356,5 +8602,6 @@ RUN_TEST(
   RUN_TEST(test_shadow_acro_trainer_only_returns_suggestion);
   RUN_TEST(test_shadow_update_cannot_change_control_or_output_state);
   RUN_TEST(test_model_sanitize_scrubs_invalid_mode_rows);
+  RUN_TEST(test_shadow_gps_navigation_has_no_control_authority);
   return UNITY_END();
 }

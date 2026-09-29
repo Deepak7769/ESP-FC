@@ -69,3 +69,17 @@ existing angle debug channel.
 
 The shadow state contains the full calculation outputs and can be inspected in
 native tests or future telemetry without changing the existing controller.
+
+
+## Authority regression coverage
+
+Native tests exercise the shadow subsystem with valid GPS/home data and a
+non-zero return-to-home navigation demand while seeding rate setpoints, angle
+targets, assisted-altitude state, PID terms, normalized output channels and
+PWM output values with sentinel values. The test requires all authoritative
+state to remain byte-for-byte equivalent at the field level after the shadow
+navigation update.
+
+This is intentionally stronger than checking the `authorityBlocked` flag:
+a future change that accidentally writes a setpoint, PID term or output will
+fail CI even if the flag still says that authority is blocked.
