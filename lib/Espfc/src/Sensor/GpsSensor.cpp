@@ -430,6 +430,18 @@ void GpsSensor::enableNav5()
 
 void GpsSensor::enableSbas()
 {
+  const State nextState =
+      isUbx6() ? CONFIGURE_NAV_RATE : DETECT_GPS_L5;
+
+  // Respect the persisted GPS setting. Configurator's SBAS=NONE maps to
+  // enableSBAS=0; older code ignored that flag and always enabled SBAS.
+  if (!_model.config.gps.enableSBAS)
+  {
+    setState(nextState);
+    _model.logger.info().logln("GPS SBAS OFF");
+    return;
+  }
+
   if (_model.state.gps.support.sbas)
   {
     if (isLegacyProto())
@@ -442,7 +454,7 @@ void GpsSensor::enableSbas()
               .scanmode2 = 0,
               .scanmode1 = 0,
           },
-          isUbx6() ? CONFIGURE_NAV_RATE : DETECT_GPS_L5);
+          nextState);
       _model.logger.info().logln("GPS SBAS");
     }
     else
@@ -456,7 +468,7 @@ void GpsSensor::enableSbas()
   }
   else
   {
-    setState(isUbx6() ? CONFIGURE_NAV_RATE : DETECT_GPS_L5);
+    setState(nextState);
   }
 }
 

@@ -1795,6 +1795,44 @@ void Cli::printGpsStatus(Stream::Printer& s, bool full) const
 #ifndef UNIT_TEST
   s.println("GPS STATUS:");
 
+  s.print("Configured: ");
+  s.println(_model.isFeatureActive(FEATURE_GPS) ? "YES" : "NO");
+
+  s.print(" Present: ");
+  s.println(_model.state.gps.present ? "YES" : "NO");
+
+  s.print("   Fresh: ");
+  s.println(_model.state.gps.solutionFresh ? "YES" : "NO");
+
+  s.print("Conflict: ");
+  s.println(_model.state.gps.serialConflict ? "GPS+SERIAL_RX" : "NONE");
+
+  s.print("GPS UART: ");
+  bool gpsPortAssigned = false;
+  for (size_t i = 0; i < SERIAL_UART_COUNT; ++i)
+  {
+    if (_model.config.serial[i].functionMask & SERIAL_FUNCTION_GPS)
+    {
+      if (gpsPortAssigned) s.print(",");
+      s.print(i);
+      s.print("@");
+      s.print(_model.config.serial[i].baud);
+      gpsPortAssigned = true;
+    }
+  }
+  if (!gpsPortAssigned) s.print("UNASSIGNED");
+  s.println();
+
+  s.print("Protocol: ");
+  s.print(_model.state.gps.support.version);
+  s.print(" / UBX ");
+  s.println(_model.state.gps.support.protVerMajor);
+
+  s.print("   Used: ");
+  s.print(_model.state.gps.usedSats);
+  s.print(" sats, max C/N0 ");
+  s.println(_model.state.gps.maxCno);
+
   s.print("   Fix: ");
   s.print(_model.state.gps.fix);
   s.print(" (");
