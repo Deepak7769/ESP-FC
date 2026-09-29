@@ -402,9 +402,11 @@ else
   }
 }
 #if defined(ESPFC_ADVANCED_MODES_ACTIVE)
-  // Acro Trainer limits the already-selected rate request and then leaves
-  // the established rate PID/mixer chain unchanged.
-  if (_model.isModeActive(MODE_ACRO_TRAINER_SHADOW) &&
+  // Acro Trainer limits the manually selected rate request.
+  // It must never override Angle V2 or LAND V2 authority.
+  if (!_model.isModeActive(MODE_ANGLE) &&
+      !landingV2Requested &&
+      _model.isModeActive(MODE_ACRO_TRAINER_SHADOW) &&
       _model.state.shadow.acroTrainerActive &&
       _model.state.attitude.healthy)
   {
