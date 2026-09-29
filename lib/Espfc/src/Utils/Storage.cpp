@@ -47,6 +47,36 @@ StorageResult Storage::load(ModelConfig& config) const
     return STORAGE_LOAD_SUCCESS;
   }
 
+  if (version == EEPROM_VERSION_V3)
+  {
+    // v0x04 appends GPS-rescue, LED-strip and VTX-table compatibility state
+    // to ConfiguratorCompatConfig. Load the exact v0x03 prefix and retain the
+    // deterministic constructor defaults for the newly appended fields.
+    constexpr size_t V4_ADDED_BYTES =
+        sizeof(CompatGpsRescueConfig) +
+        sizeof(CompatLedStripConfig) +
+        sizeof(CompatVtxTableConfig);
+
+    constexpr size_t LEGACY_V3_SIZE =
+        sizeof(ModelConfig) -
+        V4_ADDED_BYTES;
+
+    if (size != LEGACY_V3_SIZE)
+    {
+      return STORAGE_ERR_BAD_SIZE;
+    }
+
+    uint8_t* dst =
+        reinterpret_cast<uint8_t*>(&config);
+
+    for (size_t i = 0; i < LEGACY_V3_SIZE; ++i)
+    {
+      dst[i] = EEPROM.read(addr + i);
+    }
+
+    return STORAGE_LOAD_SUCCESS;
+  }
+
   if (version == EEPROM_VERSION_V2)
   {
     // v0x03 appends ConfiguratorCompatConfig to the legacy layout. Loading
