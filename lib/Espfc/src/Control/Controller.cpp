@@ -1,8 +1,5 @@
 #include "Control/Controller.h"
 #include "Control/AssistedModeV2.h"
-#if defined(ESPFC_ADVANCED_MODES_ACTIVE)
-#include "Control/ShadowFeatures.h"
-#endif
 #if defined(ESPFC_ADVANCED_MODES_ACTIVE_TEST)
 #include "Control/AdvancedModesBench.h"
 #endif
@@ -284,97 +281,41 @@ if (_model.isModeActive(MODE_ANGLE) ||
 
   if (angleV2.active)
   {
-    _model.state.setpoint.rate[AXIS_ROLL] =
-        angleV2.rateTarget[AXIS_ROLL];
+    _model.state.setpoint.rate[
+        AXIS_ROLL] =
+        angleV2.rateTarget[
+            AXIS_ROLL];
 
-    _model.state.setpoint.rate[AXIS_PITCH] =
-        angleV2.rateTarget[AXIS_PITCH];
+    _model.state.setpoint.rate[
+        AXIS_PITCH] =
+        angleV2.rateTarget[
+            AXIS_PITCH];
   }
   else
   {
-    _model.state.setpoint.rate[AXIS_ROLL] = 0.0f;
-    _model.state.setpoint.rate[AXIS_PITCH] = 0.0f;
+    // Angle/LAND was requested, but Angle V2 cannot
+    // provide a valid target. Do not reuse stale data.
+    _model.state.setpoint.rate[
+        AXIS_ROLL] =
+        0.0f;
+
+    _model.state.setpoint.rate[
+        AXIS_PITCH] =
+        0.0f;
   }
 }
 else
 {
-#if defined(ESPFC_ADVANCED_MODES_ACTIVE)
-  const bool horizon =
-      _model.isModeActive(MODE_HORIZON_SHADOW) &&
-      _model.state.shadow.horizonValid;
-
-  const bool headfree =
-      _model.isModeActive(MODE_HEADFREE_SHADOW) &&
-      _model.state.shadow.headfreeReferenceValid;
-
-  if (horizon)
+  for (size_t i = 0;
+       i < AXIS_COUNT_RP;
+       ++i)
   {
-    _model.state.setpoint.rate[AXIS_ROLL] =
-        _model.state.shadow.horizonRateSuggestion[AXIS_ROLL];
-    _model.state.setpoint.rate[AXIS_PITCH] =
-        _model.state.shadow.horizonRateSuggestion[AXIS_PITCH];
-  }
-  else if (headfree)
-  {
-    _model.state.setpoint.rate[AXIS_ROLL] =
+    _model.state.setpoint.rate[i] =
         calculateSetpointRate(
-            AXIS_ROLL,
-            std::clamp(
-                _model.state.shadow.headfreeInput[AXIS_ROLL],
-                -1.0f,
-                1.0f));
-    _model.state.setpoint.rate[AXIS_PITCH] =
-        calculateSetpointRate(
-            AXIS_PITCH,
-            std::clamp(
-                _model.state.shadow.headfreeInput[AXIS_PITCH],
-                -1.0f,
-                1.0f));
-  }
-  else
-#endif
-  {
-    for (size_t i = 0; i < AXIS_COUNT_RP; ++i)
-    {
-      _model.state.setpoint.rate[i] =
-          calculateSetpointRate(
-              i,
-              _model.state.input.ch[i]);
-    }
+            i,
+            _model.state.input.ch[i]);
   }
 }
-
-#if defined(ESPFC_ADVANCED_MODES_ACTIVE)
-  // Acro Trainer limits the already-selected rate request and then leaves
-  // the established rate PID/mixer chain unchanged.
-  if (_model.isModeActive(MODE_ACRO_TRAINER_SHADOW) &&
-      _model.state.shadow.acroTrainerActive &&
-      _model.state.attitude.healthy)
-  {
-    for (size_t axis = 0; axis < AXIS_COUNT_RP; ++axis)
-    {
-      const float requestedDegS =
-          Utils::toDeg(_model.state.setpoint.rate[axis]);
-      const float gyroDegS =
-          Utils::toDeg(_model.state.gyro.adc[axis]);
-      const float angleDeg =
-          Utils::toDeg(_model.state.attitude.euler[axis]);
-      const float angleLimit =
-          std::max(
-              1.0f,
-              static_cast<float>(
-                  _model.config.compat.acroTrainerAngleLimit));
-
-      _model.state.setpoint.rate[axis] =
-          Utils::toRad(
-              ShadowFeatures::acroTrainerSuggestion(
-                  requestedDegS,
-                  angleDeg,
-                  gyroDegS,
-                  angleLimit));
-    }
-  }
-#endif
 
   // -----------------------------------------------------
   // YAW
