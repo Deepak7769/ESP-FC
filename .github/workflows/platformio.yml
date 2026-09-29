@@ -7,6 +7,13 @@ on:
   pull_request:
     branches: [ '*' ]
 
+# Firmware builds are comparatively expensive. Keep only the newest run for a
+# branch/ref so rapid master commits do not leave a long queue of obsolete
+# validation/build jobs.
+concurrency:
+  group: platformio-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-24.04
