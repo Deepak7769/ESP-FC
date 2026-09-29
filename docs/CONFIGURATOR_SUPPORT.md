@@ -198,3 +198,12 @@ The read-only `capabilities` CLI command prints the current high-level
 Configurator contract as ACTIVE, SHADOW, PERSISTED ONLY, FIXED and UNSUPPORTED
 groups. It also prints `shadow_output_authority: NONE`, making the
 non-actuating navigation boundary visible without requiring source inspection.
+
+
+## Explicit unsupported MSP contract
+
+The unsupported OSD-warning, LED-strip editor, optical-flow and VTX-table MSP
+commands now have named error cases in `MspProcessor` rather than falling
+through the generic default. This is behaviorally the same error response, but
+it makes the compatibility boundary reviewable in source and protects against
+future placeholder responses being mistaken for implementation.

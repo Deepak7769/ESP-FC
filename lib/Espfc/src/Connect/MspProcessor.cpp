@@ -2854,6 +2854,20 @@ constexpr int REQUIRED_PID_BYTES =
               : 0u);
       break;
 
+    // Explicitly unsupported Configurator subsystems. Keep these cases named
+    // rather than relying on the default so future compatibility work cannot
+    // accidentally make a zero-filled placeholder look implemented.
+    case MSP2_GET_OSD_WARNINGS:
+    case MSP2_GET_LED_STRIP_CONFIG_VALUES:
+    case MSP2_SET_LED_STRIP_CONFIG_VALUES:
+    case MSP2_SENSOR_OPTICALFLOW:
+    case MSP_VTXTABLE_BAND:
+    case MSP_SET_VTXTABLE_BAND:
+    case MSP_VTXTABLE_POWERLEVEL:
+    case MSP_SET_VTXTABLE_POWERLEVEL:
+      r.result = -1;
+      break;
+
     default:
       r.result = -1;
       break;
