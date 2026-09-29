@@ -99,6 +99,31 @@ static Espfc::SerialSpeed fromBaudIndex(SerialSpeedIndex index)
   // clang-format on
 }
 
+static Espfc::SerialSpeed selectSerialBaud(
+    uint32_t functionMask,
+    SerialSpeedIndex mspIndex,
+    SerialSpeedIndex gpsIndex,
+    SerialSpeedIndex telemetryIndex,
+    Espfc::SerialSpeed current)
+{
+  using namespace Espfc;
+
+  const SerialSpeed msp = fromBaudIndex(mspIndex);
+  const SerialSpeed gps = fromBaudIndex(gpsIndex);
+  const SerialSpeed telemetry = fromBaudIndex(telemetryIndex);
+
+  // Betaflight carries separate baud fields for MSP/GPS/telemetry, while
+  // ESP-FC keeps one primary baud per UART. Prefer the field belonging to the
+  // selected function so a GPS baud chosen in Configurator is not discarded.
+  if ((functionMask & SERIAL_FUNCTION_GPS) && gps != SERIAL_SPEED_NONE) return gps;
+  if ((functionMask & SERIAL_FUNCTION_MSP) && msp != SERIAL_SPEED_NONE) return msp;
+  if (telemetry != SERIAL_SPEED_NONE) return telemetry;
+  if (msp != SERIAL_SPEED_NONE) return msp;
+  if (gps != SERIAL_SPEED_NONE) return gps;
+
+  return current;
+}
+
 static uint8_t fromGyroDlpf(uint8_t t)
 {
   switch (t)
@@ -167,6 +192,14 @@ constexpr uint8_t MSP_FC_VERSION_YEAR = 2026 - 2000;
 constexpr uint8_t MSP_FC_VERSION_MONTH = 6;
 constexpr uint8_t MSP_FC_VERSION_PATCH = 0;
 constexpr char MSP_FC_VERSION_STRING[] = "2026.6.0";
+
+// Betaflight build-option ID used by Configurator to expose GPS UI/support.
+constexpr uint16_t MSP_BUILD_OPTION_USE_GPS = 16412;
+
+// MSP_GPS_CONFIG values compatible with Betaflight's public enum layout.
+constexpr uint8_t MSP_GPS_PROVIDER_UBLOX = 1;
+constexpr uint8_t MSP_GPS_SBAS_AUTO = 0;
+constexpr uint8_t MSP_GPS_SBAS_NONE = 5;
 
 // MCU type id sentinel telling the configurator the name follows as a string
 constexpr uint8_t MCU_TYPE_ID_PROVIDED_BY_NAME = 255;
@@ -325,8 +358,9 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeData(buildDate, BUILD_DATE_LENGTH);
       r.writeData(buildTime, BUILD_TIME_LENGTH);
       r.writeData(shortGitRevision, GIT_SHORT_REVISION_LENGTH);
-      // 1.46
-      // build info flags - 0 * uint16_t
+      // API 1.46+ build options. Advertise GPS so current Configurator builds
+      // expose the GPS controls instead of treating support as unavailable.
+      r.writeU16(MSP_BUILD_OPTION_USE_GPS);
       break;
 
     case MSP_UID:
@@ -775,11 +809,14 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
         {
           continue;
         }
+
+        const uint8_t baudIndex = toBaudIndex(_model.config.serial[i].baud);
+
         r.writeU8(_model.config.serial[i].id);                        // identifier
         r.writeU16(_model.config.serial[i].functionMask);             // functionMask
-        r.writeU8(toBaudIndex(_model.config.serial[i].baud));         // msp_baudrateIndex
-        r.writeU8(0);                                                 // gps_baudrateIndex
-        r.writeU8(0);                                                 // telemetry_baudrateIndex
+        r.writeU8(baudIndex);                                         // msp_baudrateIndex
+        r.writeU8(baudIndex);                                         // gps_baudrateIndex
+        r.writeU8(baudIndex);                                         // telemetry_baudrateIndex
         r.writeU8(toBaudIndex(_model.config.serial[i].blackboxBaud)); // blackbox_baudrateIndex
       }
       break;
@@ -801,11 +838,13 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
         {
           continue;
         }
+        const uint8_t baudIndex = toBaudIndex(_model.config.serial[i].baud);
+
         r.writeU8(_model.config.serial[i].id);                        // identifier
         r.writeU32(_model.config.serial[i].functionMask);             // functionMask
-        r.writeU8(toBaudIndex(_model.config.serial[i].baud));         // msp_baudrateIndex
-        r.writeU8(0);                                                 // gps_baudrateIndex
-        r.writeU8(0);                                                 // telemetry_baudrateIndex
+        r.writeU8(baudIndex);                                         // msp_baudrateIndex
+        r.writeU8(baudIndex);                                         // gps_baudrateIndex
+        r.writeU8(baudIndex);                                         // telemetry_baudrateIndex
         r.writeU8(toBaudIndex(_model.config.serial[i].blackboxBaud)); // blackbox_baudrateIndex
       }
       break;
@@ -827,12 +866,22 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
           m.advance(packetSize - 1);
           continue;
         }
-        _model.config.serial[k].id = id;
-        _model.config.serial[k].functionMask = m.readU16();
-        _model.config.serial[k].baud = fromBaudIndex((SerialSpeedIndex)m.readU8());
-        m.readU8();
-        m.readU8();
-        _model.config.serial[k].blackboxBaud = fromBaudIndex((SerialSpeedIndex)m.readU8());
+        auto& serial = _model.config.serial[k];
+        serial.id = id;
+        serial.functionMask = m.readU16();
+
+        const auto mspBaudIndex = static_cast<SerialSpeedIndex>(m.readU8());
+        const auto gpsBaudIndex = static_cast<SerialSpeedIndex>(m.readU8());
+        const auto telemetryBaudIndex = static_cast<SerialSpeedIndex>(m.readU8());
+        const auto blackboxBaudIndex = static_cast<SerialSpeedIndex>(m.readU8());
+
+        serial.baud = selectSerialBaud(
+            static_cast<uint32_t>(serial.functionMask),
+            mspBaudIndex,
+            gpsBaudIndex,
+            telemetryBaudIndex,
+            static_cast<SerialSpeed>(serial.baud));
+        serial.blackboxBaud = fromBaudIndex(blackboxBaudIndex);
       }
       _model.reload();
       _model.setRebootRequired();
@@ -856,12 +905,22 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
           m.advance(packetSize - 1);
           continue;
         }
-        _model.config.serial[k].id = id;
-        _model.config.serial[k].functionMask = m.readU32();
-        _model.config.serial[k].baud = fromBaudIndex((SerialSpeedIndex)m.readU8());
-        m.readU8();
-        m.readU8();
-        _model.config.serial[k].blackboxBaud = fromBaudIndex((SerialSpeedIndex)m.readU8());
+        auto& serial = _model.config.serial[k];
+        serial.id = id;
+        serial.functionMask = m.readU32();
+
+        const auto mspBaudIndex = static_cast<SerialSpeedIndex>(m.readU8());
+        const auto gpsBaudIndex = static_cast<SerialSpeedIndex>(m.readU8());
+        const auto telemetryBaudIndex = static_cast<SerialSpeedIndex>(m.readU8());
+        const auto blackboxBaudIndex = static_cast<SerialSpeedIndex>(m.readU8());
+
+        serial.baud = selectSerialBaud(
+            static_cast<uint32_t>(serial.functionMask),
+            mspBaudIndex,
+            gpsBaudIndex,
+            telemetryBaudIndex,
+            static_cast<SerialSpeed>(serial.baud));
+        serial.blackboxBaud = fromBaudIndex(blackboxBaudIndex);
       }
       _model.reload();
       _model.setRebootRequired();
@@ -2099,27 +2158,40 @@ constexpr int REQUIRED_PID_BYTES =
       }
       break;
 
-    case MSP_SET_GPS_CONFIG:
-      m.readU8(); // provider
-      m.readU8(); // sbas mode
-      m.readU8(); // auto config
-      m.readU8(); // auto baud
+    case MSP_SET_GPS_CONFIG: {
+      // ESP-FC's GPS driver is UBX-only and always auto-configures/auto-detects
+      // baud, so provider/auto flags are capability constants. Persist the
+      // settings that have real backing fields in ModelConfig.
+      const uint8_t provider = m.readU8();
+      const uint8_t sbasMode = m.readU8();
+      const uint8_t autoConfig = m.readU8();
+      const uint8_t autoBaud = m.readU8();
+      (void)provider;
+      (void)autoConfig;
+      (void)autoBaud;
+
+      _model.config.gps.enableSBAS =
+          sbasMode != MSP_GPS_SBAS_NONE;
+
       if (m.remain() >= 2)
       {
         // Added in API version 1.43
         _model.config.gps.setHomeOnce = m.readU8(); // gps_set_home_point_once
-        m.readU8();                                 // gps_ublox_use_galileo
+        _model.config.gps.enableGalileo = m.readU8() ? 1 : 0;
       }
+
+      _model.setRebootRequired();
       break;
+    }
 
     case MSP_GPS_CONFIG:
-      r.writeU8(1); // provider
-      r.writeU8(0); // sbasMode, 0: auto
-      r.writeU8(1); // autoConfig, 0: off, 1: on
-      r.writeU8(1); // autoBaud, 0: off, 1: on
+      r.writeU8(MSP_GPS_PROVIDER_UBLOX);
+      r.writeU8(_model.config.gps.enableSBAS ? MSP_GPS_SBAS_AUTO : MSP_GPS_SBAS_NONE);
+      r.writeU8(1); // autoConfig: GPS driver always auto-configures
+      r.writeU8(1); // autoBaud: GPS driver always scans supported baud rates
       // Added in API version 1.43
-      r.writeU8(_model.config.gps.setHomeOnce); // gps_set_home_point_once
-      r.writeU8(1);                             // gps_ublox_use_galileo
+      r.writeU8(_model.config.gps.setHomeOnce);
+      r.writeU8(_model.config.gps.enableGalileo ? 1 : 0);
       break;
 
     case MSP_RAW_GPS:
