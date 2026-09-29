@@ -52,14 +52,12 @@ StorageResult Storage::load(ModelConfig& config) const
     // v0x04 appends GPS-rescue, LED-strip and VTX-table compatibility state
     // to ConfiguratorCompatConfig. Load the exact v0x03 prefix and retain the
     // deterministic constructor defaults for the newly appended fields.
-    constexpr size_t V4_ADDED_BYTES =
-        sizeof(CompatGpsRescueConfig) +
-        sizeof(CompatLedStripConfig) +
-        sizeof(CompatVtxTableConfig);
-
+    // Use member offsets rather than sizeof subtraction: structure tail
+    // padding is implementation-defined and can differ between native tests
+    // and embedded targets.
     constexpr size_t LEGACY_V3_SIZE =
-        sizeof(ModelConfig) -
-        V4_ADDED_BYTES;
+        offsetof(ModelConfig, compat) +
+        offsetof(ConfiguratorCompatConfig, gpsRescue);
 
     if (size != LEGACY_V3_SIZE)
     {
