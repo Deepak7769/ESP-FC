@@ -2,6 +2,7 @@
 #include "Connect/MspParser.hpp"
 #include "Connect/MspProcessor.hpp"
 #include "msp/msp_protocol.h"
+#include "msp/msp_protocol_v2_betaflight.h"
 #include <EscDriver.h>
 #include <Gps.hpp>
 #include <Hal/Gpio.hpp>
