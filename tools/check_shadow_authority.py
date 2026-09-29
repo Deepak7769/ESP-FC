@@ -60,13 +60,25 @@ def main() -> int:
             pattern = re.compile(
                 rf"_model\.state\.{re.escape(field)}"
                 rf"(?:(?:\[[^\]]*\])|(?:\.[A-Za-z_][A-Za-z0-9_]*))*"
-                rf"\s*(?:\+=|-=|\*=|/=|%=|=)"
+                rf"\s*(?:\+=|-=|\*=|/=|%=|=(?!=))"
             )
             for match in pattern.finditer(code):
                 line = code.count("\n", 0, match.start()) + 1
                 errors.append(
                     f"{path.relative_to(ROOT)}:{line}: "
                     f"shadow assignment to authoritative state '{field}'"
+                )
+
+            alias_pattern = re.compile(
+                rf"(?:auto|[A-Za-z_][A-Za-z0-9_:<>]*)\s*&\s*"
+                rf"[A-Za-z_][A-Za-z0-9_]*\s*=\s*"
+                rf"_model\.state\.{re.escape(field)}\b"
+            )
+            for match in alias_pattern.finditer(code):
+                line = code.count("\n", 0, match.start()) + 1
+                errors.append(
+                    f"{path.relative_to(ROOT)}:{line}: "
+                    f"non-const alias to authoritative state '{field}'"
                 )
 
         for call in FORBIDDEN_CALLS:
