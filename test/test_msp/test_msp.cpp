@@ -1319,6 +1319,45 @@ void test_msp2_vtx_device_status_reports_only_observable_smartaudio_state()
       active.data[16]);
 }
 
+
+void test_msp_tx_info_does_not_claim_hardware_rtc()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  model.config.compat.rtcSeconds =
+      123456u;
+
+  model.config.compat.rtcMillis =
+      789;
+
+  model.config.compat.rtcValid =
+      1;
+
+  MspMessage get;
+  get.cmd =
+      MSP_TX_INFO;
+
+  MspResponse response;
+  processor.processCommand(
+      get,
+      response,
+      stream);
+
+  TEST_ASSERT_EQUAL_UINT16(
+      2,
+      response.len);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      0,
+      response.data[0]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      0xff,
+      response.data[1]);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -1349,5 +1388,6 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp_sensor_alignment_rejects_custom_offsets_without_partial_write);
   RUN_TEST(test_msp_unsupported_configurator_subsystems_fail_explicitly);
   RUN_TEST(test_msp2_vtx_device_status_reports_only_observable_smartaudio_state);
+  RUN_TEST(test_msp_tx_info_does_not_claim_hardware_rtc);
   return UNITY_END();
 }

@@ -188,6 +188,8 @@ static uint16_t toIbatCurrent(float current)
 
 constexpr uint8_t MSP_PASSTHROUGH_ESC_4WAY = 0xff;
 constexpr uint8_t MSP_VTX_TYPE_SMARTAUDIO = 3;
+constexpr uint8_t MSP_RSSI_SOURCE_NONE = 0;
+constexpr uint8_t MSP_RTC_NOT_SUPPORTED = 0xff;
 
 // FC version reported over MSP, mirrors Betaflight 2026.6 CalVer for configurator compatibility
 constexpr uint8_t MSP_FC_VERSION_YEAR = 2026 - 2000;
@@ -379,6 +381,14 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU32(getBoardId0());
       r.writeU32(getBoardId1());
       r.writeU32(getBoardId2());
+      break;
+
+    case MSP_TX_INFO:
+      // ESP-FC does not maintain Betaflight's global RSSI-source enum and has
+      // no battery-backed RTC. Keep this capability report explicit even when
+      // a software timestamp was supplied through MSP_SET_RTC.
+      r.writeU8(MSP_RSSI_SOURCE_NONE);
+      r.writeU8(MSP_RTC_NOT_SUPPORTED);
       break;
 
     case MSP_STATUS_EX:

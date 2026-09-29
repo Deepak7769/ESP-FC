@@ -167,7 +167,8 @@ hardware implementation.
 ## Miscellaneous compatibility
 
 - `MSP_SET_RTC` stores a software timestamp, but does not imply a battery-backed
-  hardware RTC.
+  hardware RTC. `MSP_TX_INFO` therefore reports RTC support as unavailable
+  even after a software timestamp has been supplied.
 - Normal firmware reboot is supported. Reboot-to-bootloader remains target/
   bootloader dependent and is not falsely acknowledged.
 - Craft name is implemented and writable. Build key and release name are
