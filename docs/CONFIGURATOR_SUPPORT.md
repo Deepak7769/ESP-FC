@@ -229,3 +229,15 @@ DSHOT command are explicit protocol errors in ESP-FC. They are not represented
 as Configurator-compatible placeholders. Motor mapping remains owned by the
 existing ESP-FC pin/output configuration, and no MSPv2 direct motor-command
 authority is added by the compatibility layer.
+
+
+## Advanced-mode SAFE_BENCH promotion
+
+Horizon, Headfree and Acro Trainer now have a non-actuating controller
+validation build. `esp32_advanced_modes_bench` promotes their calculations into
+the real setpoint chain while `ESPFC_SAFE_BENCH_BUILD` prevents ESC/servo
+attachment.
+
+Their standard ESP32 status remains **SHADOW** until transition/failure tests
+are complete. GPS Rescue/RTH, Position Hold and Waypoint navigation remain
+calculation-only and do not yet receive attitude/thrust authority.
