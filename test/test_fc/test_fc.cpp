@@ -1842,17 +1842,9 @@ void test_model_config_antigravity_tail_layout_stays_packed()
           ModelConfig,
           antiGravityConfigTag));
 
-  TEST_ASSERT_EQUAL_UINT32(
-      offsetof(
-          ModelConfig,
-          antiGravityConfigTag) +
-          sizeof(uint16_t),
-      sizeof(
-          ModelConfig));
-
-  // Reconstruct the size the legacy class had when modelName was its final
-  // member. If this rounded legacy end equals the current size, the new bytes
-  // are consuming tail padding rather than growing the EEPROM image.
+  // Storage v0x03 intentionally appends ConfiguratorCompatConfig. The
+  // pre-v0x03 prefix must still end exactly where the old ModelConfig ended so
+  // a v0x02 EEPROM image can be migrated without shifting any legacy field.
   const size_t legacyRoundedSize =
       ((modelNameEnd +
         alignof(ModelConfig) -
@@ -1862,6 +1854,16 @@ void test_model_config_antigravity_tail_layout_stays_packed()
 
   TEST_ASSERT_EQUAL_UINT32(
       legacyRoundedSize,
+      offsetof(
+          ModelConfig,
+          compat));
+
+  TEST_ASSERT_GREATER_OR_EQUAL_UINT32(
+      offsetof(
+          ModelConfig,
+          compat) +
+          sizeof(
+              ConfiguratorCompatConfig),
       sizeof(
           ModelConfig));
 }
