@@ -128,3 +128,18 @@ Global shadow-navigation deltas now use great-circle distance and initial
 bearing, then project that diagnostic vector into local north/east components.
 The calculation remains non-actuating but no longer relies on a short-baseline
 flat-Earth approximation for high-latitude or long-distance targets.
+
+
+## SAFE_BENCH authority promotion
+
+Horizon, Headfree and Acro Trainer now have a dedicated controller-authority
+validation target: `esp32_advanced_modes_bench`.
+
+In that target only, `ESPFC_ADVANCED_MODES_ACTIVE_TEST` feeds those modes
+through the real roll/pitch setpoint path. The macro is compile-time locked to
+`ESPFC_SAFE_BENCH_BUILD`; selecting it without the motor-driver interlock is a
+hard build error.
+
+The normal motor-driving `esp32` target is unchanged. These modes therefore
+remain non-actuating in production while transition, estimator-failure and
+interaction regressions are developed against the real controller pipeline.
