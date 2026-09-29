@@ -1961,8 +1961,18 @@ void Cli::printGpsStatus(Stream::Printer& s, bool full) const
   s.println();
 
   s.print("  Rate: ");
-  s.print(1000000.0f / _model.state.gps.interval, 1);
-  s.println(" Hz");
+  if (_model.state.gps.interval > 0)
+  {
+    s.print(
+        1000000.0f /
+            _model.state.gps.interval,
+        1);
+    s.println(" Hz");
+  }
+  else
+  {
+    s.println("N/A");
+  }
 
   s.print("  Sats: ");
   s.print(_model.state.gps.numSats);
@@ -1995,7 +2005,9 @@ void Cli::printGpsStatus(Stream::Printer& s, bool full) const
     s.println(")");
 
     s.print("  Dist: ");
-    s.print(Utils::toDeg(_model.state.gps.distanceToHome), 2);
+    s.print(
+        _model.state.gps.distanceToHome,
+        2);
     s.println(" m");
 
     s.print("  Bear: ");

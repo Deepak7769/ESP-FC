@@ -71,3 +71,11 @@ The GPIO16/GPIO17 resource conflict is not bypassed: if SERIAL_RX and GPS are
 both assigned to that same UART, receiver input retains priority and GPS is
 removed from the effective serial configuration. A raw receiver stream and a
 raw GPS stream cannot be decoded simultaneously on one UART.
+
+
+## CLI diagnostic corrections
+
+The `gps` CLI status now prints `distanceToHome` directly in meters instead
+of applying an angular radians-to-degrees conversion. GPS update rate also
+prints `N/A` until a non-zero message interval has been measured, avoiding
+an infinite/undefined diagnostic during startup or a cold start.
