@@ -1,5 +1,6 @@
 #include "Control/Actuator.h"
 #include "Control/AssistedModeV2.h"
+#include "Control/AdvancedModesBench.h"
 #include "Control/Controller.h"
 #include "Control/ShadowFeatures.h"
 #include "Control/Altitude.hpp"
@@ -8509,6 +8510,129 @@ void test_shadow_geo_delta_global_baseline_is_finite()
       300000.0f);
 }
 
+
+#if defined(ESPFC_ADVANCED_MODES_ACTIVE_TEST)
+
+static void prepareAdvancedModeBenchModel(
+    Model& model,
+    Controller& controller)
+{
+  model.state.gyro.clock = 1000;
+  model.config.gyro.dlpf = GYRO_DLPF_188;
+  model.config.loopSync = 1;
+  model.config.mixerSync = 1;
+  model.config.mixer.type = FC_MIXER_QUADX;
+
+  model.config.input.rateType = RATES_TYPE_BETAFLIGHT;
+  model.config.input.rate[AXIS_ROLL] = 70;
+  model.config.input.superRate[AXIS_ROLL] = 80;
+  model.config.input.rateLimit[AXIS_ROLL] = 1000;
+  model.config.input.rate[AXIS_PITCH] = 70;
+  model.config.input.superRate[AXIS_PITCH] = 80;
+  model.config.input.rateLimit[AXIS_PITCH] = 1000;
+
+  model.state.input.channelsValid = true;
+  model.state.input.channelCount = AXIS_COUNT;
+  model.state.attitude.healthy = true;
+  model.state.gyro.present = true;
+  model.state.gyro.sampleValid = true;
+  model.state.accel.present = true;
+
+  model.begin();
+  controller.begin();
+}
+
+void test_advanced_modes_bench_horizon_changes_rate_setpoint()
+{
+  Model model;
+  Controller controller(model);
+  prepareAdvancedModeBenchModel(model, controller);
+
+  model.state.attitude.euler =
+      VectorFloat(
+          Utils::toRad(20.0f),
+          0.0f,
+          0.0f);
+
+  model.state.input.ch[AXIS_ROLL] = 0.0f;
+  model.state.input.ch[AXIS_PITCH] = 0.0f;
+  model.state.setpoint.rate[AXIS_ROLL] =
+      Utils::toRad(100.0f);
+
+  model.updateModes(
+      uint32_t{1} << MODE_HORIZON_SHADOW);
+
+  applyAdvancedModesBench(model, controller);
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(model.state.setpoint.rate[AXIS_ROLL]));
+
+  TEST_ASSERT_TRUE(
+      model.state.setpoint.rate[AXIS_ROLL] <
+      Utils::toRad(100.0f));
+}
+
+void test_advanced_modes_bench_headfree_rotates_pilot_axes()
+{
+  Model model;
+  Controller controller(model);
+  prepareAdvancedModeBenchModel(model, controller);
+
+  model.state.input.ch[AXIS_ROLL] = 1.0f;
+  model.state.input.ch[AXIS_PITCH] = 0.0f;
+
+  model.state.attitude.euler =
+      VectorFloat(0.0f, 0.0f, 0.0f);
+
+  model.updateModes(
+      uint32_t{1} << MODE_HEADFREE_SHADOW);
+
+  applyAdvancedModesBench(model, controller);
+
+  model.state.attitude.euler.z =
+      Utils::toRad(90.0f);
+
+  applyAdvancedModesBench(model, controller);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.05f,
+      0.0f,
+      model.state.setpoint.rate[AXIS_ROLL]);
+
+  TEST_ASSERT_TRUE(
+      model.state.setpoint.rate[AXIS_PITCH] < 0.0f);
+}
+
+void test_advanced_modes_bench_acro_trainer_limits_outward_rate()
+{
+  Model model;
+  Controller controller(model);
+  prepareAdvancedModeBenchModel(model, controller);
+
+  model.config.compat.acroTrainerAngleLimit = 20;
+  model.state.attitude.euler =
+      VectorFloat(
+          Utils::toRad(25.0f),
+          0.0f,
+          0.0f);
+
+  model.state.gyro.adc[AXIS_ROLL] =
+      Utils::toRad(50.0f);
+
+  model.state.setpoint.rate[AXIS_ROLL] =
+      Utils::toRad(200.0f);
+
+  model.updateModes(
+      uint32_t{1} << MODE_ACRO_TRAINER_SHADOW);
+
+  applyAdvancedModesBench(model, controller);
+
+  TEST_ASSERT_TRUE(
+      model.state.setpoint.rate[AXIS_ROLL] < 0.0f);
+}
+
+#endif
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -8765,5 +8889,10 @@ RUN_TEST(
   RUN_TEST(test_shadow_geo_delta_wraps_international_date_line);
   RUN_TEST(test_shadow_navigation_rejects_invalid_fix_and_waypoint_coordinates);
   RUN_TEST(test_shadow_geo_delta_global_baseline_is_finite);
+#if defined(ESPFC_ADVANCED_MODES_ACTIVE_TEST)
+  RUN_TEST(test_advanced_modes_bench_horizon_changes_rate_setpoint);
+  RUN_TEST(test_advanced_modes_bench_headfree_rotates_pilot_axes);
+  RUN_TEST(test_advanced_modes_bench_acro_trainer_limits_outward_rate);
+#endif
   return UNITY_END();
 }
