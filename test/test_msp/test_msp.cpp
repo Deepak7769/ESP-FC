@@ -716,6 +716,175 @@ void test_msp2_get_text_rejects_missing_type()
       response.len);
 }
 
+
+void test_msp2_single_battery_profile_roundtrip()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  model.config.vbat.cellWarning =
+      355;
+
+  MspMessage get;
+  get.cmd =
+      MSP2_BATTERY_PROFILE;
+
+  MspResponse getResponse;
+  processor.processCommand(
+      get,
+      getResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_UINT16(
+      14,
+      getResponse.len);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      0,
+      getResponse.data[0]);
+
+  TEST_ASSERT_EQUAL_UINT16(
+      340,
+      readResponseU16(
+          getResponse,
+          1));
+
+  TEST_ASSERT_EQUAL_UINT16(
+      420,
+      readResponseU16(
+          getResponse,
+          3));
+
+  TEST_ASSERT_EQUAL_UINT16(
+      355,
+      readResponseU16(
+          getResponse,
+          5));
+
+  TEST_ASSERT_EQUAL_UINT16(
+      420,
+      readResponseU16(
+          getResponse,
+          7));
+
+  MspMessage set;
+  set.cmd =
+      MSP2_SET_BATTERY_PROFILE;
+
+  const uint8_t profileIndex =
+      0;
+
+  set.append(
+      &profileIndex,
+      1);
+
+  appendU16(
+      set,
+      340);
+
+  appendU16(
+      set,
+      420);
+
+  appendU16(
+      set,
+      365);
+
+  appendU16(
+      set,
+      420);
+
+  appendU16(
+      set,
+      0);
+
+  const uint8_t tail[] = {
+      0,
+      0};
+
+  set.append(
+      tail,
+      sizeof(tail));
+
+  MspResponse setResponse;
+  processor.processCommand(
+      set,
+      setResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      1,
+      setResponse.result);
+
+  TEST_ASSERT_EQUAL_INT16(
+      365,
+      model.config.vbat.cellWarning);
+}
+
+void test_msp2_battery_profile_rejects_unsupported_profile_fields()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  model.config.vbat.cellWarning =
+      350;
+
+  MspMessage set;
+  set.cmd =
+      MSP2_SET_BATTERY_PROFILE;
+
+  const uint8_t profileIndex =
+      0;
+
+  set.append(
+      &profileIndex,
+      1);
+
+  appendU16(
+      set,
+      330);
+
+  appendU16(
+      set,
+      420);
+
+  appendU16(
+      set,
+      350);
+
+  appendU16(
+      set,
+      420);
+
+  appendU16(
+      set,
+      0);
+
+  const uint8_t tail[] = {
+      0,
+      0};
+
+  set.append(
+      tail,
+      sizeof(tail));
+
+  MspResponse response;
+  processor.processCommand(
+      set,
+      response,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      response.result);
+
+  TEST_ASSERT_EQUAL_INT16(
+      350,
+      model.config.vbat.cellWarning);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -738,5 +907,7 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp2_text_build_metadata_is_read_only);
   RUN_TEST(test_msp2_gyro_sensor_active_handles_missing_device_pointer);
   RUN_TEST(test_msp2_get_text_rejects_missing_type);
+  RUN_TEST(test_msp2_single_battery_profile_roundtrip);
+  RUN_TEST(test_msp2_battery_profile_rejects_unsupported_profile_fields);
   return UNITY_END();
 }

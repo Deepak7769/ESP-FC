@@ -118,6 +118,15 @@ ADC voltage/current and MSP companion current are active. Virtual and ESC
 current-meter source IDs remain unsupported and are sanitized instead of being
 misrepresented as working sensors.
 
+Betaflight's MSPv2 battery-profile surface is bridged to ESP-FC's single
+battery configuration. Profile index 0 reports the existing cell-warning
+threshold and the same fixed min/max/full-cell values already exposed by
+`MSP_BATTERY_CONFIG`. The warning threshold may be written through the
+profile command. Multiple profiles, capacity tracking, forced cell count and
+consumption-percentage warnings remain unsupported; writes that attempt to
+change those unsupported fields are rejected rather than acknowledged and
+discarded.
+
 ## Blackbox and storage
 
 Serial and target-supported flash Blackbox paths are active. Selecting an

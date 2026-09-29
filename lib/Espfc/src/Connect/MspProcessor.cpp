@@ -202,6 +202,16 @@ constexpr uint8_t MSP_GPS_PROVIDER_UBLOX = 1;
 constexpr uint8_t MSP_GPS_SBAS_AUTO = 0;
 constexpr uint8_t MSP_GPS_SBAS_NONE = 5;
 
+// ESP-FC currently has one battery configuration rather than Betaflight's
+// profile bank. Keep the unsupported profile fields explicit and fixed.
+constexpr uint8_t MSP_BATTERY_PROFILE_INDEX = 0;
+constexpr uint16_t MSP_BATTERY_MIN_CELL_CV = 340;
+constexpr uint16_t MSP_BATTERY_MAX_CELL_CV = 420;
+constexpr uint16_t MSP_BATTERY_FULL_CELL_CV = 420;
+constexpr uint16_t MSP_BATTERY_CAPACITY_MAH = 0;
+constexpr uint8_t MSP_BATTERY_FORCE_CELL_COUNT = 0;
+constexpr uint8_t MSP_BATTERY_CONSUMPTION_WARNING_PERCENT = 0;
+
 // MCU type id sentinel telling the configurator the name follows as a string
 constexpr uint8_t MCU_TYPE_ID_PROVIDED_BY_NAME = 255;
 
@@ -685,6 +695,121 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
         _model.config.vbat.cellWarning = m.readU16();
       }
       break;
+
+    case MSP2_BATTERY_PROFILE: {
+      if (m.remain() > 1)
+      {
+        r.result = -1;
+        break;
+      }
+
+      const uint8_t profileIndex =
+          m.remain()
+              ? m.readU8()
+              : MSP_BATTERY_PROFILE_INDEX;
+
+      if (profileIndex !=
+          MSP_BATTERY_PROFILE_INDEX)
+      {
+        r.result = -1;
+        break;
+      }
+
+      r.writeU8(
+          MSP_BATTERY_PROFILE_INDEX);
+
+      r.writeU16(
+          MSP_BATTERY_MIN_CELL_CV);
+
+      r.writeU16(
+          MSP_BATTERY_MAX_CELL_CV);
+
+      r.writeU16(
+          static_cast<uint16_t>(
+              _model.config.vbat.cellWarning));
+
+      r.writeU16(
+          MSP_BATTERY_FULL_CELL_CV);
+
+      r.writeU16(
+          MSP_BATTERY_CAPACITY_MAH);
+
+      r.writeU8(
+          MSP_BATTERY_FORCE_CELL_COUNT);
+
+      r.writeU8(
+          MSP_BATTERY_CONSUMPTION_WARNING_PERCENT);
+      break;
+    }
+
+    case MSP2_SET_BATTERY_PROFILE: {
+      constexpr size_t PAYLOAD_SIZE =
+          sizeof(uint8_t) +
+          sizeof(uint16_t) * 5 +
+          sizeof(uint8_t) * 2;
+
+      if (m.remain() !=
+          PAYLOAD_SIZE)
+      {
+        r.result = -1;
+        break;
+      }
+
+      const uint8_t profileIndex =
+          m.readU8();
+
+      const uint16_t vbatMin =
+          m.readU16();
+
+      const uint16_t vbatMax =
+          m.readU16();
+
+      const uint16_t vbatWarn =
+          m.readU16();
+
+      const uint16_t vbatFull =
+          m.readU16();
+
+      const uint16_t capacity =
+          m.readU16();
+
+      const uint8_t forceCellCount =
+          m.readU8();
+
+      const uint8_t consumptionWarning =
+          m.readU8();
+
+      const bool supported =
+          profileIndex ==
+              MSP_BATTERY_PROFILE_INDEX &&
+          vbatMin ==
+              MSP_BATTERY_MIN_CELL_CV &&
+          vbatMax ==
+              MSP_BATTERY_MAX_CELL_CV &&
+          vbatFull ==
+              MSP_BATTERY_FULL_CELL_CV &&
+          capacity ==
+              MSP_BATTERY_CAPACITY_MAH &&
+          forceCellCount ==
+              MSP_BATTERY_FORCE_CELL_COUNT &&
+          consumptionWarning ==
+              MSP_BATTERY_CONSUMPTION_WARNING_PERCENT &&
+          vbatWarn >=
+              MSP_BATTERY_MIN_CELL_CV &&
+          vbatWarn <=
+              MSP_BATTERY_FULL_CELL_CV;
+
+      if (!supported)
+      {
+        r.result = -1;
+        break;
+      }
+
+      _model.config.vbat.cellWarning =
+          static_cast<int16_t>(
+              vbatWarn);
+      break;
+    }
 
     case MSP_BATTERY_STATE:
       // battery characteristics
