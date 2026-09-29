@@ -651,6 +651,45 @@ void test_msp2_text_build_metadata_is_read_only()
       setResponse.result);
 }
 
+
+void test_msp2_gyro_sensor_active_handles_missing_device_pointer()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  model.config.gyro.dev =
+      GYRO_AUTO;
+
+  model.state.gyro.present =
+      true;
+
+  model.state.gyro.dev =
+      nullptr;
+
+  MspMessage get;
+  get.cmd =
+      MSP2_GYRO_SENSOR_ACTIVE;
+
+  MspResponse response;
+  processor.processCommand(
+      get,
+      response,
+      stream);
+
+  TEST_ASSERT_EQUAL_UINT16(
+      2,
+      response.len);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      1,
+      response.data[0]);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      GYRO_NONE,
+      response.data[1]);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -671,5 +710,6 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp2_set_text_rejects_truncated_craft_name_without_erasing_it);
   RUN_TEST(test_msp_box_names_and_ids_cover_every_declared_mode);
   RUN_TEST(test_msp2_text_build_metadata_is_read_only);
+  RUN_TEST(test_msp2_gyro_sensor_active_handles_missing_device_pointer);
   return UNITY_END();
 }

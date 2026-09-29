@@ -892,8 +892,12 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
     }
 
     case MSP2_GYRO_SENSOR_ACTIVE:
-      r.writeU8(1);                                                                  // gyro count, single gyro only
-      r.writeU8(_model.gyroActive() ? _model.state.gyro.dev->getType() : GYRO_NONE); // gyro 1
+      r.writeU8(1); // gyro count, single gyro only
+      r.writeU8(
+          _model.gyroActive() &&
+                  _model.state.gyro.dev
+              ? _model.state.gyro.dev->getType()
+              : GYRO_NONE); // gyro 1
       break;
 
     case MSP_SENSOR_ALIGNMENT:
