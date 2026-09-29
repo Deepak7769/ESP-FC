@@ -3,6 +3,7 @@
 #include "Connect/MspProcessor.hpp"
 #include "msp/msp_protocol.h"
 #include "msp/msp_protocol_v2_betaflight.h"
+#include "msp/msp_protocol_v2_common.h"
 #include <EscDriver.h>
 #include <Gps.hpp>
 #include <Hal/Gpio.hpp>
@@ -1161,6 +1162,67 @@ void test_msp_sensor_alignment_rejects_custom_offsets_without_partial_write()
       model.config.mag.align);
 }
 
+
+void test_msp_unsupported_configurator_subsystems_fail_explicitly()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  const uint16_t commands[] = {
+      MSP2_GET_OSD_WARNINGS,
+      MSP2_GET_LED_STRIP_CONFIG_VALUES,
+      MSP2_SENSOR_OPTICALFLOW,
+      MSP_VTXTABLE_BAND,
+      MSP_VTXTABLE_POWERLEVEL};
+
+  for (const uint16_t command : commands)
+  {
+    MspMessage request;
+    request.cmd =
+        command;
+
+    MspResponse response;
+    processor.processCommand(
+        request,
+        response,
+        stream);
+
+    TEST_ASSERT_EQUAL_INT8(
+        -1,
+        response.result);
+
+    TEST_ASSERT_EQUAL_UINT16(
+        0,
+        response.len);
+  }
+
+  const uint8_t ledPayload[] = {
+      100,
+      0,
+      0,
+      0,
+      0};
+
+  MspMessage ledSet;
+  ledSet.cmd =
+      MSP2_SET_LED_STRIP_CONFIG_VALUES;
+
+  ledSet.append(
+      ledPayload,
+      sizeof(ledPayload));
+
+  MspResponse ledSetResponse;
+  processor.processCommand(
+      ledSet,
+      ledSetResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      ledSetResponse.result);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -1189,5 +1251,6 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp_gps_config_rejects_unrepresentable_fixed_capabilities);
   RUN_TEST(test_msp_sensor_config_rejects_unimplemented_sensor_selectors_atomically);
   RUN_TEST(test_msp_sensor_alignment_rejects_custom_offsets_without_partial_write);
+  RUN_TEST(test_msp_unsupported_configurator_subsystems_fail_explicitly);
   return UNITY_END();
 }

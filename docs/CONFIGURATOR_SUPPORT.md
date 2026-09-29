@@ -153,6 +153,10 @@ unsupported on the standard target.
 - Status LED / WS2812 support exists, but a full Betaflight LED-strip layout
   and effects editor is not implemented.
 - A general Betaflight OSD/DisplayPort subsystem is not present.
+- MSP requests for OSD warnings, the Betaflight LED-strip value editor,
+  optical-flow telemetry and VTX-table rows remain explicit protocol errors.
+  Native regressions lock this behavior so unsupported Configurator pages are
+  not accidentally made to look functional by zero-filled placeholder data.
 
 These interfaces stay explicit rather than reporting a stored value as a
 hardware implementation.
