@@ -1069,6 +1069,7 @@ void Cli::execute(CliCmd& cmd, Stream::Printer& s)
     static const char* const helps[] = {"available commands:", " help", " dump", " get param", " set param value ...",
                                         " cal [gyro]", " defaults", " save", " reboot", " scaler", " mixer", " stats",
                                         " status", " devinfo", " version", " logs", " gps [set_home|clear_home]", " shadow",
+                                        " capabilities",
                                         //" load", " eeprom",
                                         //" fsinfo", " fsformat", " log",
                                         nullptr};
@@ -1350,6 +1351,10 @@ void Cli::execute(CliCmd& cmd, Stream::Printer& s)
   else if (std::strcmp(cmd.args[0], "shadow") == 0)
   {
     printShadowStatus(s);
+  }
+  else if (std::strcmp(cmd.args[0], "capabilities") == 0)
+  {
+    printCapabilities(s);
   }
   else if (std::strcmp(cmd.args[0], "preset") == 0)
   {
@@ -2045,6 +2050,29 @@ void Cli::printShadowStatus(Stream::Printer& s) const
   s.println(Utils::toDeg(shadow.targetBearingRad), 2);
 
   s.println(" output authority: NONE");
+}
+
+void Cli::printCapabilities(Stream::Printer& s) const
+{
+  s.println("CONFIGURATOR CAPABILITIES:");
+
+  s.println(
+      " active: ACRO ANGLE ALTHOLD LAND ANTI_GRAVITY GPS_SENSING SMARTAUDIO");
+
+  s.println(
+      " shadow: HORIZON GPS_RESCUE POSHOLD HEADFREE ACRO_TRAINER WAYPOINT");
+
+  s.println(
+      " persisted_only: 3D PID_COMPAT RX_METADATA GYRO_METADATA");
+
+  s.println(
+      " fixed: GPS_UBLOX GPS_AUTO_CONFIG GPS_AUTO_BAUD SINGLE_BATTERY_PROFILE");
+
+  s.println(
+      " unsupported: NAV_AUTHORITY OSD DISPLAYPORT VTX_TABLE LED_EDITOR RANGEFINDER OPTICALFLOW SPI_RX_DRIVER");
+
+  s.println(
+      " shadow_output_authority: NONE");
 }
 
 void Cli::printVersion(Stream::Printer& s) const

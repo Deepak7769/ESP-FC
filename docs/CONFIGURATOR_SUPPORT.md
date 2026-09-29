@@ -190,3 +190,11 @@ rather than inventing a new flight stack:
 
 No source from those projects is used to bypass ESP-FC's hard non-actuating
 boundary.
+
+
+## CLI capability summary
+
+The read-only `capabilities` CLI command prints the current high-level
+Configurator contract as ACTIVE, SHADOW, PERSISTED ONLY, FIXED and UNSUPPORTED
+groups. It also prints `shadow_output_authority: NONE`, making the
+non-actuating navigation boundary visible without requiring source inspection.

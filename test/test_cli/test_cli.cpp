@@ -311,6 +311,45 @@ void test_cli_uint16_param_roundtrip()
       result.find("set compat_failsafe_throttle 1234"));
 }
 
+
+void test_cli_capabilities_reports_authority_boundaries()
+{
+  Model model;
+  Cli cli{model};
+  CliCmd cmd;
+
+  for (char c : std::string("capabilities\n"))
+  {
+    cli.process(
+        c,
+        cmd,
+        printer);
+  }
+
+  const auto result =
+      stream.str();
+
+  TEST_ASSERT_NOT_EQUAL(
+      std::string::npos,
+      result.find(
+          "CONFIGURATOR CAPABILITIES:"));
+
+  TEST_ASSERT_NOT_EQUAL(
+      std::string::npos,
+      result.find(
+          "shadow: HORIZON GPS_RESCUE POSHOLD"));
+
+  TEST_ASSERT_NOT_EQUAL(
+      std::string::npos,
+      result.find(
+          "unsupported: NAV_AUTHORITY"));
+
+  TEST_ASSERT_NOT_EQUAL(
+      std::string::npos,
+      result.find(
+          "shadow_output_authority: NONE"));
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -327,5 +366,6 @@ int main(int argc, char** argv)
   RUN_TEST(test_cli_bf_get_mag_calibration);
   RUN_TEST(test_cli_bf_sensor_hardware);
   RUN_TEST(test_cli_uint16_param_roundtrip);
+  RUN_TEST(test_cli_capabilities_reports_authority_boundaries);
   return UNITY_END();
 }
