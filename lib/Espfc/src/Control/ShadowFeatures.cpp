@@ -571,6 +571,11 @@ void ShadowFeatures::updateNavigation()
       gpsPositionUsable(
           _model);
 
+  const bool rescueMinSatsSatisfied =
+      !rth ||
+      _model.state.gps.numSats >=
+          _model.config.compat.gpsRescue.minSats;
+
   if (posHold &&
       (!shadow.holdLocationValid ||
        _model.hasChanged(
@@ -649,6 +654,7 @@ void ShadowFeatures::updateNavigation()
 
   if (!targetValid ||
       !positionUsable ||
+      !rescueMinSatsSatisfied ||
       !coordinateValid(
           target.lat,
           target.lon))
@@ -697,12 +703,23 @@ void ShadowFeatures::updateNavigation()
     // Reference-style outer navigation demand only: proportional distance
     // error with a bounded horizontal speed. Never converted to angle,
     // attitude, PID or mixer commands.
+    const float configuredMaxSpeed =
+        rth
+            ? std::clamp(
+                  static_cast<float>(
+                      _model.config.compat.gpsRescue
+                          .groundSpeedCmS) *
+                      0.01f,
+                  0.0f,
+                  30.0f)
+            : 5.0f;
+
     const float speed =
         std::clamp(
             shadow.targetDistanceM *
                 0.5f,
             0.0f,
-            5.0f);
+            configuredMaxSpeed);
 
     shadow.desiredNorthMs =
         std::cos(
