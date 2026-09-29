@@ -27,10 +27,13 @@ UNSUPPORTED_MSP = [
     "MSP2_MOTOR_OUTPUT_REORDERING",
     "MSP2_SET_MOTOR_OUTPUT_REORDERING",
     "MSP2_SEND_DSHOT_COMMAND",
+    "MSP2_SENSOR_OPTICALFLOW",
+]
+
+SUPPORTED_COMPAT_MSP = [
     "MSP2_GET_OSD_WARNINGS",
     "MSP2_GET_LED_STRIP_CONFIG_VALUES",
     "MSP2_SET_LED_STRIP_CONFIG_VALUES",
-    "MSP2_SENSOR_OPTICALFLOW",
     "MSP_GPS_RESCUE",
     "MSP_SET_GPS_RESCUE",
     "MSP_GPS_RESCUE_PIDS",
@@ -78,6 +81,9 @@ def main() -> int:
         require(model, symbol, str(MODEL_CONFIG.relative_to(ROOT)), errors)
 
     for command in UNSUPPORTED_MSP:
+        require(msp, f"case {command}:", str(MSP.relative_to(ROOT)), errors)
+
+    for command in SUPPORTED_COMPAT_MSP:
         require(msp, f"case {command}:", str(MSP.relative_to(ROOT)), errors)
 
     require(
