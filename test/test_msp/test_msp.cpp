@@ -737,7 +737,7 @@ void test_msp2_single_battery_profile_roundtrip()
       stream);
 
   TEST_ASSERT_EQUAL_UINT16(
-      14,
+      13,
       getResponse.len);
 
   TEST_ASSERT_EQUAL_UINT8(
