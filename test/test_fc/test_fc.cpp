@@ -7972,11 +7972,16 @@ void test_shadow_update_cannot_change_control_or_output_state()
   const AssistedModeState assistedBefore =
       model.state.assistedMode;
 
-  float pidOutputsBefore[AXIS_COUNT_RPYT] = {};
+  float pidITermBefore[AXIS_COUNT_RPYT] = {};
+  float pidPTermBefore[AXIS_COUNT_RPYT] = {};
+  float pidDTermBefore[AXIS_COUNT_RPYT] = {};
+  float pidFTermBefore[AXIS_COUNT_RPYT] = {};
   for (size_t i = 0; i < AXIS_COUNT_RPYT; ++i)
   {
-    pidOutputsBefore[i] =
-        model.state.innerPid[i].output;
+    pidITermBefore[i] = model.state.innerPid[i].iTerm;
+    pidPTermBefore[i] = model.state.innerPid[i].pTerm;
+    pidDTermBefore[i] = model.state.innerPid[i].dTerm;
+    pidFTermBefore[i] = model.state.innerPid[i].fTerm;
   }
 
   const OutputState outputBefore =
@@ -7998,8 +8003,20 @@ void test_shadow_update_cannot_change_control_or_output_state()
 
     TEST_ASSERT_FLOAT_WITHIN(
         0.000001f,
-        pidOutputsBefore[i],
-        model.state.innerPid[i].output);
+        pidITermBefore[i],
+        model.state.innerPid[i].iTerm);
+    TEST_ASSERT_FLOAT_WITHIN(
+        0.000001f,
+        pidPTermBefore[i],
+        model.state.innerPid[i].pTerm);
+    TEST_ASSERT_FLOAT_WITHIN(
+        0.000001f,
+        pidDTermBefore[i],
+        model.state.innerPid[i].dTerm);
+    TEST_ASSERT_FLOAT_WITHIN(
+        0.000001f,
+        pidFTermBefore[i],
+        model.state.innerPid[i].fTerm);
   }
 
   TEST_ASSERT_FLOAT_WITHIN(
