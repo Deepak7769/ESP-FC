@@ -3,6 +3,7 @@
 #include "Utils/Storage.h"
 #include "ModelConfig.h"
 #include <Arduino.h>
+#include <cstddef>
 #include <EEPROM.h>
 
 #if defined(NO_GLOBAL_INSTANCES) || defined(NO_GLOBAL_EEPROM)
@@ -29,22 +30,64 @@ StorageResult Storage::load(ModelConfig& config) const
     return STORAGE_ERR_BAD_MAGIC;
   }
 
-  uint8_t version = EEPROM.read(addr++);
-  if (EEPROM_VERSION != version)
-  {
-    return STORAGE_ERR_BAD_VERSION;
-  }
+  const uint8_t version = EEPROM.read(addr++);
 
   uint16_t size = 0;
   size = EEPROM.read(addr++);
   size |= EEPROM.read(addr++) << 8;
-  if (size != sizeof(ModelConfig))
+
+  if (version == EEPROM_VERSION)
   {
-    return STORAGE_ERR_BAD_SIZE;
+    if (size != sizeof(ModelConfig))
+    {
+      return STORAGE_ERR_BAD_SIZE;
+    }
+
+    EEPROM.get(addr, config);
+    return STORAGE_LOAD_SUCCESS;
   }
 
-  EEPROM.get(addr, config);
-  return STORAGE_LOAD_SUCCESS;
+  if (version == EEPROM_VERSION_V2)
+  {
+    // v0x03 appends ConfiguratorCompatConfig to the legacy layout. Loading
+    // exactly the prefix keeps every previous field/offset intact and leaves
+    // the new tail at its constructor defaults.
+    constexpr size_t LEGACY_V2_SIZE =
+        offsetof(ModelConfig, compat);
+
+    if (size != LEGACY_V2_SIZE)
+    {
+      return STORAGE_ERR_BAD_SIZE;
+    }
+
+    uint8_t* dst =
+        reinterpret_cast<uint8_t*>(&config);
+
+    for (size_t i = 0; i < LEGACY_V2_SIZE; ++i)
+    {
+      dst[i] = EEPROM.read(addr + i);
+    }
+
+    // IDs added after MODE_ANTI_GRAVITY were invalid/ignored in v0x02.
+    // Scrub those stale rows so arbitrary old bytes cannot become newly-live
+    // shadow mode requests after migration.
+    for (size_t i = 0; i < ACTUATOR_CONDITIONS; ++i)
+    {
+      auto& condition = config.conditions[i];
+
+      if ((condition.id >= MODE_HORIZON_SHADOW &&
+           condition.id < MODE_COUNT) ||
+          (condition.linkId >= MODE_HORIZON_SHADOW &&
+           condition.linkId < MODE_COUNT))
+      {
+        condition = ActuatorCondition{};
+      }
+    }
+
+    return STORAGE_LOAD_SUCCESS;
+  }
+
+  return STORAGE_ERR_BAD_VERSION;
 }
 
 StorageResult Storage::save(const ModelConfig& config)

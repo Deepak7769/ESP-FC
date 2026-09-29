@@ -1083,37 +1083,50 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       break;
 
     case MSP_MOTOR_3D_CONFIG:
-      r.writeU16(1406); // deadband3d_low;
-      r.writeU16(1514); // deadband3d_high;
-      r.writeU16(1460); // neutral3d;
+      r.writeU16(_model.config.compat.deadband3dLow);
+      r.writeU16(_model.config.compat.deadband3dHigh);
+      r.writeU16(_model.config.compat.neutral3d);
+      break;
+
+    case MSP_SET_MOTOR_3D_CONFIG:
+      if (m.remain() >= 6)
+      {
+        _model.config.compat.deadband3dLow = m.readU16();
+        _model.config.compat.deadband3dHigh = m.readU16();
+        _model.config.compat.neutral3d = m.readU16();
+      }
+      else
+      {
+        r.result = -1;
+      }
       break;
 
     case MSP_ARMING_CONFIG:
-      r.writeU8(5);                               // auto_disarm delay
-      r.writeU8(0);                               // disarm kill switch
-      r.writeU8(_model.config.arming.smallAngle); // small angle
-      r.writeU8(0);                               // gyro_cal_on_first_arm
+      r.writeU8(_model.config.compat.autoDisarmDelay);
+      r.writeU8(_model.config.compat.disarmKillSwitch);
+      r.writeU8(_model.config.arming.smallAngle);
+      r.writeU8(_model.config.compat.gyroCalOnFirstArm);
       break;
 
     case MSP_SET_ARMING_CONFIG:
-      m.readU8();                                                           // auto_disarm delay
-      m.readU8();                                                           // disarm kill switch
-      _model.config.arming.smallAngle = std::min<uint8_t>(180, m.readU8()); // small angle
-      m.readU8();                                                           // gyro_cal_on_first_arm
+      _model.config.compat.autoDisarmDelay = m.readU8();
+      _model.config.compat.disarmKillSwitch = m.readU8();
+      _model.config.arming.smallAngle = std::min<uint8_t>(180, m.readU8());
+      _model.config.compat.gyroCalOnFirstArm = m.readU8();
       break;
 
     case MSP_RC_DEADBAND:
       r.writeU8(_model.config.input.deadband);
-      r.writeU8(0);  // yaw deadband
-      r.writeU8(0);  // pos hold deadband
-      r.writeU16(0); // deadband 3d throttle
+      r.writeU8(_model.config.compat.yawDeadband);
+      r.writeU8(_model.config.compat.posHoldDeadband);
+      r.writeU16(_model.config.compat.deadband3dThrottle);
       break;
 
     case MSP_SET_RC_DEADBAND:
       _model.config.input.deadband = m.readU8();
-      m.readU8();  // yaw deadband
-      m.readU8();  // pos hod deadband
-      m.readU16(); // deadband 3d throttle
+      _model.config.compat.yawDeadband = m.readU8();
+      _model.config.compat.posHoldDeadband = m.readU8();
+      _model.config.compat.deadband3dThrottle = m.readU16();
       break;
 
     case MSP_RX_CONFIG:
@@ -1121,34 +1134,33 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU16(_model.config.input.maxCheck);                             // maxcheck
       r.writeU16(_model.config.input.midRc);                                // midrc
       r.writeU16(_model.config.input.minCheck);                             // mincheck
-      r.writeU8(0);                                                         // spectrum bind
+      r.writeU8(_model.config.compat.spektrumBind);                         // spectrum bind
       r.writeU16(_model.config.input.minRc);                                // min_us
       r.writeU16(_model.config.input.maxRc);                                // max_us
-      r.writeU8(0);                                                         // rc interpolation
-      r.writeU8(0);                                                         // rc interpolation interval
+      r.writeU8(_model.config.compat.rcInterpolation);                      // rc interpolation
+      r.writeU8(_model.config.compat.rcInterpolationInterval);               // rc interpolation interval
       r.writeU16(_model.config.input.airModeActivateThreshold * 10 + 1000); // airmode activate threshold
-      r.writeU8(0);                                                         // rx spi prot
-      r.writeU32(0);                                                        // rx spi id
-      r.writeU8(0);                                                         // rx spi chan count
-      r.writeU8(0);                                                         // fpv camera angle
-      r.writeU8(2);                                                         // rc iterpolation channels: RPYT
-      r.writeU8(0);                                                         // deprecated: rc_smoothing_type
+      r.writeU8(_model.config.compat.rxSpiProtocol);                         // rx spi prot
+      r.writeU32(_model.config.compat.rxSpiId);                              // rx spi id
+      r.writeU8(_model.config.compat.rxSpiChannelCount);                     // rx spi chan count
+      r.writeU8(_model.config.compat.fpvCameraAngle);                        // fpv camera angle
+      r.writeU8(_model.config.compat.rcInterpolationChannels);               // rc interpolation channels
+      r.writeU8(_model.config.compat.rcSmoothingType);                       // deprecated: rc_smoothing_type
       r.writeU8(_model.config.input.filter.freq);                           // rc_smoothing_setpoint_cutoff
       r.writeU8(_model.config.input.filterThrottle.freq);                   // rc_smoothing_throtle_cutoff
       r.writeU8(_model.config.input.filterAutoThrottleFactor);              // rc_smoothing_auto_factor_throttle
-      r.writeU8(0);                                                         // rc_smoothing_derivative_type
-      r.writeU8(0);                                                         // usb type
+      r.writeU8(_model.config.compat.rcSmoothingDerivativeType);            // rc_smoothing_derivative_type
+      r.writeU8(_model.config.compat.usbType);                               // usb type
       // 1.42+
       r.writeU8(_model.config.input.filterAutoFactor); // rc_smoothing_auto_factor
       // 1.44
       r.writeU8(_model.config.input.filterEnable); // rc_smoothing
       // 1.45
-      {
-        uint8_t uid[6] = {};
-        r.writeData((const char*)uid, sizeof(uid)); // elrs uid
-      }
+      r.writeData(
+          reinterpret_cast<const char*>(_model.config.compat.elrsUid),
+          sizeof(_model.config.compat.elrsUid)); // elrs uid
       // 1.47
-      r.writeU8(0); // elrs modelId
+      r.writeU8(_model.config.compat.elrsModelId); // elrs modelId
       break;
 
     case MSP_SET_RX_CONFIG:
@@ -1156,38 +1168,38 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       _model.config.input.maxCheck = m.readU16();        // maxcheck
       _model.config.input.midRc = m.readU16();           // midrc
       _model.config.input.minCheck = m.readU16();        // mincheck
-      m.readU8();                                        // spectrum bind
+      _model.config.compat.spektrumBind = m.readU8();    // spectrum bind
       _model.config.input.minRc = m.readU16();           // min_us
       _model.config.input.maxRc = m.readU16();           // max_us
       if (m.remain() >= 4)
       {
-        m.readU8();                                                               // rc interpolation
-        m.readU8();                                                               // rc interpolation interval
+        _model.config.compat.rcInterpolation = m.readU8();                        // rc interpolation
+        _model.config.compat.rcInterpolationInterval = m.readU8();                 // rc interpolation interval
         _model.config.input.airModeActivateThreshold = (m.readU16() - 1000) / 10; // airmode activate threshold
       }
       if (m.remain() >= 6)
       {
-        m.readU8();  // rx spi prot
-        m.readU32(); // rx spi id
-        m.readU8();  // rx spi chan count
+        _model.config.compat.rxSpiProtocol = m.readU8();
+        _model.config.compat.rxSpiId = m.readU32();
+        _model.config.compat.rxSpiChannelCount = m.readU8();
       }
       if (m.remain() >= 1)
       {
-        m.readU8(); // fpv camera angle
+        _model.config.compat.fpvCameraAngle = m.readU8();
       }
       // 1.40+
       if (m.remain() >= 6)
       {
-        m.readU8();                                                // was rc iterpolation channels
-        m.readU8();                                                // was rc_smoothing_type
+        _model.config.compat.rcInterpolationChannels = m.readU8();
+        _model.config.compat.rcSmoothingType = m.readU8();
         _model.config.input.filter.freq = m.readU8();              // rc_smoothing_setpoint_cutoff
         _model.config.input.filterThrottle.freq = m.readU8();      // rc_smoothing_throttle_cutoff
         _model.config.input.filterAutoThrottleFactor = m.readU8(); // rc_smoothing_auto_factor_throttle
-        m.readU8();                                                // was rc_smoothing_derivative_type
+        _model.config.compat.rcSmoothingDerivativeType = m.readU8();
       }
       if (m.remain() >= 1)
       {
-        m.readU8(); // usb type
+        _model.config.compat.usbType = m.readU8();
       }
       // 1.42+
       if (m.remain() >= 1)
@@ -1202,22 +1214,25 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       // 1.45
       if (m.remain() >= 6)
       {
-        m.advance(6); // elrs uid
+        for (size_t i = 0; i < sizeof(_model.config.compat.elrsUid); ++i)
+        {
+          _model.config.compat.elrsUid[i] = m.readU8();
+        }
       }
       // 1.47
       if (m.remain() >= 1)
       {
-        m.readU8(); // elrs modelId
+        _model.config.compat.elrsModelId = m.readU8();
       }
       _model.notifyConfigChange(MODEL_CHANGE_INPUT);
       break;
 
     case MSP_FAILSAFE_CONFIG:
       r.writeU8(_model.config.failsafe.delay);      // failsafe_delay
-      r.writeU8(0);                                 // failsafe_off_delay
-      r.writeU16(1000);                             // failsafe_throttle
-      r.writeU8(_model.config.failsafe.killSwitch); // failsafe_kill_switch
-      r.writeU16(0);                                // failsafe_throttle_low_delay
+      r.writeU8(_model.config.compat.failsafeOffDelay);        // failsafe_off_delay
+      r.writeU16(_model.config.compat.failsafeThrottle);        // failsafe_throttle
+      r.writeU8(_model.config.failsafe.killSwitch);             // failsafe_kill_switch
+      r.writeU16(_model.config.compat.failsafeThrottleLowDelay); // failsafe_throttle_low_delay
 r.writeU8(
     _model.config.failsafe.procedure);
       break;
@@ -1227,13 +1242,17 @@ case MSP_SET_FAILSAFE_CONFIG:
   _model.config.failsafe.delay =
       m.readU8();
 
-  m.readU8();  // failsafe_off_delay
-  m.readU16(); // failsafe_throttle
+  _model.config.compat.failsafeOffDelay =
+      m.readU8();
+
+  _model.config.compat.failsafeThrottle =
+      m.readU16();
 
   _model.config.failsafe.killSwitch =
       m.readU8();
 
-  m.readU16(); // failsafe_throttle_low_delay
+  _model.config.compat.failsafeThrottleLowDelay =
+      m.readU16();
 
 const uint8_t procedure =
     m.readU8();
@@ -1283,8 +1302,8 @@ _model.config.failsafe.procedure =
         r.writeU8(_model.config.input.superRate[i]);
       }
       r.writeU8(0);                                    // was tpa scale
-      r.writeU8(50);                                   // thrMid8
-      r.writeU8(0);                                    // thr expo
+      r.writeU8(_model.config.compat.throttleMid);     // thrMid8
+      r.writeU8(_model.config.compat.throttleExpo);    // thr expo
       r.writeU16(0);                                   // was tpa breakpoint
       r.writeU8(_model.config.input.expo[AXIS_YAW]);   // yaw expo
       r.writeU8(_model.config.input.rate[AXIS_YAW]);   // yaw rate
@@ -1300,7 +1319,7 @@ _model.config.failsafe.procedure =
       // 1.43+
       r.writeU8(_model.config.input.rateType); // rates type
       // 1.47
-      r.writeU8(50); // thrHover8
+      r.writeU8(_model.config.compat.throttleHover); // thrHover8
       break;
 
     case MSP_SET_RC_TUNING:
@@ -1325,8 +1344,8 @@ _model.config.failsafe.procedure =
           _model.config.input.superRate[i] = m.readU8();
         }
         m.readU8();  // was tpa scale
-        m.readU8();  // thrMid8
-        m.readU8();  // thr expo
+        _model.config.compat.throttleMid = m.readU8();
+        _model.config.compat.throttleExpo = m.readU8();
         m.readU16(); // was tpa breakpoint
         if (m.remain() >= 1)
         {
@@ -1365,7 +1384,7 @@ _model.config.failsafe.procedure =
         // 1.47
         if (m.remain() >= 1)
         {
-          m.readU8(); // thrHover8
+          _model.config.compat.throttleHover = m.readU8();
         }
         _model.notifyConfigChange(MODEL_CHANGE_RATES);
       }
@@ -1383,14 +1402,14 @@ _model.config.failsafe.procedure =
       r.writeU8(_model.config.output.protocol);
       r.writeU16(_model.config.output.rate);
       r.writeU16(_model.config.output.motorIdle);
-      r.writeU8(0);    // 32k gyro
-      r.writeU8(0);    // PWM inversion
-      r.writeU8(0);    // gyro_to_use: {1:0, 2:1. 2:both}
-      r.writeU8(0);    // gyro high fsr (flase)
-      r.writeU8(48);   // gyro cal threshold
-      r.writeU16(125); // gyro cal duration (1.25s)
-      r.writeU16(0);   // gyro offset yaw
-      r.writeU8(0);    // check overflow
+      r.writeU8(_model.config.compat.gyro32k);
+      r.writeU8(_model.config.compat.pwmInversion);
+      r.writeU8(_model.config.compat.gyroToUse);
+      r.writeU8(_model.config.compat.gyroHighFsr);
+      r.writeU8(_model.config.compat.gyroCalThreshold);
+      r.writeU16(_model.config.compat.gyroCalDuration);
+      r.writeU16(_model.config.compat.gyroOffsetYaw);
+      r.writeU8(_model.config.compat.gyroOverflowCheck);
       r.writeU8(_model.config.debug.mode);
       r.writeU8(DEBUG_COUNT);
       break;
@@ -1407,20 +1426,20 @@ _model.config.failsafe.procedure =
       }
       if (m.remain())
       {
-        m.readU8(); // 32k gyro
+        _model.config.compat.gyro32k = m.readU8();
       }
       if (m.remain())
       {
-        m.readU8(); // PWM inversion
+        _model.config.compat.pwmInversion = m.readU8();
       }
       if (m.remain() >= 8)
       {
-        m.readU8();  // gyro_to_use
-        m.readU8();  // gyro high fsr
-        m.readU8();  // gyro cal threshold
-        m.readU16(); // gyro cal duration
-        m.readU16(); // gyro offset yaw
-        m.readU8();  // check overflow
+        _model.config.compat.gyroToUse = m.readU8();
+        _model.config.compat.gyroHighFsr = m.readU8();
+        _model.config.compat.gyroCalThreshold = m.readU8();
+        _model.config.compat.gyroCalDuration = m.readU16();
+        _model.config.compat.gyroOffsetYaw = m.readU16();
+        _model.config.compat.gyroOverflowCheck = m.readU8();
       }
       if (m.remain())
       {
@@ -1473,7 +1492,7 @@ _model.config.failsafe.procedure =
       // 1.43+
       r.writeU16(_model.config.gyro.dynamicFilter.max_freq); // dyn_notch_max_hz
       // 1.44
-      r.writeU8(0); // dterm lpf1 dyn expo
+      r.writeU8(_model.config.compat.dtermDynLpfExponent);
       r.writeU8(_model.config.gyro.dynamicFilter.count);
       // 1.48
       r.writeU16(_model.config.gyro.rpmFilter.fade); // rpm_notch_fade_range_hz
@@ -1540,7 +1559,7 @@ _model.config.failsafe.procedure =
       // 1.44
       if (m.remain() >= 2)
       {
-        m.readU8(); // dterm lpf1 dyn expo
+        _model.config.compat.dtermDynLpfExponent = m.readU8();
         _model.config.gyro.dynamicFilter.count = m.readU8();
       }
       // 1.48
@@ -1618,52 +1637,52 @@ constexpr int REQUIRED_PID_BYTES =
       r.writeU16(0);
       r.writeU16(0);                             // was pidProfile.yaw_p_limit
       r.writeU8(0);                              // reserved
-      r.writeU8(0);                              // vbatPidCompensation;
-      r.writeU8(0);                              // feedForwardTransition;
+      r.writeU8(_model.config.compat.vbatPidCompensation);
+      r.writeU8(_model.config.compat.feedForwardTransition);
       r.writeU8(0);                              // was low byte of dtermSetpointWeight
       r.writeU8(0);                              // reserved
       r.writeU8(0);                              // reserved
       r.writeU8(0);                              // reserved
-      r.writeU16(0);                             // rateAccelLimit;
-      r.writeU16(0);                             // yawRateAccelLimit;
+      r.writeU16(_model.config.compat.rateAccelLimit);
+      r.writeU16(_model.config.compat.yawRateAccelLimit);
       r.writeU8(_model.config.level.angleLimit); // levelAngleLimit;
       r.writeU8(0);                              // was pidProfile.levelSensitivity
       r.writeU16(0);                             // itermThrottleThreshold;
       r.writeU16(_model.config.antiGravityGain); // anti_gravity_gain
       r.writeU16(0);
-      r.writeU8(0);                                  // iterm rotation
-      r.writeU8(0);                                  // smart feed forward
-      r.writeU8(_model.config.iterm.relax);          // iterm relax
-      r.writeU8(1);                                  // iterm relax type (setpoint only)
-      r.writeU8(0);                                  // abs control gain
-      r.writeU8(0);                                  // throttle boost
-      r.writeU8(0);                                  // acro trainer max angle
+      r.writeU8(_model.config.compat.itermRotation);
+      r.writeU8(_model.config.compat.smartFeedForward);
+      r.writeU8(_model.config.iterm.relax);
+      r.writeU8(_model.config.compat.itermRelaxType);
+      r.writeU8(_model.config.compat.absControlGain);
+      r.writeU8(_model.config.compat.throttleBoost);
+      r.writeU8(_model.config.compat.acroTrainerAngleLimit);
       r.writeU16(_model.config.pid[FC_PID_ROLL].F);  // pid roll f
       r.writeU16(_model.config.pid[FC_PID_PITCH].F); // pid pitch f
       r.writeU16(_model.config.pid[FC_PID_YAW].F);   // pid yaw f
       r.writeU8(0);                                  // antigravity mode
       // 1.41+
-      r.writeU8(0); // d max roll
-      r.writeU8(0); // d max pitch
-      r.writeU8(0); // d max yaw
-      r.writeU8(0); // d max gain
-      r.writeU8(0); // d max advance
-      r.writeU8(0); // use_integrated_yaw
-      r.writeU8(0); // integrated_yaw_relax
+      r.writeU8(_model.config.compat.dMax[0]);
+      r.writeU8(_model.config.compat.dMax[1]);
+      r.writeU8(_model.config.compat.dMax[2]);
+      r.writeU8(_model.config.compat.dMaxGain);
+      r.writeU8(_model.config.compat.dMaxAdvance);
+      r.writeU8(_model.config.compat.integratedYaw);
+      r.writeU8(_model.config.compat.integratedYawRelax);
       // 1.42+
       r.writeU8(_model.config.iterm.relaxCutoff); // iterm_relax_cutoff
       // 1.43+
       r.writeU8(_model.config.output.motorLimit); // motor_output_limit
-      r.writeU8(0);                               // auto_profile_cell_count
-      r.writeU8(0);                               // idle_min_rpm
+      r.writeU8(_model.config.compat.autoProfileCellCount);
+      r.writeU8(_model.config.compat.idleMinRpm);
       // 1.44
-      r.writeU8(0);                                       // ff avg
-      r.writeU8(0);                                       // ff smooth
-      r.writeU8(0);                                       // ff boost
-      r.writeU8(0);                                       // ff max rate limit
-      r.writeU8(0);                                       // ff jitter factor
-      r.writeU8(0);                                       // vbat sag compensation
-      r.writeU8(0);                                       // thrust linearization
+      r.writeU8(_model.config.compat.ffAveraging);
+      r.writeU8(_model.config.compat.ffSmoothFactor);
+      r.writeU8(_model.config.compat.ffBoost);
+      r.writeU8(_model.config.compat.ffMaxRateLimit);
+      r.writeU8(_model.config.compat.ffJitterFactor);
+      r.writeU8(_model.config.compat.vbatSagCompensation);
+      r.writeU8(_model.config.compat.thrustLinearization);
       r.writeU8(_model.config.controller.tpaMode);        // tpa mode
       r.writeU8(_model.config.controller.tpaScale);       // tpa rate
       r.writeU16(_model.config.controller.tpaBreakpoint); // tpa breakpoint
@@ -1674,14 +1693,14 @@ constexpr int REQUIRED_PID_BYTES =
       m.readU16();
       m.readU16(); // was pidProfile.yaw_p_limit
       m.readU8();  // reserved
-      m.readU8();
-      m.readU8();
-      m.readU8();
+      _model.config.compat.vbatPidCompensation = m.readU8();
+      _model.config.compat.feedForwardTransition = m.readU8();
+      m.readU8(); // was low byte of dtermSetpointWeight
       m.readU8(); // reserved
       m.readU8(); // reserved
       m.readU8(); // reserved
-      m.readU16();
-      m.readU16();
+      _model.config.compat.rateAccelLimit = m.readU16();
+      _model.config.compat.yawRateAccelLimit = m.readU16();
       if (m.remain() >= 2)
       {
         _model.config.level.angleLimit = m.readU8();
@@ -1702,13 +1721,13 @@ constexpr int REQUIRED_PID_BYTES =
       }
       if (m.remain() >= 14)
       {
-        m.readU8();                                      // iterm rotation
-        m.readU8();                                      // smart feed forward
-        _model.config.iterm.relax = m.readU8();          // iterm relax
-        m.readU8();                                      // iterm relax type
-        m.readU8();                                      // abs control gain
-        m.readU8();                                      // throttle boost
-        m.readU8();                                      // acro trainer max angle
+        _model.config.compat.itermRotation = m.readU8();
+        _model.config.compat.smartFeedForward = m.readU8();
+        _model.config.iterm.relax = m.readU8();
+        _model.config.compat.itermRelaxType = m.readU8();
+        _model.config.compat.absControlGain = m.readU8();
+        _model.config.compat.throttleBoost = m.readU8();
+        _model.config.compat.acroTrainerAngleLimit = m.readU8();
         _model.config.pid[FC_PID_ROLL].F = m.readU16();  // pid roll f
         _model.config.pid[FC_PID_PITCH].F = m.readU16(); // pid pitch f
         _model.config.pid[FC_PID_YAW].F = m.readU16();   // pid yaw f
@@ -1717,13 +1736,13 @@ constexpr int REQUIRED_PID_BYTES =
       // 1.41+
       if (m.remain() >= 7)
       {
-        m.readU8(); // d max roll
-        m.readU8(); // d max pitch
-        m.readU8(); // d max yaw
-        m.readU8(); // d max gain
-        m.readU8(); // d max advance
-        m.readU8(); // use_integrated_yaw
-        m.readU8(); // integrated_yaw_relax
+        _model.config.compat.dMax[0] = m.readU8();
+        _model.config.compat.dMax[1] = m.readU8();
+        _model.config.compat.dMax[2] = m.readU8();
+        _model.config.compat.dMaxGain = m.readU8();
+        _model.config.compat.dMaxAdvance = m.readU8();
+        _model.config.compat.integratedYaw = m.readU8();
+        _model.config.compat.integratedYawRelax = m.readU8();
       }
       // 1.42+
       if (m.remain() >= 1)
@@ -1734,25 +1753,25 @@ constexpr int REQUIRED_PID_BYTES =
       if (m.remain() >= 3)
       {
         _model.config.output.motorLimit = m.readU8(); // motor_output_limit
-        m.readU8();                                   // auto_profile_cell_count
-        m.readU8();                                   // idle_min_rpm
+        _model.config.compat.autoProfileCellCount = m.readU8();
+        _model.config.compat.idleMinRpm = m.readU8();
       }
       // 1.44
       if (m.remain() >= 5)
       {
-        m.readU8(); // ff avg
-        m.readU8(); // ff smooth
-        m.readU8(); // ff boost
-        m.readU8(); // ff max rate limit
-        m.readU8(); // ff jitter factor
+        _model.config.compat.ffAveraging = m.readU8();
+        _model.config.compat.ffSmoothFactor = m.readU8();
+        _model.config.compat.ffBoost = m.readU8();
+        _model.config.compat.ffMaxRateLimit = m.readU8();
+        _model.config.compat.ffJitterFactor = m.readU8();
       }
       if (m.remain() >= 1)
       {
-        m.readU8(); // vbat sag compensation
+        _model.config.compat.vbatSagCompensation = m.readU8();
       }
       if (m.remain() >= 1)
       {
-        m.readU8(); // thrust linearization
+        _model.config.compat.thrustLinearization = m.readU8();
       }
       if (m.remain() >= 4)
       {
@@ -2277,9 +2296,17 @@ constexpr int REQUIRED_PID_BYTES =
     }
 
     case MSP_SET_RTC:
-      m.readU32(); // secs: ignore
-      m.readU16(); // msecs: ignore
-      break;       // RTC not supported, accept and ignore
+      if (m.remain() >= 6)
+      {
+        _model.config.compat.rtcSeconds = m.readU32();
+        _model.config.compat.rtcMillis = m.readU16();
+        _model.config.compat.rtcValid = 1;
+      }
+      else
+      {
+        r.result = -1;
+      }
+      break; // software timestamp only; no hardware RTC is implied
 
     default:
       r.result = -1;

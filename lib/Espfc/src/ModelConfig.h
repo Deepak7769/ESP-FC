@@ -821,6 +821,95 @@ struct SimplifiedTuningConfig
   uint8_t gyroFilterMultiplier = 100;
 };
 
+// Betaflight Configurator exposes a broader MSP surface than ESP-FC's active
+// controller/runtime. Keep those values persistent and round-trippable without
+// pretending that they have control authority. Fields in this structure are
+// compatibility metadata unless a separate, documented safe consumer reads
+// them (for example the non-actuating shadow diagnostics).
+struct ConfiguratorCompatConfig
+{
+  // MSP_PID_ADVANCED compatibility
+  uint8_t vbatPidCompensation = 0;
+  uint8_t feedForwardTransition = 0;
+  uint16_t rateAccelLimit = 0;
+  uint16_t yawRateAccelLimit = 0;
+  uint8_t itermRotation = 0;
+  uint8_t smartFeedForward = 0;
+  uint8_t itermRelaxType = 1; // Betaflight SETPOINT type
+  uint8_t absControlGain = 0;
+  uint8_t throttleBoost = 0;
+  uint8_t acroTrainerAngleLimit = 20;
+  uint8_t dMax[3] = {0, 0, 0};
+  uint8_t dMaxGain = 0;
+  uint8_t dMaxAdvance = 0;
+  uint8_t integratedYaw = 0;
+  uint8_t integratedYawRelax = 0;
+  uint8_t autoProfileCellCount = 0;
+  uint8_t idleMinRpm = 0;
+  uint8_t ffAveraging = 0;
+  uint8_t ffSmoothFactor = 0;
+  uint8_t ffBoost = 0;
+  uint8_t ffMaxRateLimit = 0;
+  uint8_t ffJitterFactor = 0;
+  uint8_t vbatSagCompensation = 0;
+  uint8_t thrustLinearization = 0;
+
+  // MSP_ADVANCED_CONFIG compatibility
+  uint8_t gyro32k = 0;
+  uint8_t pwmInversion = 0;
+  uint8_t gyroToUse = 0;
+  uint8_t gyroHighFsr = 0;
+  uint8_t gyroCalThreshold = 48;
+  uint16_t gyroCalDuration = 125;
+  uint16_t gyroOffsetYaw = 0;
+  uint8_t gyroOverflowCheck = 0;
+
+  // MSP_RX_CONFIG compatibility
+  uint8_t spektrumBind = 0;
+  uint8_t rcInterpolation = 0;
+  uint8_t rcInterpolationInterval = 0;
+  uint8_t rxSpiProtocol = 0;
+  uint32_t rxSpiId = 0;
+  uint8_t rxSpiChannelCount = 0;
+  uint8_t fpvCameraAngle = 0;
+  uint8_t rcInterpolationChannels = 2;
+  uint8_t rcSmoothingType = 0;
+  uint8_t rcSmoothingDerivativeType = 0;
+  uint8_t usbType = 0;
+  uint8_t elrsUid[6] = {0, 0, 0, 0, 0, 0};
+  uint8_t elrsModelId = 0;
+
+  // Failsafe compatibility values. The active ESP-FC failsafe/LAND policy
+  // remains authoritative; these values are not consumed by that controller.
+  uint8_t failsafeOffDelay = 0;
+  uint16_t failsafeThrottle = 1000;
+  uint16_t failsafeThrottleLowDelay = 0;
+
+  // RC tuning compatibility values. Existing Acro/rate logic is unchanged.
+  uint8_t throttleMid = 50;
+  uint8_t throttleExpo = 0;
+  uint8_t throttleHover = 50;
+
+  // 3D/reversible-flight UI compatibility only; no 3D actuator path.
+  uint16_t deadband3dLow = 1406;
+  uint16_t deadband3dHigh = 1514;
+  uint16_t neutral3d = 1460;
+  uint16_t deadband3dThrottle = 0;
+
+  // Arming/deadband/filter compatibility
+  uint8_t autoDisarmDelay = 5;
+  uint8_t disarmKillSwitch = 0;
+  uint8_t gyroCalOnFirstArm = 0;
+  uint8_t yawDeadband = 0;
+  uint8_t posHoldDeadband = 0;
+  uint8_t dtermDynLpfExponent = 0;
+
+  // Software RTC compatibility. No hardware RTC is implied.
+  uint32_t rtcSeconds = 0;
+  uint16_t rtcMillis = 0;
+  uint8_t rtcValid = 0;
+};
+
 // persistent data
 class ModelConfig
 {
@@ -968,6 +1057,11 @@ class ModelConfig
     // Anti-Gravity setting.
     uint8_t antiGravityGain = ANTI_GRAVITY_GAIN_DEFAULT;
     uint16_t antiGravityConfigTag = ANTI_GRAVITY_CONFIG_TAG;
+
+    // Appended in storage format v0x03. Keeping it last allows v0x02 images
+    // to migrate by loading the unchanged legacy prefix and retaining these
+    // deterministic defaults for the new compatibility fields.
+    ConfiguratorCompatConfig compat;
 
     ModelConfig()
     {
