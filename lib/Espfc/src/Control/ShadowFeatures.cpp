@@ -10,8 +10,9 @@ namespace Espfc::Control {
 namespace {
 
 constexpr float PI_F = 3.14159265358979323846f;
-constexpr float DEG_TO_RAD_F = PI_F / 180.0f;
-constexpr float EARTH_RADIUS_M = 6371000.0f;
+constexpr double PI_D = 3.14159265358979323846;
+constexpr double DEG_TO_RAD_D = PI_D / 180.0;
+constexpr double EARTH_RADIUS_M_D = 6371000.0;
 
 float wrapPi(float angle)
 {
@@ -149,35 +150,64 @@ void ShadowFeatures::geoDeltaMeters(
     float& northM,
     float& eastM)
 {
-  const float lat0 =
-      static_cast<float>(originLat) *
-      1.0e-7f *
-      DEG_TO_RAD_F;
+  const double lat0 =
+      static_cast<double>(originLat) *
+      1.0e-7 *
+      DEG_TO_RAD_D;
 
-  const float lat1 =
-      static_cast<float>(targetLat) *
-      1.0e-7f *
-      DEG_TO_RAD_F;
+  const double lat1 =
+      static_cast<double>(targetLat) *
+      1.0e-7 *
+      DEG_TO_RAD_D;
 
-  const float dLat =
+  const double dLat =
       lat1 - lat0;
 
-  const float dLon =
-      static_cast<float>(targetLon - originLon) *
-      1.0e-7f *
-      DEG_TO_RAD_F;
+  // Work in 64-bit space before subtraction. Longitudes are stored as
+  // degrees * 1e7, so crossing +180/-180 can otherwise overflow int32_t and
+  // also select the long way around the globe.
+  int64_t dLonE7 =
+      static_cast<int64_t>(targetLon) -
+      static_cast<int64_t>(originLon);
 
-  const float meanLat =
-      0.5f * (lat0 + lat1);
+  constexpr int64_t HALF_TURN_E7 =
+      1800000000LL;
+
+  constexpr int64_t FULL_TURN_E7 =
+      3600000000LL;
+
+  if (dLonE7 >
+      HALF_TURN_E7)
+  {
+    dLonE7 -=
+        FULL_TURN_E7;
+  }
+  else if (dLonE7 <
+           -HALF_TURN_E7)
+  {
+    dLonE7 +=
+        FULL_TURN_E7;
+  }
+
+  const double dLon =
+      static_cast<double>(dLonE7) *
+      1.0e-7 *
+      DEG_TO_RAD_D;
+
+  const double meanLat =
+      0.5 *
+      (lat0 + lat1);
 
   northM =
-      dLat *
-      EARTH_RADIUS_M;
+      static_cast<float>(
+          dLat *
+          EARTH_RADIUS_M_D);
 
   eastM =
-      dLon *
-      std::cos(meanLat) *
-      EARTH_RADIUS_M;
+      static_cast<float>(
+          dLon *
+          std::cos(meanLat) *
+          EARTH_RADIUS_M_D);
 }
 
 void ShadowFeatures::setWaypoint(

@@ -83,3 +83,12 @@ navigation update.
 This is intentionally stronger than checking the `authorityBlocked` flag:
 a future change that accidentally writes a setpoint, PID term or output will
 fail CI even if the flag still says that authority is blocked.
+
+
+## Coordinate robustness
+
+Horizontal shadow-navigation deltas use 64-bit longitude subtraction and
+shortest-path wrapping across the international date line before converting to
+local north/east meters. This avoids signed 32-bit overflow at the
++180/-180-degree boundary and keeps the diagnostic vector local rather than
+accidentally spanning nearly a full Earth circumference.

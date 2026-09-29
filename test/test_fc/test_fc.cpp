@@ -8350,6 +8350,49 @@ void test_shadow_gps_navigation_has_no_control_authority()
   }
 }
 
+
+void test_shadow_geo_delta_wraps_international_date_line()
+{
+  float north = 0.0f;
+  float east = 0.0f;
+
+  Control::ShadowFeatures::geoDeltaMeters(
+      0,
+      1799990000,
+      0,
+      -1799990000,
+      north,
+      east);
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(east));
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      1.0f,
+      0.0f,
+      north);
+
+  TEST_ASSERT_TRUE(
+      east > 100.0f);
+
+  TEST_ASSERT_TRUE(
+      east < 500.0f);
+
+  Control::ShadowFeatures::geoDeltaMeters(
+      0,
+      -1799990000,
+      0,
+      1799990000,
+      north,
+      east);
+
+  TEST_ASSERT_TRUE(
+      east < -100.0f);
+
+  TEST_ASSERT_TRUE(
+      east > -500.0f);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -8603,5 +8646,6 @@ RUN_TEST(
   RUN_TEST(test_shadow_update_cannot_change_control_or_output_state);
   RUN_TEST(test_model_sanitize_scrubs_invalid_mode_rows);
   RUN_TEST(test_shadow_gps_navigation_has_no_control_authority);
+  RUN_TEST(test_shadow_geo_delta_wraps_international_date_line);
   return UNITY_END();
 }
