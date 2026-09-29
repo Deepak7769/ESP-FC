@@ -690,6 +690,32 @@ void test_msp2_gyro_sensor_active_handles_missing_device_pointer()
       response.data[1]);
 }
 
+
+void test_msp2_get_text_rejects_missing_type()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  MspMessage get;
+  get.cmd =
+      MSP2_GET_TEXT;
+
+  MspResponse response;
+  processor.processCommand(
+      get,
+      response,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      response.result);
+
+  TEST_ASSERT_EQUAL_UINT16(
+      0,
+      response.len);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -711,5 +737,6 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp_box_names_and_ids_cover_every_declared_mode);
   RUN_TEST(test_msp2_text_build_metadata_is_read_only);
   RUN_TEST(test_msp2_gyro_sensor_active_handles_missing_device_pointer);
+  RUN_TEST(test_msp2_get_text_rejects_missing_type);
   return UNITY_END();
 }

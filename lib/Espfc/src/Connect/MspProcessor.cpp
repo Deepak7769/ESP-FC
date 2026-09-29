@@ -417,8 +417,17 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       break;
 
     case MSP2_GET_TEXT: {
-      const uint8_t textType = m.remain() ? m.readU8() : 0;
+      if (m.remain() < 1)
+      {
+        r.result = -1;
+        break;
+      }
+
+      const uint8_t textType =
+          m.readU8();
+
       r.writeU8(textType);
+
       switch (textType)
       {
         case MSP2TEXT_CRAFT_NAME:
