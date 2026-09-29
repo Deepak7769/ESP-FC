@@ -289,6 +289,28 @@ void test_cli_bf_sensor_hardware()
   TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("mag: AUTO,"));
 }
 
+
+void test_cli_uint16_param_roundtrip()
+{
+  Model model;
+  Cli cli{model};
+  CliCmd cmd;
+
+  for (char c : std::string("set compat_failsafe_throttle 1234\n"))
+  {
+    cli.process(c, cmd, printer);
+  }
+
+  TEST_ASSERT_EQUAL_UINT16(
+      1234,
+      model.config.compat.failsafeThrottle);
+
+  const auto result = stream.str();
+  TEST_ASSERT_NOT_EQUAL(
+      std::string::npos,
+      result.find("compat_failsafe_throttle = 1234"));
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -304,5 +326,6 @@ int main(int argc, char** argv)
   RUN_TEST(test_cli_set_mixer_type);
   RUN_TEST(test_cli_bf_get_mag_calibration);
   RUN_TEST(test_cli_bf_sensor_hardware);
+  RUN_TEST(test_cli_uint16_param_roundtrip);
   return UNITY_END();
 }

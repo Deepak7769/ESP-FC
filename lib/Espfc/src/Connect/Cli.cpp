@@ -84,6 +84,9 @@ void Cli::Param::print(Stream::Printer& stream) const
     case PARAM_SHORT:
       print(stream, *reinterpret_cast<int16_t*>(addr));
       break;
+    case PARAM_SHORT_U:
+      print(stream, *reinterpret_cast<uint16_t*>(addr));
+      break;
     case PARAM_INT:
       print(stream, *reinterpret_cast<int32_t*>(addr));
       break;
@@ -227,6 +230,10 @@ void Cli::Param::update(const char** args) const
     case PARAM_SHORT:
       if (!v) return;
       write((int16_t)parse(v));
+      break;
+    case PARAM_SHORT_U:
+      if (!v) return;
+      write((uint16_t)parse(v));
       break;
     case PARAM_INT:
       if (!v) return;
@@ -620,16 +627,16 @@ Param(
     failsafeProcedureChoices),
 
       Param("compat_failsafe_off_delay", &c.compat.failsafeOffDelay),
-      Param("compat_failsafe_throttle", reinterpret_cast<int16_t*>(&c.compat.failsafeThrottle)),
-      Param("compat_failsafe_throttle_low_delay", reinterpret_cast<int16_t*>(&c.compat.failsafeThrottleLowDelay)),
+      Param("compat_failsafe_throttle", &c.compat.failsafeThrottle),
+      Param("compat_failsafe_throttle_low_delay", &c.compat.failsafeThrottleLowDelay),
 
       Param("arming_small_angle", &c.arming.smallAngle),
       Param("compat_auto_disarm_delay", &c.compat.autoDisarmDelay),
       Param("compat_gyro_cal_first_arm", &c.compat.gyroCalOnFirstArm),
 
-      Param("compat_3d_deadband_low", reinterpret_cast<int16_t*>(&c.compat.deadband3dLow)),
-      Param("compat_3d_deadband_high", reinterpret_cast<int16_t*>(&c.compat.deadband3dHigh)),
-      Param("compat_3d_neutral", reinterpret_cast<int16_t*>(&c.compat.neutral3d)),
+      Param("compat_3d_deadband_low", &c.compat.deadband3dLow),
+      Param("compat_3d_deadband_high", &c.compat.deadband3dHigh),
+      Param("compat_3d_neutral", &c.compat.neutral3d),
 
       Param("anti_gravity_gain", &c.antiGravityGain),
 
