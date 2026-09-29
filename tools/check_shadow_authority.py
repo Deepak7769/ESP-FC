@@ -143,16 +143,27 @@ def main() -> int:
             code = strip_comments(raw_source)
 
             if path.resolve() in TEST_ONLY_AUTHORITY_FILES:
-                required_tokens = (
-                    "ESPFC_ADVANCED_MODES_ACTIVE_TEST",
-                    "ESPFC_SAFE_BENCH_BUILD",
-                )
-                for token in required_tokens:
-                    if token not in raw_source:
-                        errors.append(
-                            f"{path.relative_to(ROOT)}: "
-                            f"test-only authority file missing {token}"
-                        )
+                if "ESPFC_ADVANCED_MODES_ACTIVE_TEST" not in raw_source:
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: "
+                        "test-only authority file missing "
+                        "ESPFC_ADVANCED_MODES_ACTIVE_TEST"
+                    )
+
+                # The header owns the hard build-time interlock. The .cpp
+                # includes that header, so requiring the SAFE_BENCH token to be
+                # duplicated in both files would create a false CI failure.
+                if path.suffix == ".h" and                    "ESPFC_SAFE_BENCH_BUILD" not in raw_source:
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: "
+                        "authority header missing ESPFC_SAFE_BENCH_BUILD gate"
+                    )
+
+                if path.suffix == ".cpp" and                    '#include "Control/AdvancedModesBench.h"' not in raw_source:
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: "
+                        "authority implementation bypasses guarded header"
+                    )
                 continue
 
             for symbol in SHADOW_MODE_SYMBOLS:
