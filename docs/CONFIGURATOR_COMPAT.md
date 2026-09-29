@@ -86,3 +86,17 @@ silently become inputs to PID, mixer, attitude, assisted-mode, or output code.
 The sole Control-layer compatibility consumer remains
 `ShadowFeatures.cpp`, where the Acro-Trainer angle value affects diagnostics
 only.
+
+
+## Setter integrity
+
+Configurator setters for battery, ADC meter calibration and GPS configuration
+now validate their minimum payload before modifying stored state. Truncated
+messages are rejected atomically instead of allowing `readU8/readU16`
+fallback zeros to partially overwrite settings.
+
+GPS provider, auto-configuration and auto-baud are fixed ESP-FC capabilities.
+Writes that request a different provider, disable fixed auto behavior, or use
+an SBAS mode that cannot be represented by ESP-FC's AUTO/NONE model are now
+rejected rather than acknowledged and then displayed differently on the next
+read.

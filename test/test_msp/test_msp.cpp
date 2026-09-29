@@ -885,6 +885,171 @@ void test_msp2_battery_profile_rejects_unsupported_profile_fields()
       model.config.vbat.cellWarning);
 }
 
+
+void test_msp_config_setters_reject_truncated_payloads_without_mutation()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  model.config.vbat.cellWarning =
+      350;
+
+  model.config.vbat.scale =
+      101;
+
+  model.config.ibat.scale =
+      222;
+
+  model.config.gps.enableSBAS =
+      1;
+
+  MspMessage battery;
+  battery.cmd =
+      MSP_SET_BATTERY_CONFIG;
+
+  const uint8_t shortBattery[] = {
+      34,
+      42,
+      35};
+
+  battery.append(
+      shortBattery,
+      sizeof(shortBattery));
+
+  MspResponse batteryResponse;
+  processor.processCommand(
+      battery,
+      batteryResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      batteryResponse.result);
+
+  TEST_ASSERT_EQUAL_INT16(
+      350,
+      model.config.vbat.cellWarning);
+
+  MspMessage voltage;
+  voltage.cmd =
+      MSP_SET_VOLTAGE_METER_CONFIG;
+
+  const uint8_t shortVoltage[] = {
+      10,
+      99};
+
+  voltage.append(
+      shortVoltage,
+      sizeof(shortVoltage));
+
+  MspResponse voltageResponse;
+  processor.processCommand(
+      voltage,
+      voltageResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      voltageResponse.result);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      101,
+      model.config.vbat.scale);
+
+  MspMessage current;
+  current.cmd =
+      MSP_SET_CURRENT_METER_CONFIG;
+
+  const uint8_t shortCurrent[] = {
+      10,
+      1,
+      0};
+
+  current.append(
+      shortCurrent,
+      sizeof(shortCurrent));
+
+  MspResponse currentResponse;
+  processor.processCommand(
+      current,
+      currentResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      currentResponse.result);
+
+  TEST_ASSERT_EQUAL_INT16(
+      222,
+      model.config.ibat.scale);
+
+  MspMessage gps;
+  gps.cmd =
+      MSP_SET_GPS_CONFIG;
+
+  const uint8_t shortGps[] = {
+      1,
+      0,
+      1};
+
+  gps.append(
+      shortGps,
+      sizeof(shortGps));
+
+  MspResponse gpsResponse;
+  processor.processCommand(
+      gps,
+      gpsResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      gpsResponse.result);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      1,
+      model.config.gps.enableSBAS);
+}
+
+void test_msp_gps_config_rejects_unrepresentable_fixed_capabilities()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  model.config.gps.enableSBAS =
+      1;
+
+  MspMessage set;
+  set.cmd =
+      MSP_SET_GPS_CONFIG;
+
+  const uint8_t data[] = {
+      1,
+      0,
+      0,
+      1};
+
+  set.append(
+      data,
+      sizeof(data));
+
+  MspResponse response;
+  processor.processCommand(
+      set,
+      response,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      response.result);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      1,
+      model.config.gps.enableSBAS);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -909,5 +1074,7 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp2_get_text_rejects_missing_type);
   RUN_TEST(test_msp2_single_battery_profile_roundtrip);
   RUN_TEST(test_msp2_battery_profile_rejects_unsupported_profile_fields);
+  RUN_TEST(test_msp_config_setters_reject_truncated_payloads_without_mutation);
+  RUN_TEST(test_msp_gps_config_rejects_unrepresentable_fixed_capabilities);
   return UNITY_END();
 }

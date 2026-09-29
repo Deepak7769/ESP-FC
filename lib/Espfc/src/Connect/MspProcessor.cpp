@@ -681,20 +681,69 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU16(_model.config.vbat.cellWarning);           // vbatwarningcellvoltage
       break;
 
-    case MSP_SET_BATTERY_CONFIG:
-      m.readU8();                                           // vbatmincellvoltage
-      m.readU8();                                           // vbatmaxcellvoltage
-      _model.config.vbat.cellWarning = m.readU8() * 10;     // vbatwarningcellvoltage
-      m.readU16();                                          // batteryCapacity
-      _model.config.vbat.source = toVbatSource(m.readU8()); // voltageMeterSource
-      _model.config.ibat.source = toIbatSource(m.readU8()); // currentMeterSource
-      if (m.remain() >= 6)
+    case MSP_SET_BATTERY_CONFIG: {
+      const size_t payloadSize =
+          m.remain();
+
+      // Legacy layout is 7 bytes. API 1.41+ appends three u16 cell-voltage
+      // fields. Reject a truncated extension before touching configuration.
+      if (payloadSize < 7 ||
+          (payloadSize > 7 &&
+           payloadSize < 13))
       {
-        m.readU16(); // vbatmincellvoltage
-        m.readU16(); // vbatmaxcellvoltage
-        _model.config.vbat.cellWarning = m.readU16();
+        r.result = -1;
+        break;
       }
+
+      m.readU8(); // legacy min cell voltage
+      m.readU8(); // legacy max cell voltage
+
+      const uint16_t legacyWarning =
+          static_cast<uint16_t>(
+              m.readU8()) *
+          10u;
+
+      m.readU16(); // battery capacity, unsupported
+
+      const int8_t voltageSource =
+          toVbatSource(
+              m.readU8());
+
+      const int8_t currentSource =
+          toIbatSource(
+              m.readU8());
+
+      uint16_t warning =
+          legacyWarning;
+
+      if (payloadSize >= 13)
+      {
+        m.readU16(); // min cell voltage, fixed capability
+        m.readU16(); // max cell voltage, fixed capability
+        warning =
+            m.readU16();
+      }
+
+      if (warning <
+              MSP_BATTERY_MIN_CELL_CV ||
+          warning >
+              MSP_BATTERY_FULL_CELL_CV)
+      {
+        r.result = -1;
+        break;
+      }
+
+      _model.config.vbat.cellWarning =
+          static_cast<int16_t>(
+              warning);
+
+      _model.config.vbat.source =
+          voltageSource;
+
+      _model.config.ibat.source =
+          currentSource;
       break;
+    }
 
     case MSP2_BATTERY_PROFILE: {
       if (m.remain() > 1)
@@ -881,13 +930,38 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       break;
 
     case MSP_SET_VOLTAGE_METER_CONFIG: {
-      int id = m.readU8();
-      if (id == 10 + 0) // id (10-19 vbat adc, allow only 10)
+      if (m.remain() < 4)
       {
-        _model.config.vbat.scale = m.readU8();
-        _model.config.vbat.resDiv = m.readU8();
-        _model.config.vbat.resMult = m.readU8();
+        r.result = -1;
+        break;
       }
+
+      const uint8_t id =
+          m.readU8();
+
+      const uint8_t scale =
+          m.readU8();
+
+      const uint8_t resDiv =
+          m.readU8();
+
+      const uint8_t resMult =
+          m.readU8();
+
+      if (id != 10)
+      {
+        r.result = -1;
+        break;
+      }
+
+      _model.config.vbat.scale =
+          scale;
+
+      _model.config.vbat.resDiv =
+          resDiv;
+
+      _model.config.vbat.resMult =
+          resMult;
     }
     break;
 
@@ -904,12 +978,34 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       break;
 
     case MSP_SET_CURRENT_METER_CONFIG: {
-      int id = m.readU8();
-      if (id == 10 + 0) // id (10-19 ibat adc, allow only 10)
+      if (m.remain() < 5)
       {
-        _model.config.ibat.scale = m.readU16();
-        _model.config.ibat.offset = m.readU16();
+        r.result = -1;
+        break;
       }
+
+      const uint8_t id =
+          m.readU8();
+
+      const int16_t scale =
+          static_cast<int16_t>(
+              m.readU16());
+
+      const int16_t offset =
+          static_cast<int16_t>(
+              m.readU16());
+
+      if (id != 10)
+      {
+        r.result = -1;
+        break;
+      }
+
+      _model.config.ibat.scale =
+          scale;
+
+      _model.config.ibat.offset =
+          offset;
     }
     break;
 
@@ -2442,26 +2538,67 @@ constexpr int REQUIRED_PID_BYTES =
       break;
 
     case MSP_SET_GPS_CONFIG: {
-      // ESP-FC's GPS driver is UBX-only and always auto-configures/auto-detects
-      // baud, so provider/auto flags are capability constants. Persist the
-      // settings that have real backing fields in ModelConfig.
-      const uint8_t provider = m.readU8();
-      const uint8_t sbasMode = m.readU8();
-      const uint8_t autoConfig = m.readU8();
-      const uint8_t autoBaud = m.readU8();
-      (void)provider;
-      (void)autoConfig;
-      (void)autoBaud;
+      const size_t payloadSize =
+          m.remain();
+
+      if (payloadSize < 4 ||
+          payloadSize == 5)
+      {
+        r.result = -1;
+        break;
+      }
+
+      const uint8_t provider =
+          m.readU8();
+
+      const uint8_t sbasMode =
+          m.readU8();
+
+      const uint8_t autoConfig =
+          m.readU8();
+
+      const uint8_t autoBaud =
+          m.readU8();
+
+      // These are fixed capabilities in ESP-FC. Reject values that would be
+      // acknowledged and then immediately reported differently.
+      if (provider !=
+              MSP_GPS_PROVIDER_UBLOX ||
+          (sbasMode !=
+               MSP_GPS_SBAS_AUTO &&
+           sbasMode !=
+               MSP_GPS_SBAS_NONE) ||
+          autoConfig != 1 ||
+          autoBaud != 1)
+      {
+        r.result = -1;
+        break;
+      }
+
+      uint8_t setHomeOnce =
+          _model.config.gps.setHomeOnce;
+
+      uint8_t enableGalileo =
+          _model.config.gps.enableGalileo;
+
+      if (payloadSize >= 6)
+      {
+        setHomeOnce =
+            m.readU8() ? 1 : 0;
+
+        enableGalileo =
+            m.readU8() ? 1 : 0;
+      }
 
       _model.config.gps.enableSBAS =
-          sbasMode != MSP_GPS_SBAS_NONE;
+          sbasMode ==
+          MSP_GPS_SBAS_AUTO;
 
-      if (m.remain() >= 2)
-      {
-        // Added in API version 1.43
-        _model.config.gps.setHomeOnce = m.readU8(); // gps_set_home_point_once
-        _model.config.gps.enableGalileo = m.readU8() ? 1 : 0;
-      }
+      _model.config.gps.setHomeOnce =
+          setHomeOnce;
+
+      _model.config.gps.enableGalileo =
+          enableGalileo;
 
       _model.setRebootRequired();
       break;
