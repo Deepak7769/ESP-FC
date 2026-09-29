@@ -393,6 +393,77 @@ void test_msp_response_write_string_uses_full_response_capacity()
   }
 }
 
+
+void test_msp_set_mode_range_rejects_invalid_shadow_or_link_ids()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  const ActuatorCondition before =
+      model.config.conditions[0];
+
+  MspMessage invalidMode;
+  invalidMode.cmd =
+      MSP_SET_MODE_RANGE;
+
+  const uint8_t invalidModeData[] = {
+      0,
+      static_cast<uint8_t>(MODE_COUNT),
+      0,
+      12,
+      20};
+
+  invalidMode.append(
+      invalidModeData,
+      sizeof(invalidModeData));
+
+  MspResponse invalidModeResponse;
+  processor.processCommand(
+      invalidMode,
+      invalidModeResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      invalidModeResponse.result);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      before.id,
+      model.config.conditions[0].id);
+
+  MspMessage invalidLink;
+  invalidLink.cmd =
+      MSP_SET_MODE_RANGE;
+
+  const uint8_t invalidLinkData[] = {
+      0,
+      static_cast<uint8_t>(MODE_HORIZON_SHADOW),
+      0,
+      12,
+      20,
+      0,
+      static_cast<uint8_t>(MODE_COUNT)};
+
+  invalidLink.append(
+      invalidLinkData,
+      sizeof(invalidLinkData));
+
+  MspResponse invalidLinkResponse;
+  processor.processCommand(
+      invalidLink,
+      invalidLinkResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      invalidLinkResponse.result);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      before.id,
+      model.config.conditions[0].id);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -409,5 +480,6 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp_rtc_is_software_metadata_only);
   RUN_TEST(test_msp_shadow_modes_are_explicitly_named);
   RUN_TEST(test_msp_response_write_string_uses_full_response_capacity);
+  RUN_TEST(test_msp_set_mode_range_rejects_invalid_shadow_or_link_ids);
   return UNITY_END();
 }

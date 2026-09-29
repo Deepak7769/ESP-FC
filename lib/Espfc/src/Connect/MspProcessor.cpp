@@ -495,23 +495,82 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       break;
 
     case MSP_SET_MODE_RANGE: {
-      size_t i = m.readU8();
-      if (i < ACTUATOR_CONDITIONS)
-      {
-        _model.config.conditions[i].id = m.readU8();
-        _model.config.conditions[i].ch = m.readU8() + AXIS_AUX_1;
-        _model.config.conditions[i].min = m.readU8() * 25 + 900;
-        _model.config.conditions[i].max = m.readU8() * 25 + 900;
-        if (m.remain() >= 2)
-        {
-          _model.config.conditions[i].logicMode = m.readU8(); // mode logic
-          _model.config.conditions[i].linkId = m.readU8();    // link to
-        }
-      }
-      else
+      const size_t i =
+          m.readU8();
+
+      if (i >= ACTUATOR_CONDITIONS ||
+          m.remain() < 4)
       {
         r.result = -1;
+        break;
       }
+
+      ActuatorCondition next =
+          _model.config.conditions[i];
+
+      const uint8_t modeId =
+          m.readU8();
+
+      const uint8_t auxIndex =
+          m.readU8();
+
+      const int16_t min =
+          static_cast<int16_t>(
+              m.readU8() * 25 + 900);
+
+      const int16_t max =
+          static_cast<int16_t>(
+              m.readU8() * 25 + 900);
+
+      if (modeId >= MODE_COUNT ||
+          auxIndex >=
+              (AXIS_COUNT - AXIS_AUX_1) ||
+          min > max)
+      {
+        r.result = -1;
+        break;
+      }
+
+      next.id =
+          modeId;
+
+      next.ch =
+          static_cast<uint8_t>(
+              auxIndex + AXIS_AUX_1);
+
+      next.min =
+          min;
+
+      next.max =
+          max;
+
+      if (m.remain() >= 2)
+      {
+        const uint8_t logicMode =
+            m.readU8();
+
+        const uint8_t linkId =
+            m.readU8();
+
+        if (logicMode > 1 ||
+            linkId >= MODE_COUNT ||
+            linkId == modeId ||
+            (modeId == MODE_ARMED &&
+             linkId != 0))
+        {
+          r.result = -1;
+          break;
+        }
+
+        next.logicMode =
+            logicMode;
+
+        next.linkId =
+            linkId;
+      }
+
+      _model.config.conditions[i] =
+          next;
     }
     break;
 

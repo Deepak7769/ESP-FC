@@ -8049,6 +8049,61 @@ void test_shadow_update_cannot_change_control_or_output_state()
   }
 }
 
+
+void test_model_sanitize_scrubs_invalid_mode_rows()
+{
+  Model model;
+
+  model.config.conditions[0].id =
+      static_cast<uint8_t>(
+          MODE_COUNT);
+
+  model.config.conditions[0].ch =
+      AXIS_AUX_1;
+
+  model.config.conditions[0].min =
+      1200;
+
+  model.config.conditions[0].max =
+      1800;
+
+  model.config.conditions[1].id =
+      MODE_HORIZON_SHADOW;
+
+  model.config.conditions[1].linkId =
+      static_cast<uint8_t>(
+          MODE_COUNT);
+
+  model.config.conditions[1].logicMode =
+      7;
+
+  model.sanitize();
+
+  TEST_ASSERT_EQUAL_UINT8(
+      MODE_ARMED,
+      model.config.conditions[0].id);
+
+  TEST_ASSERT_EQUAL_INT16(
+      900,
+      model.config.conditions[0].min);
+
+  TEST_ASSERT_EQUAL_INT16(
+      900,
+      model.config.conditions[0].max);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      MODE_HORIZON_SHADOW,
+      model.config.conditions[1].id);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      0,
+      model.config.conditions[1].linkId);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      1,
+      model.config.conditions[1].logicMode);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -8300,5 +8355,6 @@ RUN_TEST(
   RUN_TEST(test_shadow_geo_delta_is_finite_and_directional);
   RUN_TEST(test_shadow_acro_trainer_only_returns_suggestion);
   RUN_TEST(test_shadow_update_cannot_change_control_or_output_state);
+  RUN_TEST(test_model_sanitize_scrubs_invalid_mode_rows);
   return UNITY_END();
 }

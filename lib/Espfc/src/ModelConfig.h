@@ -98,6 +98,10 @@ enum FlightMode {
   MODE_COUNT,
 };
 
+static_assert(
+    MODE_COUNT <= 32,
+    "FlightMode count exceeds the 32-bit runtime mode mask");
+
 enum ScalerDimension {
   ACT_INNER_P     = 1 << 0,  // rate PID P
   ACT_INNER_I     = 1 << 1,  // rate PID I

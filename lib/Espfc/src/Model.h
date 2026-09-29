@@ -755,6 +755,47 @@ config.antiGravityGain =
         0,
         250);
 
+// Keep persisted mode rows inside the runtime mode-mask contract. Invalid
+// mode/link IDs are ignored at runtime already, but scrubbing them here keeps
+// Configurator/CLI round-trips deterministic and avoids stale EEPROM values
+// being reinterpreted if more modes are appended in the future.
+for (size_t i = 0; i < ACTUATOR_CONDITIONS; ++i)
+{
+  auto& condition =
+      config.conditions[i];
+
+  if (condition.id >= MODE_COUNT)
+  {
+    condition =
+        ActuatorCondition{};
+
+    continue;
+  }
+
+  condition.logicMode =
+      condition.logicMode ? 1 : 0;
+
+  condition.min =
+      std::clamp<int16_t>(
+          condition.min,
+          900,
+          2100);
+
+  condition.max =
+      std::clamp<int16_t>(
+          condition.max,
+          900,
+          2100);
+
+  if (condition.linkId >= MODE_COUNT ||
+      condition.linkId == condition.id ||
+      (condition.id == MODE_ARMED &&
+       condition.linkId != 0))
+  {
+    condition.linkId = 0;
+  }
+}
+
 // Compatibility values are persistent UI/shadow metadata. Sanitizing them
 // prevents malformed MSP/EEPROM values without connecting them to existing
 // PID, Angle, Acro, mixer or failsafe logic.
