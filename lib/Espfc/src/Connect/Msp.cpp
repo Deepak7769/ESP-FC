@@ -161,14 +161,50 @@ void MspResponse::writeData(const char* v, int size)
 
 void MspResponse::writeString(const char* v)
 {
-  writeData(v, std::clamp<int>(std::strlen(v), 0, 168));
+  if (!v) return;
+
+  const size_t available =
+      static_cast<size_t>(
+          remain());
+
+  const size_t size =
+      std::min(
+          std::strlen(v),
+          available);
+
+  writeData(
+      v,
+      static_cast<int>(size));
 }
 
 void MspResponse::writePString(const char* v)
 {
-  const auto len = std::clamp<int>(std::strlen(v), 0, 168);
-  writeU8(len);
-  writeData(v, len);
+  if (!v)
+  {
+    writeU8(0);
+    return;
+  }
+
+  // Pascal strings use an 8-bit length field. Also respect the actual MSP
+  // response capacity instead of the historical arbitrary 168-byte ceiling.
+  const size_t available =
+      remain() > 0
+          ? static_cast<size_t>(remain() - 1)
+          : 0u;
+
+  const size_t size =
+      std::min<size_t>(
+          std::strlen(v),
+          std::min<size_t>(
+              available,
+              255u));
+
+  writeU8(
+      static_cast<uint8_t>(size));
+
+  writeData(
+      v,
+      static_cast<int>(size));
 }
 
 void MspResponse::writeU8(uint8_t v)

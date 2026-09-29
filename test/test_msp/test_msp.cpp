@@ -369,6 +369,30 @@ void test_msp_shadow_modes_are_explicitly_named()
   TEST_ASSERT_NOT_EQUAL(std::string::npos, names.find("WAYPOINT SHADOW"));
 }
 
+
+void test_msp_response_write_string_uses_full_response_capacity()
+{
+  MspResponse response;
+
+  const std::string payload(
+      200,
+      'X');
+
+  response.writeString(
+      payload.c_str());
+
+  TEST_ASSERT_EQUAL_UINT16(
+      200,
+      response.len);
+
+  for (size_t i = 0; i < response.len; ++i)
+  {
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>('X'),
+        response.data[i]);
+  }
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -384,5 +408,6 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp_pid_advanced_reports_compat_metadata_without_mutating_pid);
   RUN_TEST(test_msp_rtc_is_software_metadata_only);
   RUN_TEST(test_msp_shadow_modes_are_explicitly_named);
+  RUN_TEST(test_msp_response_write_string_uses_full_response_capacity);
   return UNITY_END();
 }
