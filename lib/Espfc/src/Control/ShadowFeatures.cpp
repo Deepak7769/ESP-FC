@@ -414,7 +414,11 @@ void ShadowFeatures::updateAcroTrainer()
             acroTrainerSuggestion(
                 requestedDegS,
                 angleDeg[axis],
-                rateDegS));
+                rateDegS,
+                std::max(
+                    1.0f,
+                    static_cast<float>(
+                        _model.config.compat.acroTrainerAngleLimit))));
   }
 }
 

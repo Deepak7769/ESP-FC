@@ -755,6 +755,64 @@ config.antiGravityGain =
         0,
         250);
 
+// Compatibility values are persistent UI/shadow metadata. Sanitizing them
+// prevents malformed MSP/EEPROM values without connecting them to existing
+// PID, Angle, Acro, mixer or failsafe logic.
+config.compat.acroTrainerAngleLimit =
+    std::clamp<uint8_t>(
+        config.compat.acroTrainerAngleLimit,
+        1,
+        90);
+
+config.compat.throttleMid =
+    std::min<uint8_t>(
+        config.compat.throttleMid,
+        100);
+
+config.compat.throttleExpo =
+    std::min<uint8_t>(
+        config.compat.throttleExpo,
+        100);
+
+config.compat.throttleHover =
+    std::min<uint8_t>(
+        config.compat.throttleHover,
+        100);
+
+config.compat.yawDeadband =
+    std::min<uint8_t>(
+        config.compat.yawDeadband,
+        100);
+
+config.compat.posHoldDeadband =
+    std::min<uint8_t>(
+        config.compat.posHoldDeadband,
+        100);
+
+config.compat.failsafeThrottle =
+    std::clamp<uint16_t>(
+        config.compat.failsafeThrottle,
+        750,
+        2250);
+
+config.compat.deadband3dLow =
+    std::clamp<uint16_t>(
+        config.compat.deadband3dLow,
+        750,
+        2250);
+
+config.compat.deadband3dHigh =
+    std::clamp<uint16_t>(
+        config.compat.deadband3dHigh,
+        750,
+        2250);
+
+config.compat.neutral3d =
+    std::clamp<uint16_t>(
+        config.compat.neutral3d,
+        750,
+        2250);
+
 // Receiver/control settings are persisted and can be edited over MSP/CLI.
 // Keep them inside ranges that preserve the arming and smoothing invariants.
 if (config.input.ppmMode != PPM_MODE_NORMAL &&

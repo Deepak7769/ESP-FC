@@ -53,3 +53,14 @@ its unchanged legacy prefix and leaving the appended compatibility tail at
 deterministic defaults. Mode rows using IDs that were invalid before the new
 shadow-mode append are scrubbed during this migration so stale bytes cannot
 activate a newly visible shadow request.
+
+
+## CLI visibility
+
+Compatibility values are exposed with a `compat_` prefix so a CLI dump does
+not imply that a stored Betaflight field is an active ESP-FC controller. The
+existing Anti-Gravity feature bit and gain now also have named CLI entries.
+
+The `shadow` command prints Horizon, Headfree, Acro-Trainer and horizontal
+navigation diagnostic state and always reports the hard output-authority
+boundary.

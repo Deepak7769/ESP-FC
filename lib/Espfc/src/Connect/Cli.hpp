@@ -109,6 +109,7 @@ private:
 #endif
   void print(const Param& param, Stream::Printer& s) const;
   void printGpsStatus(Stream::Printer& s, bool full) const;
+  void printShadowStatus(Stream::Printer& s) const;
   void printVersion(Stream::Printer& s) const;
   void printStats(Stream::Printer& s) const;
 

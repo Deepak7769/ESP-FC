@@ -410,6 +410,7 @@ failsafeProcedureChoices[] = {
   static const Param params[] = {
 
       Param("feature_gps", &c.featureMask, 7),
+      Param("feature_anti_gravity", &c.featureMask, 28),
       Param("feature_motor_stop", &c.featureMask, 4),
       Param("feature_rx_ppm", &c.featureMask, 0),
       Param("feature_rx_serial", &c.featureMask, 3),
@@ -454,6 +455,12 @@ failsafeProcedureChoices[] = {
 
       Param("gyro_tuning", &c.simplifiedTuning.gyroFilter),
       Param("gyro_tuning_gain", &c.simplifiedTuning.gyroFilterMultiplier),
+      Param("compat_gyro_32khz", &c.compat.gyro32k),
+      Param("compat_pwm_inversion", &c.compat.pwmInversion),
+      Param("compat_gyro_to_use", &c.compat.gyroToUse),
+      Param("compat_gyro_high_fsr", &c.compat.gyroHighFsr),
+      Param("compat_gyro_cal_threshold", &c.compat.gyroCalThreshold),
+      Param("compat_dterm_dyn_lpf_exponent", &c.compat.dtermDynLpfExponent),
 
       Param("accel_bus", &c.accel.bus, busDevChoices),
       Param("accel_dev", &c.accel.dev, gyroDevChoices),
@@ -495,6 +502,32 @@ failsafeProcedureChoices[] = {
       Param("gps_enable_qzss", &c.gps.enableQZSS),
       Param("gps_enable_sbas", &c.gps.enableSBAS),
 
+      // Compatibility-only fields round-trip through Configurator/MSP but do
+      // not alter PID/Angle/Acro/mixer authority.
+      Param("compat_acro_trainer_angle", &c.compat.acroTrainerAngleLimit),
+      Param("compat_abs_control_gain", &c.compat.absControlGain),
+      Param("compat_iterm_rotation", &c.compat.itermRotation),
+      Param("compat_iterm_relax_type", &c.compat.itermRelaxType),
+      Param("compat_smart_feedforward", &c.compat.smartFeedForward),
+      Param("compat_throttle_boost", &c.compat.throttleBoost),
+      Param("compat_dmax_roll", &c.compat.dMax[0]),
+      Param("compat_dmax_pitch", &c.compat.dMax[1]),
+      Param("compat_dmax_yaw", &c.compat.dMax[2]),
+      Param("compat_dmax_gain", &c.compat.dMaxGain),
+      Param("compat_dmax_advance", &c.compat.dMaxAdvance),
+      Param("compat_integrated_yaw", &c.compat.integratedYaw),
+      Param("compat_integrated_yaw_relax", &c.compat.integratedYawRelax),
+      Param("compat_ff_transition", &c.compat.feedForwardTransition),
+      Param("compat_ff_averaging", &c.compat.ffAveraging),
+      Param("compat_ff_smooth", &c.compat.ffSmoothFactor),
+      Param("compat_ff_boost", &c.compat.ffBoost),
+      Param("compat_ff_max_rate", &c.compat.ffMaxRateLimit),
+      Param("compat_ff_jitter", &c.compat.ffJitterFactor),
+      Param("compat_vbat_pid_comp", &c.compat.vbatPidCompensation),
+      Param("compat_vbat_sag_comp", &c.compat.vbatSagCompensation),
+      Param("compat_thrust_linearization", &c.compat.thrustLinearization),
+      Param("compat_idle_min_rpm", &c.compat.idleMinRpm),
+
       Param("board_align_roll", &c.boardAlignment[0]),
       Param("board_align_pitch", &c.boardAlignment[1]),
       Param("board_align_yaw", &c.boardAlignment[2]),
@@ -532,6 +565,12 @@ failsafeProcedureChoices[] = {
       Param("input_yaw_limit", &c.input.rateLimit[2]),
 
       Param("input_deadband", &c.input.deadband),
+      Param("compat_yaw_deadband", &c.compat.yawDeadband),
+      Param("compat_poshold_deadband", &c.compat.posHoldDeadband),
+      Param("compat_3d_throttle_deadband", &c.compat.deadband3dThrottle),
+      Param("compat_throttle_mid", &c.compat.throttleMid),
+      Param("compat_throttle_expo", &c.compat.throttleExpo),
+      Param("compat_throttle_hover", &c.compat.throttleHover),
       Param("input_airmode_threshold", &c.input.airModeActivateThreshold),
 
       Param("input_min", &c.input.minRc),
@@ -580,7 +619,19 @@ Param(
     &c.failsafe.procedure,
     failsafeProcedureChoices),
 
+      Param("compat_failsafe_off_delay", &c.compat.failsafeOffDelay),
+      Param("compat_failsafe_throttle", reinterpret_cast<int16_t*>(&c.compat.failsafeThrottle)),
+      Param("compat_failsafe_throttle_low_delay", reinterpret_cast<int16_t*>(&c.compat.failsafeThrottleLowDelay)),
+
       Param("arming_small_angle", &c.arming.smallAngle),
+      Param("compat_auto_disarm_delay", &c.compat.autoDisarmDelay),
+      Param("compat_gyro_cal_first_arm", &c.compat.gyroCalOnFirstArm),
+
+      Param("compat_3d_deadband_low", reinterpret_cast<int16_t*>(&c.compat.deadband3dLow)),
+      Param("compat_3d_deadband_high", reinterpret_cast<int16_t*>(&c.compat.deadband3dHigh)),
+      Param("compat_3d_neutral", reinterpret_cast<int16_t*>(&c.compat.neutral3d)),
+
+      Param("anti_gravity_gain", &c.antiGravityGain),
 
       Param("vtx_power", &c.vtx.power),
       Param("vtx_channel", &c.vtx.channel),
@@ -1010,7 +1061,7 @@ void Cli::execute(CliCmd& cmd, Stream::Printer& s)
   {
     static const char* const helps[] = {"available commands:", " help", " dump", " get param", " set param value ...",
                                         " cal [gyro]", " defaults", " save", " reboot", " scaler", " mixer", " stats",
-                                        " status", " devinfo", " version", " logs", " gps [set_home|clear_home]",
+                                        " status", " devinfo", " version", " logs", " gps [set_home|clear_home]", " shadow",
                                         //" load", " eeprom",
                                         //" fsinfo", " fsformat", " log",
                                         nullptr};
@@ -1288,6 +1339,10 @@ void Cli::execute(CliCmd& cmd, Stream::Printer& s)
     {
       printGpsStatus(s, true);
     }
+  }
+  else if (std::strcmp(cmd.args[0], "shadow") == 0)
+  {
+    printShadowStatus(s);
   }
   else if (std::strcmp(cmd.args[0], "preset") == 0)
   {
@@ -1940,6 +1995,49 @@ void Cli::printGpsStatus(Stream::Printer& s, bool full) const
     s.println("  Not set");
   }
 #endif
+}
+
+void Cli::printShadowStatus(Stream::Printer& s) const
+{
+  const auto& shadow = _model.state.shadow;
+
+  s.println("SHADOW FEATURES:");
+  s.print(" authority: ");
+  s.println(shadow.authorityBlocked ? "BLOCKED" : "ERROR");
+
+  s.print(" horizon: ");
+  s.print(shadow.horizonActive ? "ON" : "OFF");
+  s.print(", valid=");
+  s.print(shadow.horizonValid);
+  s.print(", strength=");
+  s.println(shadow.horizonStrength, 3);
+
+  s.print(" headfree: ");
+  s.print(shadow.headfreeActive ? "ON" : "OFF");
+  s.print(", reference=");
+  s.print(shadow.headfreeReferenceValid);
+  s.print(", heading_error_deg=");
+  s.println(Utils::toDeg(shadow.headingError), 2);
+
+  s.print(" acro trainer: ");
+  s.print(shadow.acroTrainerActive ? "ON" : "OFF");
+  s.print(", limit=");
+  s.println(_model.config.compat.acroTrainerAngleLimit);
+
+  s.print(" navigation: phase=");
+  s.print(static_cast<int>(shadow.navPhase));
+  s.print(", gps_valid=");
+  s.print(shadow.gpsNavigationValid);
+  s.print(", north_m=");
+  s.print(shadow.targetNorthM, 2);
+  s.print(", east_m=");
+  s.print(shadow.targetEastM, 2);
+  s.print(", distance_m=");
+  s.print(shadow.targetDistanceM, 2);
+  s.print(", bearing_deg=");
+  s.println(Utils::toDeg(shadow.targetBearingRad), 2);
+
+  s.println(" output authority: NONE");
 }
 
 void Cli::printVersion(Stream::Printer& s) const
