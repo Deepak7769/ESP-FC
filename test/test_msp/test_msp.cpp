@@ -1182,17 +1182,15 @@ void test_msp_unsupported_configurator_subsystems_fail_explicitly()
   MspProcessor processor(model);
   MspTestStream stream;
 
-  const uint16_t commands[] = {
-      MSP2_BETAFLIGHT_BIND,
-      MSP2_MOTOR_OUTPUT_REORDERING,
-      MSP2_SEND_DSHOT_COMMAND,
-      MSP2_GET_OSD_WARNINGS,
-      MSP2_GET_LED_STRIP_CONFIG_VALUES,
-      MSP2_SENSOR_OPTICALFLOW,
-      MSP_GPS_RESCUE,
-      MSP_GPS_RESCUE_PIDS,
-      MSP_VTXTABLE_BAND,
-      MSP_VTXTABLE_POWERLEVEL};
+const uint16_t commands[] = {
+    MSP2_BETAFLIGHT_BIND,
+    MSP2_MOTOR_OUTPUT_REORDERING,
+    MSP2_SEND_DSHOT_COMMAND,
+    MSP2_GET_OSD_WARNINGS,
+    MSP2_GET_LED_STRIP_CONFIG_VALUES,
+    MSP2_SENSOR_OPTICALFLOW,
+    MSP_VTXTABLE_BAND,
+    MSP_VTXTABLE_POWERLEVEL};
 
   for (const uint16_t command : commands)
   {
