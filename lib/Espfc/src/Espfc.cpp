@@ -99,6 +99,10 @@ int FAST_CODE_ATTR Espfc::update(bool externalTrigger)
 
   if (sensorFlags & SENSOR_READ_CONTROL)
   {
+          // Advanced modes consume the navigation/attitude diagnostics during the
+    // same deterministic control cycle. Evaluate them before Controller so
+    // active modes can feed the existing setpoint -> PID -> mixer chain.
+    _shadow.update();
     _controller.update();
 
     if (_model.state.mixer.timer.syncTo(
@@ -168,6 +172,9 @@ if (_model.state.actuatorTimer.check())
   if (gyroSampleValid &&
       controlDue)
   {
+          // Keep active compatibility/advanced-mode calculations ahead of the
+    // controller so their outputs are consumed in this same control cycle.
+    _shadow.update();
     _controller.update();
 
     if (_model.state.mixer.timer.syncTo(
@@ -200,11 +207,7 @@ if (_model.state.actuatorTimer.check())
 
 #endif
 
-  // Compatibility/shadow features are deliberately evaluated after all
-  // authoritative flight-control work for this cycle. Their state is
-  // diagnostic-only and cannot feed back into Controller/Pid/Mixer.
-  _shadow.update();
-
+  
   _serial.update();
   _buzzer.update();
   _model.state.led.update();
