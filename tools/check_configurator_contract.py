@@ -49,7 +49,9 @@ REQUIRED_DOC_PHRASES = [
 
 
 def require(text: str, needle: str, where: str, errors: list[str]) -> None:
-    if needle not in text:
+    normalized_text = " ".join(text.split())
+    normalized_needle = " ".join(needle.split())
+    if normalized_needle not in normalized_text:
         errors.append(f"{where}: missing {needle!r}")
 
 
