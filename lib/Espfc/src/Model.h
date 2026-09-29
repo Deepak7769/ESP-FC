@@ -854,6 +854,111 @@ config.compat.neutral3d =
         750,
         2250);
 
+// Configurator GPS Rescue state remains non-actuating, but keep every stored
+// value inside the same broad ranges accepted by the MSP setter so corrupted
+// EEPROM cannot poison shadow navigation diagnostics.
+config.compat.gpsRescue.maxAngle =
+    std::min<uint16_t>(
+        config.compat.gpsRescue.maxAngle,
+        60);
+
+config.compat.gpsRescue.returnAltitudeM =
+    std::clamp<uint16_t>(
+        config.compat.gpsRescue.returnAltitudeM,
+        5,
+        1000);
+
+config.compat.gpsRescue.descentDistanceM =
+    std::clamp<uint16_t>(
+        config.compat.gpsRescue.descentDistanceM,
+        5,
+        500);
+
+config.compat.gpsRescue.groundSpeedCmS =
+    std::min<uint16_t>(
+        config.compat.gpsRescue.groundSpeedCmS,
+        3000);
+
+config.compat.gpsRescue.throttleMin =
+    std::clamp<uint16_t>(
+        config.compat.gpsRescue.throttleMin,
+        1000,
+        2000);
+
+config.compat.gpsRescue.throttleMax =
+    std::clamp<uint16_t>(
+        config.compat.gpsRescue.throttleMax,
+        config.compat.gpsRescue.throttleMin,
+        2000);
+
+config.compat.gpsRescue.hoverThrottle =
+    std::clamp<uint16_t>(
+        config.compat.gpsRescue.hoverThrottle,
+        config.compat.gpsRescue.throttleMin,
+        config.compat.gpsRescue.throttleMax);
+
+config.compat.gpsRescue.minSats =
+    std::min<uint8_t>(
+        config.compat.gpsRescue.minSats,
+        32);
+
+config.compat.gpsRescue.ascendRate =
+    std::clamp<uint16_t>(
+        config.compat.gpsRescue.ascendRate,
+        50,
+        2500);
+
+config.compat.gpsRescue.descendRate =
+    std::clamp<uint16_t>(
+        config.compat.gpsRescue.descendRate,
+        25,
+        500);
+
+config.compat.gpsRescue.allowArmingWithoutFix =
+    config.compat.gpsRescue.allowArmingWithoutFix
+        ? 1
+        : 0;
+
+config.compat.gpsRescue.altitudeMode =
+    std::min<uint8_t>(
+        config.compat.gpsRescue.altitudeMode,
+        3);
+
+config.compat.gpsRescue.minStartDistM =
+    std::min<uint16_t>(
+        config.compat.gpsRescue.minStartDistM,
+        1000);
+
+config.compat.gpsRescue.initialClimbM =
+    std::min<uint16_t>(
+        config.compat.gpsRescue.initialClimbM,
+        1000);
+
+config.compat.vtxTable.bands =
+    std::min<uint8_t>(
+        config.compat.vtxTable.bands,
+        COMPAT_VTX_MAX_BANDS);
+
+config.compat.vtxTable.channels =
+    std::min<uint8_t>(
+        config.compat.vtxTable.channels,
+        COMPAT_VTX_MAX_CHANNELS);
+
+config.compat.vtxTable.powerLevels =
+    std::min<uint8_t>(
+        config.compat.vtxTable.powerLevels,
+        COMPAT_VTX_MAX_POWER_LEVELS);
+
+for (size_t i = 0;
+     i < COMPAT_VTX_MAX_BANDS;
+     ++i)
+{
+  config.compat.vtxTable.isFactoryBand[i] =
+      config.compat.vtxTable.isFactoryBand[i]
+          ? 1
+          : 0;
+}
+
 // Receiver/control settings are persisted and can be edited over MSP/CLI.
 // Keep them inside ranges that preserve the arming and smoothing invariants.
 if (config.input.ppmMode != PPM_MODE_NORMAL &&
