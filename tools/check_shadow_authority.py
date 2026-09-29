@@ -67,6 +67,13 @@ TEST_ONLY_AUTHORITY_FILES = {
     (ROOT / "lib/Espfc/src/Control/AdvancedModesBench.h").resolve(),
 }
 
+# Promoted advanced modes (Horizon, Headfree, Acro Trainer). Controller.cpp is
+# the only authority file allowed to consume the promoted shadow state, and it
+# must keep every use inside an ESPFC_ADVANCED_MODES_ACTIVE gate.
+PROMOTED_AUTHORITY_FILES = {
+    (ROOT / "lib/Espfc/src/Control/Controller.cpp").resolve(),
+}
+
 
 def strip_comments(source: str) -> str:
     source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
@@ -165,6 +172,18 @@ def main() -> int:
                         "authority implementation bypasses guarded header"
                     )
                 continue
+              
+            if path.resolve() in PROMOTED_AUTHORITY_FILES:
+                # Promoted advanced modes may consume shadow mode identifiers
+                # and Configurator compat metadata, but only behind the
+                # ESPFC_ADVANCED_MODES_ACTIVE compile-time gate.
+                if "ESPFC_ADVANCED_MODES_ACTIVE" not in raw_source:
+                    errors.append(
+                        f"{path.relative_to(ROOT)}: "
+                        "promoted authority file missing "
+                        "ESPFC_ADVANCED_MODES_ACTIVE gate"
+                    )
+                continue  
 
             for symbol in SHADOW_MODE_SYMBOLS:
                 if symbol in code:
