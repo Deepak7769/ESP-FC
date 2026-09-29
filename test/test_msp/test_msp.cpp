@@ -8,6 +8,7 @@
 #include <helper_3dmath.hpp>
 #include <printf.h>
 #include <unity.h>
+#include <cstring>
 #include <string>
 #include <vector>
 

@@ -6,6 +6,7 @@
 #include "Stream/Printer.hpp"
 #include <algorithm>
 #include <cstring>
+#include <iterator>
 #include <limits>
 #include <platform.h>
 #if defined(ESPFC_MULTI_CORE) && defined(ESPFC_FREE_RTOS)
