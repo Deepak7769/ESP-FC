@@ -1,5 +1,8 @@
 #include "Control/Controller.h"
 #include "Control/AssistedModeV2.h"
+#if defined(ESPFC_ADVANCED_MODES_ACTIVE_TEST)
+#include "Control/AdvancedModesBench.h"
+#endif
 #include "Hal/Time.hpp"
 #include "Utils/Math.hpp"
 #include <algorithm>
@@ -153,6 +156,12 @@ updateAssistedModes();
         outerLoop();
         break;
     }
+
+#if defined(ESPFC_ADVANCED_MODES_ACTIVE_TEST)
+    // Controller-authority validation for Configurator-visible modes is
+    // compile-time locked to ESPFC_SAFE_BENCH_BUILD.
+    applyAdvancedModesBench(_model, *this);
+#endif
   }
 
   // Betaflight-style Anti-Gravity demand is computed every cycle. Builds with
