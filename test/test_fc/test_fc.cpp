@@ -8131,6 +8131,9 @@ void test_shadow_gps_navigation_has_no_control_authority()
   model.state.gps.fixType =
       3;
 
+  model.state.gps.numSats =
+      model.config.compat.gpsRescue.minSats;
+
   model.state.gps.homeSet =
       true;
 
