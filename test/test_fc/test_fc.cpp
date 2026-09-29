@@ -8616,8 +8616,9 @@ void test_advanced_modes_bench_acro_trainer_limits_outward_rate()
           0.0f,
           0.0f);
 
-  model.state.gyro.adc[AXIS_ROLL] =
-      Utils::toRad(50.0f);
+  model.state.gyro.adc.set(
+      AXIS_ROLL,
+      Utils::toRad(50.0f));
 
   model.state.setpoint.rate[AXIS_ROLL] =
       Utils::toRad(200.0f);
