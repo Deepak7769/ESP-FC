@@ -2976,31 +2976,42 @@ constexpr int REQUIRED_PID_BYTES =
     // Explicitly unsupported Configurator subsystems. Keep these cases named
     // rather than relying on the default so future compatibility work cannot
     // accidentally make a zero-filled placeholder look implemented.
-    case MSP2_BETAFLIGHT_BIND:
-    case MSP2_MOTOR_OUTPUT_REORDERING:
-    case MSP2_SET_MOTOR_OUTPUT_REORDERING:
-    case MSP2_SEND_DSHOT_COMMAND:
-    case MSP_GPS_RESCUE: {
-      const auto& cfg =
-          _model.config.compat.gpsRescue;
+// Explicitly unsupported Configurator subsystems.
+// These commands must remain unsupported until their real runtime
+// implementation exists.
+case MSP2_BETAFLIGHT_BIND:
+case MSP2_MOTOR_OUTPUT_REORDERING:
+case MSP2_SET_MOTOR_OUTPUT_REORDERING:
+case MSP2_SEND_DSHOT_COMMAND:
+{
+    r.result = -1;
+    break;
+}
 
-      r.writeU16(cfg.maxAngle);
-      r.writeU16(cfg.returnAltitudeM);
-      r.writeU16(cfg.descentDistanceM);
-      r.writeU16(cfg.groundSpeedCmS);
-      r.writeU16(cfg.throttleMin);
-      r.writeU16(cfg.throttleMax);
-      r.writeU16(cfg.hoverThrottle);
-      r.writeU8(cfg.sanityChecks);
-      r.writeU8(cfg.minSats);
-      r.writeU16(cfg.ascendRate);
-      r.writeU16(cfg.descendRate);
-      r.writeU8(cfg.allowArmingWithoutFix);
-      r.writeU8(cfg.altitudeMode);
-      r.writeU16(cfg.minStartDistM);
-      r.writeU16(cfg.initialClimbM);
-      break;
-    }
+// GPS Rescue configuration is supported as configuration/telemetry
+// metadata, but it is not by itself GPS Rescue actuator authority.
+case MSP_GPS_RESCUE:
+{
+    const auto& cfg =
+        _model.config.compat.gpsRescue;
+
+    r.writeU16(cfg.maxAngle);
+    r.writeU16(cfg.returnAltitudeM);
+    r.writeU16(cfg.descentDistanceM);
+    r.writeU16(cfg.groundSpeedCmS);
+    r.writeU16(cfg.throttleMin);
+    r.writeU16(cfg.throttleMax);
+    r.writeU16(cfg.hoverThrottle);
+    r.writeU8(cfg.sanityChecks);
+    r.writeU8(cfg.minSats);
+    r.writeU16(cfg.ascendRate);
+    r.writeU16(cfg.descendRate);
+    r.writeU8(cfg.allowArmingWithoutFix);
+    r.writeU8(cfg.altitudeMode);
+    r.writeU16(cfg.minStartDistM);
+    r.writeU16(cfg.initialClimbM);
+    break;
+}
 
     case MSP_SET_GPS_RESCUE: {
       const size_t payloadSize =
