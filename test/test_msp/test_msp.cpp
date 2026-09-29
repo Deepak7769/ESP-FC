@@ -534,6 +534,65 @@ void test_msp_set_mode_range_rejects_invalid_shadow_or_link_ids()
       model.config.conditions[0].id);
 }
 
+
+void test_msp_box_names_and_ids_cover_every_declared_mode()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  MspMessage namesRequest;
+  namesRequest.cmd =
+      MSP_BOXNAMES;
+
+  MspResponse namesResponse;
+  processor.processCommand(
+      namesRequest,
+      namesResponse,
+      stream);
+
+  size_t nameCount =
+      0;
+
+  for (size_t i = 0;
+       i < namesResponse.len;
+       ++i)
+  {
+    if (namesResponse.data[i] ==
+        static_cast<uint8_t>(';'))
+    {
+      ++nameCount;
+    }
+  }
+
+  MspMessage idsRequest;
+  idsRequest.cmd =
+      MSP_BOXIDS;
+
+  MspResponse idsResponse;
+  processor.processCommand(
+      idsRequest,
+      idsResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_UINT32(
+      MODE_COUNT,
+      nameCount);
+
+  TEST_ASSERT_EQUAL_UINT16(
+      MODE_COUNT,
+      idsResponse.len);
+
+  for (size_t i = 0;
+       i < idsResponse.len;
+       ++i)
+  {
+    TEST_ASSERT_EQUAL_UINT8(
+        i,
+        idsResponse.data[i]);
+  }
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -552,5 +611,6 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp_response_write_string_uses_full_response_capacity);
   RUN_TEST(test_msp_set_mode_range_rejects_invalid_shadow_or_link_ids);
   RUN_TEST(test_msp2_set_text_rejects_truncated_craft_name_without_erasing_it);
+  RUN_TEST(test_msp_box_names_and_ids_cover_every_declared_mode);
   return UNITY_END();
 }
