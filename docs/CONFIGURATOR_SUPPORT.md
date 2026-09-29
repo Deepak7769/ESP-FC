@@ -220,3 +220,12 @@ status vocabulary, shadow-mode declarations, explicitly unsupported MSP
 commands, single-battery-profile bridge, SmartAudio status surface and
 non-actuating CLI authority declaration remain present together. This catches
 source/documentation drift before a firmware artifact is produced.
+
+
+## Direct-output and bind command boundary
+
+The Betaflight MSPv2 bind command, motor-output-reordering commands and direct
+DSHOT command are explicit protocol errors in ESP-FC. They are not represented
+as Configurator-compatible placeholders. Motor mapping remains owned by the
+existing ESP-FC pin/output configuration, and no MSPv2 direct motor-command
+authority is added by the compatibility layer.

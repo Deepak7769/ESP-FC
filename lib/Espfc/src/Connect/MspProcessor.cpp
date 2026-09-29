@@ -2966,6 +2966,10 @@ constexpr int REQUIRED_PID_BYTES =
     // Explicitly unsupported Configurator subsystems. Keep these cases named
     // rather than relying on the default so future compatibility work cannot
     // accidentally make a zero-filled placeholder look implemented.
+    case MSP2_BETAFLIGHT_BIND:
+    case MSP2_MOTOR_OUTPUT_REORDERING:
+    case MSP2_SET_MOTOR_OUTPUT_REORDERING:
+    case MSP2_SEND_DSHOT_COMMAND:
     case MSP2_GET_OSD_WARNINGS:
     case MSP2_GET_LED_STRIP_CONFIG_VALUES:
     case MSP2_SET_LED_STRIP_CONFIG_VALUES:

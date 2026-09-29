@@ -1183,6 +1183,9 @@ void test_msp_unsupported_configurator_subsystems_fail_explicitly()
   MspTestStream stream;
 
   const uint16_t commands[] = {
+      MSP2_BETAFLIGHT_BIND,
+      MSP2_MOTOR_OUTPUT_REORDERING,
+      MSP2_SEND_DSHOT_COMMAND,
       MSP2_GET_OSD_WARNINGS,
       MSP2_GET_LED_STRIP_CONFIG_VALUES,
       MSP2_SENSOR_OPTICALFLOW,
@@ -1429,6 +1432,38 @@ void test_msp_gps_rescue_setters_remain_blocked_for_shadow_navigation()
       pidResponse.result);
 }
 
+
+void test_msp2_motor_reordering_setter_is_explicitly_unsupported()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  MspMessage set;
+  set.cmd =
+      MSP2_SET_MOTOR_OUTPUT_REORDERING;
+
+  const uint8_t payload[] = {
+      0,
+      1,
+      2,
+      3};
+
+  set.append(
+      payload,
+      sizeof(payload));
+
+  MspResponse response;
+  processor.processCommand(
+      set,
+      response,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      response.result);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -1461,5 +1496,6 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp2_vtx_device_status_reports_only_observable_smartaudio_state);
   RUN_TEST(test_msp_tx_info_does_not_claim_hardware_rtc);
   RUN_TEST(test_msp_gps_rescue_setters_remain_blocked_for_shadow_navigation);
+  RUN_TEST(test_msp2_motor_reordering_setter_is_explicitly_unsupported);
   return UNITY_END();
 }
