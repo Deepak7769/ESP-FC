@@ -64,3 +64,15 @@ existing Anti-Gravity feature bit and gain now also have named CLI entries.
 The `shadow` command prints Horizon, Headfree, Acro-Trainer and horizontal
 navigation diagnostic state and always reports the hard output-authority
 boundary.
+
+
+## Protocol robustness completion
+
+`MSP_RTC` now returns the same software timestamp accepted by
+`MSP_SET_RTC`, completing that metadata round-trip without claiming a
+battery-backed clock.
+
+MSPv2 text writes now validate the declared payload length before modifying the
+craft name. A truncated packet is rejected and leaves the previous name
+unchanged; unsupported text-slot types remain explicitly unsupported rather
+than being silently presented as implemented features.

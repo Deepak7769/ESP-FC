@@ -344,6 +344,74 @@ void test_msp_rtc_is_software_metadata_only()
   TEST_ASSERT_EQUAL_UINT32(0x12345678u, model.config.compat.rtcSeconds);
   TEST_ASSERT_EQUAL_UINT16(789, model.config.compat.rtcMillis);
   TEST_ASSERT_EQUAL_UINT8(1, model.config.compat.rtcValid);
+
+  MspMessage get;
+  get.cmd = MSP_RTC;
+
+  MspResponse getResponse;
+  processor.processCommand(
+      get,
+      getResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_UINT16(
+      6,
+      getResponse.len);
+
+  const uint32_t seconds =
+      static_cast<uint32_t>(getResponse.data[0]) |
+      (static_cast<uint32_t>(getResponse.data[1]) << 8) |
+      (static_cast<uint32_t>(getResponse.data[2]) << 16) |
+      (static_cast<uint32_t>(getResponse.data[3]) << 24);
+
+  TEST_ASSERT_EQUAL_UINT32(
+      0x12345678u,
+      seconds);
+
+  TEST_ASSERT_EQUAL_UINT16(
+      789,
+      readResponseU16(
+          getResponse,
+          4));
+}
+
+void test_msp2_set_text_rejects_truncated_craft_name_without_erasing_it()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  std::strncpy(
+      model.config.modelName,
+      "KEEP",
+      MODEL_NAME_LEN);
+
+  MspMessage set;
+  set.cmd = MSP2_SET_TEXT;
+
+  const uint8_t data[] = {
+      MSP2TEXT_CRAFT_NAME,
+      5,
+      'B',
+      'A'};
+
+  set.append(
+      data,
+      sizeof(data));
+
+  MspResponse response;
+  processor.processCommand(
+      set,
+      response,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      response.result);
+
+  TEST_ASSERT_EQUAL_STRING(
+      "KEEP",
+      model.config.modelName);
 }
 
 void test_msp_shadow_modes_are_explicitly_named()
@@ -481,5 +549,6 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp_shadow_modes_are_explicitly_named);
   RUN_TEST(test_msp_response_write_string_uses_full_response_capacity);
   RUN_TEST(test_msp_set_mode_range_rejects_invalid_shadow_or_link_ids);
+  RUN_TEST(test_msp2_set_text_rejects_truncated_craft_name_without_erasing_it);
   return UNITY_END();
 }

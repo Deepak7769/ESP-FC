@@ -431,20 +431,53 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
     }
 
     case MSP2_SET_TEXT: {
-      const uint8_t textType = m.readU8();
-      const uint8_t textLength = m.readU8();
+      if (m.remain() < 2)
+      {
+        r.result = -1;
+        break;
+      }
+
+      const uint8_t textType =
+          m.readU8();
+
+      const uint8_t textLength =
+          m.readU8();
+
+      if (m.remain() < textLength)
+      {
+        r.result = -1;
+        break;
+      }
+
       if (textType == MSP2TEXT_CRAFT_NAME)
       {
-        std::fill_n(&_model.config.modelName[0], MODEL_NAME_LEN + 1, 0);
-        for (size_t i = 0; i < textLength; i++)
+        char nextName[
+            MODEL_NAME_LEN + 1] = {};
+
+        for (size_t i = 0;
+             i < textLength;
+             ++i)
         {
-          const uint8_t c = m.readU8();
-          if (i < MODEL_NAME_LEN) _model.config.modelName[i] = c;
+          const uint8_t c =
+              m.readU8();
+
+          if (i < MODEL_NAME_LEN)
+          {
+            nextName[i] =
+                static_cast<char>(c);
+          }
         }
+
+        std::copy(
+            std::begin(nextName),
+            std::end(nextName),
+            std::begin(_model.config.modelName));
       }
       else
       {
-        m.advance(textLength); // ignore unsupported text types
+        // Unknown text slots are explicitly unsupported. Consume the complete
+        // validated payload without manufacturing a stored subsystem.
+        m.advance(textLength);
       }
       break;
     }
@@ -2366,6 +2399,21 @@ constexpr int REQUIRED_PID_BYTES =
         r.result = -1;
       }
       break; // software timestamp only; no hardware RTC is implied
+
+    case MSP_RTC:
+      // Configurator round-trip for the software timestamp. Zero means that no
+      // RTC value has been supplied since defaults/load; this still does not
+      // claim a battery-backed hardware clock.
+      r.writeU32(
+          _model.config.compat.rtcValid
+              ? _model.config.compat.rtcSeconds
+              : 0u);
+
+      r.writeU16(
+          _model.config.compat.rtcValid
+              ? _model.config.compat.rtcMillis
+              : 0u);
+      break;
 
     default:
       r.result = -1;
