@@ -4,6 +4,7 @@
 #include "Connect/Buzzer.hpp"
 #include "Control/Actuator.h"
 #include "Control/Controller.h"
+#include "Control/ShadowFeatures.h"
 #include "Hardware.h"
 #include "Input.h"
 #include "Model.h"
@@ -33,6 +34,7 @@ private:
   Model _model;
   Hardware _hardware;
   Control::Controller _controller;
+  Control::ShadowFeatures _shadow;
   TelemetryManager _telemetry;
   Input _input;
   Control::Actuator _actuator;

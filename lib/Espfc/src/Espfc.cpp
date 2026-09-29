@@ -4,7 +4,7 @@
 namespace Espfc {
 
 Espfc::Espfc()
-    : _hardware{_model}, _controller{_model}, _telemetry{_model}, _input{_model, _telemetry}, _actuator{_model},
+    : _hardware{_model}, _controller{_model}, _shadow{_model}, _telemetry{_model}, _input{_model, _telemetry}, _actuator{_model},
       _sensor{_model}, _mixer{_model}, _blackbox{_model}, _buzzer{_model}, _serial{_model, _telemetry}
 {
 }
@@ -29,6 +29,7 @@ int Espfc::begin()
   _input.begin();    // requires _serial.begin()
   _actuator.begin(); // requires _model.begin()
   _controller.begin();
+  _shadow.begin();
   _blackbox.begin(); // requires _serial.begin(), _actuator.begin()
   _buzzer.begin();
 
@@ -198,6 +199,11 @@ if (_model.state.actuatorTimer.check())
   _sensor.updateDelayed();
 
 #endif
+
+  // Compatibility/shadow features are deliberately evaluated after all
+  // authoritative flight-control work for this cycle. Their state is
+  // diagnostic-only and cannot feed back into Controller/Pid/Mixer.
+  _shadow.update();
 
   _serial.update();
   _buzzer.update();

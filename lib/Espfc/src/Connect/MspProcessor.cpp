@@ -450,7 +450,10 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
     }
 
     case MSP_BOXNAMES:
-      r.writeString("ARM;AIRMODE;ANGLE;ALTHOLD;BEEPER;FAILSAFE;BLACKBOX;BLACKBOXERASE;ANTI GRAVITY;");
+      r.writeString(
+          "ARM;AIRMODE;ANGLE;ALTHOLD;BEEPER;FAILSAFE;BLACKBOX;BLACKBOXERASE;ANTI GRAVITY;"
+          "HORIZON SHADOW;GPS RESCUE SHADOW;POSHOLD SHADOW;HEADFREE SHADOW;"
+          "ACRO TRAINER SHADOW;WAYPOINT SHADOW;");
       break;
 
     case MSP_BOXIDS:
@@ -463,6 +466,12 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU8(MODE_BLACKBOX);
       r.writeU8(MODE_BLACKBOX_ERASE);
       r.writeU8(MODE_ANTI_GRAVITY);
+      r.writeU8(MODE_HORIZON_SHADOW);
+      r.writeU8(MODE_GPS_RESCUE_SHADOW);
+      r.writeU8(MODE_POSHOLD_SHADOW);
+      r.writeU8(MODE_HEADFREE_SHADOW);
+      r.writeU8(MODE_ACRO_TRAINER_SHADOW);
+      r.writeU8(MODE_WAYPOINT_SHADOW);
       break;
 
     case MSP_MODE_RANGES:

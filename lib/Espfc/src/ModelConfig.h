@@ -83,6 +83,18 @@ enum FlightMode {
   MODE_BLACKBOX_ERASE,
   // Appended intentionally: preserve all existing stored mode IDs.
   MODE_ANTI_GRAVITY,
+
+  // Non-actuating compatibility/shadow modes. These mode bits are visible to
+  // Configurator and diagnostics but are never consumed by Controller, Pid or
+  // Mixer. They exist so missing Betaflight-style features can be developed
+  // and validated without granting actuator authority.
+  MODE_HORIZON_SHADOW,
+  MODE_GPS_RESCUE_SHADOW,
+  MODE_POSHOLD_SHADOW,
+  MODE_HEADFREE_SHADOW,
+  MODE_ACRO_TRAINER_SHADOW,
+  MODE_WAYPOINT_SHADOW,
+
   MODE_COUNT,
 };
 

@@ -1,6 +1,7 @@
 #include "Control/Actuator.h"
 #include "Control/AssistedModeV2.h"
 #include "Control/Controller.h"
+#include "Control/ShadowFeatures.h"
 #include "Control/Altitude.hpp"
 #include "Connect/MspProcessor.hpp"
 #include "Input.h"
@@ -7881,6 +7882,154 @@ void test_fusion_mode_name_rejects_negative_enum()
           static_cast<FusionMode>(-1)));
 }
 
+
+void test_shadow_horizon_strength_reference_shape()
+{
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.001f,
+      1.0f,
+      Control::ShadowFeatures::horizonStrength(
+          0.0f, 0.0f, 0.0f, 0.0f));
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.001f,
+      0.0f,
+      Control::ShadowFeatures::horizonStrength(
+          60.0f, 0.0f, 0.0f, 0.0f));
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.001f,
+      0.0f,
+      Control::ShadowFeatures::horizonStrength(
+          0.0f, 0.0f, 1.0f, 0.0f));
+}
+
+void test_shadow_geo_delta_is_finite_and_directional()
+{
+  float north = 0.0f;
+  float east = 0.0f;
+
+  Control::ShadowFeatures::geoDeltaMeters(
+      0, 0,
+      10000, 10000,
+      north, east);
+
+  TEST_ASSERT_TRUE(std::isfinite(north));
+  TEST_ASSERT_TRUE(std::isfinite(east));
+  TEST_ASSERT_TRUE(north > 100.0f);
+  TEST_ASSERT_TRUE(east > 100.0f);
+}
+
+void test_shadow_acro_trainer_only_returns_suggestion()
+{
+  const float limited =
+      Control::ShadowFeatures::acroTrainerSuggestion(
+          400.0f,
+          25.0f,
+          300.0f);
+
+  TEST_ASSERT_TRUE(limited < 0.0f);
+}
+
+void test_shadow_update_cannot_change_control_or_output_state()
+{
+  Model model;
+
+  model.state.attitude.healthy = true;
+  model.state.attitude.euler =
+      VectorFloat(
+          Utils::toRad(10.0f),
+          Utils::toRad(-5.0f),
+          Utils::toRad(30.0f));
+
+  model.state.input.channelsValid = true;
+  model.state.input.channelCount = AXIS_COUNT;
+  model.state.input.ch[AXIS_ROLL] = 0.25f;
+  model.state.input.ch[AXIS_PITCH] = -0.20f;
+
+  model.state.gyro.adc =
+      VectorFloat(
+          Utils::toRad(100.0f),
+          Utils::toRad(-80.0f),
+          0.0f);
+
+  model.state.setpoint.rate[AXIS_ROLL] =
+      Utils::toRad(250.0f);
+  model.state.setpoint.rate[AXIS_PITCH] =
+      Utils::toRad(-200.0f);
+
+  model.state.mode.mask =
+      (uint32_t{1} << MODE_HORIZON_SHADOW) |
+      (uint32_t{1} << MODE_HEADFREE_SHADOW) |
+      (uint32_t{1} << MODE_ACRO_TRAINER_SHADOW);
+
+  const SetpointState setpointBefore =
+      model.state.setpoint;
+
+  const AngleV2State angleBefore =
+      model.state.angleV2;
+
+  const AssistedModeState assistedBefore =
+      model.state.assistedMode;
+
+  float pidOutputsBefore[AXIS_COUNT_RPYT] = {};
+  for (size_t i = 0; i < AXIS_COUNT_RPYT; ++i)
+  {
+    pidOutputsBefore[i] =
+        model.state.innerPid[i].output;
+  }
+
+  const OutputState outputBefore =
+      model.state.output;
+
+  Control::ShadowFeatures shadow(model);
+  shadow.begin();
+  shadow.update();
+
+  TEST_ASSERT_TRUE(
+      model.state.shadow.authorityBlocked);
+
+  for (size_t i = 0; i < AXIS_COUNT_RPYT; ++i)
+  {
+    TEST_ASSERT_FLOAT_WITHIN(
+        0.000001f,
+        setpointBefore.rate[i],
+        model.state.setpoint.rate[i]);
+
+    TEST_ASSERT_FLOAT_WITHIN(
+        0.000001f,
+        pidOutputsBefore[i],
+        model.state.innerPid[i].output);
+  }
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.000001f,
+      angleBefore.angleTarget[0],
+      model.state.angleV2.angleTarget[0]);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.000001f,
+      angleBefore.angleTarget[1],
+      model.state.angleV2.angleTarget[1]);
+
+  TEST_ASSERT_FLOAT_WITHIN(
+      0.000001f,
+      assistedBefore.altitudeTarget,
+      model.state.assistedMode.altitudeTarget);
+
+  for (size_t i = 0; i < OUTPUT_CHANNELS; ++i)
+  {
+    TEST_ASSERT_FLOAT_WITHIN(
+        0.000001f,
+        outputBefore.ch[i],
+        model.state.output.ch[i]);
+
+    TEST_ASSERT_EQUAL_INT16(
+        outputBefore.us[i],
+        model.state.output.us[i]);
+  }
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -8128,5 +8277,9 @@ RUN_TEST(
   RUN_TEST(test_mixer_output_limit_servo);
   
 
+  RUN_TEST(test_shadow_horizon_strength_reference_shape);
+  RUN_TEST(test_shadow_geo_delta_is_finite_and_directional);
+  RUN_TEST(test_shadow_acro_trainer_only_returns_suggestion);
+  RUN_TEST(test_shadow_update_cannot_change_control_or_output_state);
   return UNITY_END();
 }

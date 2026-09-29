@@ -518,6 +518,54 @@ struct AssistedModeState
   bool altitudeTargetValid{false};
 };
 
+enum ShadowNavPhase : uint8_t
+{
+  SHADOW_NAV_IDLE = 0,
+  SHADOW_NAV_WAIT_HOME,
+  SHADOW_NAV_RETURN_HOME,
+  SHADOW_NAV_POSITION_HOLD,
+  SHADOW_NAV_WAYPOINT,
+  SHADOW_NAV_ARRIVED,
+};
+
+struct ShadowFeatureState
+{
+  // Hard invariant: this subsystem is diagnostic only. No value in this
+  // structure is an actuator command or is consumed by Controller/Pid/Mixer.
+  bool authorityBlocked{true};
+
+  bool horizonActive{false};
+  bool horizonValid{false};
+  float horizonStrength{0.0f};
+  float horizonRateSuggestion[AXIS_COUNT_RP] = {0.0f, 0.0f};
+
+  bool headfreeActive{false};
+  bool headfreeReferenceValid{false};
+  float headfreeReferenceYaw{0.0f};
+  float headfreeInput[AXIS_COUNT_RP] = {0.0f, 0.0f};
+  float headingError{0.0f};
+
+  bool acroTrainerActive{false};
+  float acroTrainerProjectedAngle[AXIS_COUNT_RP] = {0.0f, 0.0f};
+  float acroTrainerRateSuggestion[AXIS_COUNT_RP] = {0.0f, 0.0f};
+
+  bool gpsNavigationValid{false};
+  ShadowNavPhase navPhase{SHADOW_NAV_IDLE};
+  float targetNorthM{0.0f};
+  float targetEastM{0.0f};
+  float targetDistanceM{0.0f};
+  float targetBearingRad{0.0f};
+  float desiredNorthMs{0.0f};
+  float desiredEastMs{0.0f};
+
+  GpsCoordinate<int32_t> holdLocation{};
+  bool holdLocationValid{false};
+
+  GpsCoordinate<int32_t> waypointLocation{};
+  bool waypointLocationValid{false};
+  uint8_t waypointIndex{0};
+};
+
 
 struct VtxState
 {
@@ -680,6 +728,7 @@ struct ModelState
 
   AngleV2State angleV2;
   AssistedModeState assistedMode;
+  ShadowFeatureState shadow;
 
   SetpointState setpoint;
 
