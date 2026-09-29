@@ -76,3 +76,13 @@ MSPv2 text writes now validate the declared payload length before modifying the
 craft name. A truncated packet is rejected and leaves the previous name
 unchanged; unsupported text-slot types remain explicitly unsupported rather
 than being silently presented as implemented features.
+
+
+## CI non-authority rule
+
+The shadow-authority CI guard also scans authoritative Control/Output sources
+for `config.compat` references. Compatibility-only fields therefore cannot
+silently become inputs to PID, mixer, attitude, assisted-mode, or output code.
+The sole Control-layer compatibility consumer remains
+`ShadowFeatures.cpp`, where the Acro-Trainer angle value affects diagnostics
+only.

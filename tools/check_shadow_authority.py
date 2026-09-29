@@ -148,6 +148,31 @@ def main() -> int:
                         f"shadow mode consumed by authority code: {symbol}"
                     )
 
+            # ConfiguratorCompatConfig is storage/UI metadata. The only
+            # Control consumer allowed is ShadowFeatures.cpp, which was
+            # excluded above. Any other Control/Output reference would turn a
+            # persisted-only Configurator field into hidden actuator behavior.
+            compat_tokens = (
+                "_model.config.compat",
+                "model.config.compat",
+                ".config.compat",
+            )
+
+            for token in compat_tokens:
+                if token in code:
+                    line = code.count(
+                        "\n",
+                        0,
+                        code.index(token),
+                    ) + 1
+
+                    errors.append(
+                        f"{path.relative_to(ROOT)}:{line}: "
+                        "Configurator compatibility metadata consumed by "
+                        "authority code"
+                    )
+                    break
+
     if errors:
         print("Shadow authority boundary violation(s):", file=sys.stderr)
         for error in errors:
