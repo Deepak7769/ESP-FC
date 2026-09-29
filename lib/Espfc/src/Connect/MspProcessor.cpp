@@ -2979,6 +2979,9 @@ constexpr int REQUIRED_PID_BYTES =
 // Explicitly unsupported Configurator subsystems.
 // These commands must remain unsupported until their real runtime
 // implementation exists.
+// Explicitly unsupported Configurator subsystems.
+// These commands must remain unsupported until their real runtime
+// implementation exists.
 case MSP2_BETAFLIGHT_BIND:
 case MSP2_MOTOR_OUTPUT_REORDERING:
 case MSP2_SET_MOTOR_OUTPUT_REORDERING:
