@@ -109,4 +109,16 @@ In addition to runtime regression tests, CI runs
 `tools/check_shadow_authority.py`. The check rejects direct assignments from
 the shadow subsystem into setpoints, PID state, Angle V2, Assisted V2,
 failsafe, mixer or output state; it also rejects authority-changing Model
-calls and direct control/output includes. Debug telemetry remains permitted.
+calls and direct control/output includes. A second scan rejects every
+shadow-mode identifier from the authoritative Control/Output source trees, so
+a future controller cannot silently consume a shadow mode without failing CI.
+Debug telemetry remains permitted.
+
+
+## Waypoint interface scope
+
+The waypoint shadow has a bounded in-memory target API used by native
+regressions and future diagnostic integrations. There is currently no
+Configurator mission-upload protocol, persistent mission store, path planner,
+or autonomous waypoint executor. The visible WAYPOINT SHADOW mode therefore
+does not imply a working mission system.

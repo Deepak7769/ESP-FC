@@ -28,7 +28,7 @@ feature.
 | Horizon | SHADOW | Betaflight-style inclination/stick blend strength and diagnostic rate suggestion only |
 | GPS Rescue / RTH | SHADOW | Home validity, N/E error, range, bearing and desired horizontal velocity diagnostics only |
 | Position Hold | SHADOW | Captures a GPS hold point and calculates horizontal error/velocity demand only |
-| Waypoints | SHADOW | Target-coordinate navigation state and horizontal error/velocity demand only |
+| Waypoints | SHADOW | Target-coordinate calculation API and horizontal error/velocity demand only; no Configurator mission upload or autonomous waypoint execution |
 | Headfree | SHADOW | Betaflight-style yaw-reference roll/pitch transform only |
 | Acro Trainer | SHADOW | Betaflight-style projected-angle limiting suggestion only |
 | 3D reversible flight | PERSISTED ONLY | UI deadband/neutral values persist; no reversible motor-control path |
