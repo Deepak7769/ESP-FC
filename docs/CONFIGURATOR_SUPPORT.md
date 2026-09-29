@@ -110,6 +110,10 @@ custom per-gyro Euler offsets that ESP-FC cannot represent.
   home validity are real sensing/telemetry features.
 - RTH/POSHOLD/waypoint actuator authority remains deliberately absent; those
   calculations are SHADOW only.
+- Betaflight `MSP_GPS_RESCUE` and `MSP_GPS_RESCUE_PIDS` configuration
+  commands, including their setters, remain explicit protocol errors. This
+  prevents Configurator rescue gains/return parameters from looking active
+  while the corresponding ESP-FC navigation path is still non-actuating.
 
 ## Failsafe and arming UI
 
