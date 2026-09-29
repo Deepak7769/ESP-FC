@@ -8393,6 +8393,88 @@ void test_shadow_geo_delta_wraps_international_date_line()
       east > -500.0f);
 }
 
+
+void test_shadow_navigation_rejects_invalid_fix_and_waypoint_coordinates()
+{
+  Model model;
+  Control::ShadowFeatures shadow(
+      model);
+
+  shadow.begin();
+
+  model.state.gps.present =
+      true;
+
+  model.state.gps.solutionFresh =
+      true;
+
+  model.state.gps.fix =
+      true;
+
+  model.state.gps.fixType =
+      1;
+
+  model.state.gps.location.raw.lat =
+      190000000;
+
+  model.state.gps.location.raw.lon =
+      730000000;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_POSHOLD_SHADOW);
+
+  shadow.update();
+
+  TEST_ASSERT_FALSE(
+      model.state.shadow.holdLocationValid);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      SHADOW_NAV_WAIT_HOME,
+      model.state.shadow.navPhase);
+
+  shadow.setWaypoint(
+      910000000,
+      0,
+      7);
+
+  TEST_ASSERT_FALSE(
+      model.state.shadow.waypointLocationValid);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      0,
+      model.state.shadow.waypointIndex);
+
+  shadow.setWaypoint(
+      190010000,
+      730010000,
+      3);
+
+  TEST_ASSERT_TRUE(
+      model.state.shadow.waypointLocationValid);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      3,
+      model.state.shadow.waypointIndex);
+
+  model.state.gps.fixType =
+      3;
+
+  model.updateModes(
+      uint32_t{1} <<
+      MODE_WAYPOINT_SHADOW);
+
+  shadow.update();
+
+  TEST_ASSERT_EQUAL_UINT8(
+      SHADOW_NAV_WAYPOINT,
+      model.state.shadow.navPhase);
+
+  TEST_ASSERT_TRUE(
+      model.state.shadow.targetDistanceM >
+      0.0f);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -8647,5 +8729,6 @@ RUN_TEST(
   RUN_TEST(test_model_sanitize_scrubs_invalid_mode_rows);
   RUN_TEST(test_shadow_gps_navigation_has_no_control_authority);
   RUN_TEST(test_shadow_geo_delta_wraps_international_date_line);
+  RUN_TEST(test_shadow_navigation_rejects_invalid_fix_and_waypoint_coordinates);
   return UNITY_END();
 }

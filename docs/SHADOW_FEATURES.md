@@ -92,3 +92,12 @@ shortest-path wrapping across the international date line before converting to
 local north/east meters. This avoids signed 32-bit overflow at the
 +180/-180-degree boundary and keeps the diagnostic vector local rather than
 accidentally spanning nearly a full Earth circumference.
+
+
+## GPS qualification
+
+Shadow horizontal navigation now requires a fresh GPS solution, an accepted
+2D-or-better fix type, and latitude/longitude inside the physical WGS-84
+degree bounds before capturing or using a position. Diagnostic waypoints
+outside ±90 degrees latitude or ±180 degrees longitude are rejected rather
+than being propagated into navigation math.

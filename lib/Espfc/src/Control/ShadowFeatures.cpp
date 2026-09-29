@@ -28,6 +28,38 @@ float safeInput(const Model& model, size_t axis)
   return std::isfinite(value) ? std::clamp(value, -1.0f, 1.0f) : 0.0f;
 }
 
+bool coordinateValid(
+    int32_t lat,
+    int32_t lon)
+{
+  constexpr int32_t LAT_LIMIT_E7 =
+      900000000;
+
+  constexpr int32_t LON_LIMIT_E7 =
+      1800000000;
+
+  return
+      lat >= -LAT_LIMIT_E7 &&
+      lat <= LAT_LIMIT_E7 &&
+      lon >= -LON_LIMIT_E7 &&
+      lon <= LON_LIMIT_E7;
+}
+
+bool gpsPositionUsable(
+    const Model& model)
+{
+  const auto& gps =
+      model.state.gps;
+
+  return
+      gps.solutionFresh &&
+      gps.fix &&
+      gps.fixType >= 2 &&
+      coordinateValid(
+          gps.location.raw.lat,
+          gps.location.raw.lon);
+}
+
 } // namespace
 
 int ShadowFeatures::begin()
@@ -215,12 +247,35 @@ void ShadowFeatures::setWaypoint(
     int32_t lon,
     uint8_t index)
 {
-  auto& shadow = _model.state.shadow;
-  shadow.waypointLocation.lat = lat;
-  shadow.waypointLocation.lon = lon;
-  shadow.waypointLocation.height = 0;
-  shadow.waypointLocationValid = true;
-  shadow.waypointIndex = index;
+  auto& shadow =
+      _model.state.shadow;
+
+  if (!coordinateValid(
+          lat,
+          lon))
+  {
+    shadow.waypointLocation = {};
+    shadow.waypointLocationValid =
+        false;
+    shadow.waypointIndex =
+        0;
+    return;
+  }
+
+  shadow.waypointLocation.lat =
+      lat;
+
+  shadow.waypointLocation.lon =
+      lon;
+
+  shadow.waypointLocation.height =
+      0;
+
+  shadow.waypointLocationValid =
+      true;
+
+  shadow.waypointIndex =
+      index;
 }
 
 void ShadowFeatures::clearWaypoint()
@@ -472,12 +527,15 @@ void ShadowFeatures::updateNavigation()
       _model.isModeActive(
           MODE_WAYPOINT_SHADOW);
 
+  const bool positionUsable =
+      gpsPositionUsable(
+          _model);
+
   if (posHold &&
       (!shadow.holdLocationValid ||
        _model.hasChanged(
            MODE_POSHOLD_SHADOW)) &&
-      _model.state.gps.solutionFresh &&
-      _model.state.gps.fix)
+      positionUsable)
   {
     shadow.holdLocation =
         _model.state.gps.location.raw;
@@ -550,8 +608,10 @@ void ShadowFeatures::updateNavigation()
   }
 
   if (!targetValid ||
-      !_model.state.gps.solutionFresh ||
-      !_model.state.gps.fix)
+      !positionUsable ||
+      !coordinateValid(
+          target.lat,
+          target.lon))
   {
     shadow.targetNorthM = 0.0f;
     shadow.targetEastM = 0.0f;
