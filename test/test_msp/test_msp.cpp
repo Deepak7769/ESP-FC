@@ -593,6 +593,64 @@ void test_msp_box_names_and_ids_cover_every_declared_mode()
   }
 }
 
+
+void test_msp2_text_build_metadata_is_read_only()
+{
+  Model model;
+  MspProcessor processor(model);
+  MspTestStream stream;
+
+  MspMessage releaseGet;
+  releaseGet.cmd =
+      MSP2_GET_TEXT;
+
+  const uint8_t releaseType =
+      MSP2TEXT_RELEASENAME;
+
+  releaseGet.append(
+      &releaseType,
+      1);
+
+  MspResponse releaseResponse;
+  processor.processCommand(
+      releaseGet,
+      releaseResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      MSP2TEXT_RELEASENAME,
+      releaseResponse.data[0]);
+
+  TEST_ASSERT_GREATER_THAN_UINT8(
+      0,
+      releaseResponse.data[1]);
+
+  MspMessage buildSet;
+  buildSet.cmd =
+      MSP2_SET_TEXT;
+
+  const uint8_t buildPayload[] = {
+      MSP2TEXT_BUILDKEY,
+      3,
+      'B',
+      'A',
+      'D'};
+
+  buildSet.append(
+      buildPayload,
+      sizeof(buildPayload));
+
+  MspResponse setResponse;
+  processor.processCommand(
+      buildSet,
+      setResponse,
+      stream);
+
+  TEST_ASSERT_EQUAL_INT8(
+      -1,
+      setResponse.result);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -612,5 +670,6 @@ int main(int argc, char** argv)
   RUN_TEST(test_msp_set_mode_range_rejects_invalid_shadow_or_link_ids);
   RUN_TEST(test_msp2_set_text_rejects_truncated_craft_name_without_erasing_it);
   RUN_TEST(test_msp_box_names_and_ids_cover_every_declared_mode);
+  RUN_TEST(test_msp2_text_build_metadata_is_read_only);
   return UNITY_END();
 }

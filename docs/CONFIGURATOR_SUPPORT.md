@@ -148,8 +148,9 @@ hardware implementation.
   hardware RTC.
 - Normal firmware reboot is supported. Reboot-to-bootloader remains target/
   bootloader dependent and is not falsely acknowledged.
-- Craft name is implemented. Other Betaflight text slots are not treated as
-  active subsystems merely because the protocol defines them.
+- Craft name is implemented and writable. Build key and release name are
+  exposed as read-only firmware metadata. Unsupported text slots are rejected
+  on write instead of falsely acknowledging a value that cannot be preserved.
 - Debug-menu names are not capability declarations; a debug selection is
   meaningful only when ESP-FC has a producer for it.
 

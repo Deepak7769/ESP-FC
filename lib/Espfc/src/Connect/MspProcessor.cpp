@@ -422,10 +422,32 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       switch (textType)
       {
         case MSP2TEXT_CRAFT_NAME:
-          r.writePString(_model.config.modelName);
+          r.writePString(
+              _model.config.modelName);
           break;
+
+        case MSP2TEXT_BUILDKEY: {
+          char revision[
+              GIT_SHORT_REVISION_LENGTH + 1] = {};
+
+          std::copy_n(
+              shortGitRevision,
+              GIT_SHORT_REVISION_LENGTH,
+              revision);
+
+          r.writePString(
+              revision);
+          break;
+        }
+
+        case MSP2TEXT_RELEASENAME:
+          r.writePString(
+              MSP_FC_VERSION_STRING);
+          break;
+
         default:
-          r.writePString(""); // unsupported text types reported as empty
+          // Empty means the text slot has no backing implementation.
+          r.writePString("");
           break;
       }
       break;
@@ -476,9 +498,11 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       }
       else
       {
-        // Unknown text slots are explicitly unsupported. Consume the complete
-        // validated payload without manufacturing a stored subsystem.
+        // Unknown/read-only text slots are explicitly rejected. Consume the
+        // validated payload so parser state remains deterministic, but do not
+        // acknowledge a save that the firmware cannot preserve.
         m.advance(textLength);
+        r.result = -1;
       }
       break;
     }
