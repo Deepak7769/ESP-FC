@@ -59,6 +59,14 @@ AUTHORITY_DIRS = [
     ROOT / "lib/Espfc/src/Output",
 ]
 
+# A deliberately narrow exception for non-actuating controller validation.
+# These files must retain both compile-time tokens below; their header raises a
+# build error if ACTIVE_TEST is selected without SAFE_BENCH.
+TEST_ONLY_AUTHORITY_FILES = {
+    (ROOT / "lib/Espfc/src/Control/AdvancedModesBench.cpp").resolve(),
+    (ROOT / "lib/Espfc/src/Control/AdvancedModesBench.h").resolve(),
+}
+
 
 def strip_comments(source: str) -> str:
     source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
@@ -131,9 +139,21 @@ def main() -> int:
             ):
                 continue
 
-            code = strip_comments(
-                path.read_text(encoding="utf-8")
-            )
+            raw_source = path.read_text(encoding="utf-8")
+            code = strip_comments(raw_source)
+
+            if path.resolve() in TEST_ONLY_AUTHORITY_FILES:
+                required_tokens = (
+                    "ESPFC_ADVANCED_MODES_ACTIVE_TEST",
+                    "ESPFC_SAFE_BENCH_BUILD",
+                )
+                for token in required_tokens:
+                    if token not in raw_source:
+                        errors.append(
+                            f"{path.relative_to(ROOT)}: "
+                            f"test-only authority file missing {token}"
+                        )
+                continue
 
             for symbol in SHADOW_MODE_SYMBOLS:
                 if symbol in code:
