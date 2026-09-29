@@ -2623,7 +2623,7 @@ constexpr int REQUIRED_PID_BYTES =
       if (!_model.isModeActive(MODE_ARMED)) _model.calibrateMag();
       break;
 
-    case MSP_VTX_CONFIG:
+    case MSP_VTX_CONFIG: {
       if (!_model.state.vtx.active)
       {
         r.writeU8(0);  // vtx type
@@ -2641,23 +2641,28 @@ constexpr int REQUIRED_PID_BYTES =
         r.writeU8(_model.config.vtx.band);           // band
         r.writeU8(_model.config.vtx.channel);        // channel
         r.writeU8(_model.config.vtx.power);          // power
-        r.writeU8(0);                                // status (looks like 1 means pit mode :shrug:)
+        r.writeU8(0);                                // status
         r.writeU16(0);                               // freq
         r.writeU8(1);                                // ready
         r.writeU8(_model.config.vtx.lowPowerDisarm); // low power disarm
       }
-      // 1.42
+
+      // API 1.42+ VTX-table capability summary.
       r.writeU16(0); // pit mode freq
+
       const auto& compatVtx =
           _model.config.compat.vtxTable;
+
       const bool tableAvailable =
           compatVtx.bands > 0 &&
           compatVtx.channels > 0;
+
       r.writeU8(tableAvailable ? 1 : 0);
       r.writeU8(compatVtx.bands);
       r.writeU8(compatVtx.channels);
-      r.writeU8(compatVtx.powerLevels)
+      r.writeU8(compatVtx.powerLevels);
       break;
+    }
 
     case MSP2_GET_VTX_DEVICE_STATUS:
       // Mirror Betaflight's vtxCommonSerializeDeviceStatus() field order for
