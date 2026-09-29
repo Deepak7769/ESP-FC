@@ -100,3 +100,12 @@ Writes that request a different provider, disable fixed auto behavior, or use
 an SBAS mode that cannot be represented by ESP-FC's AUTO/NONE model are now
 rejected rather than acknowledged and then displayed differently on the next
 read.
+
+
+## RTC wire-format compatibility
+
+`MSP_SET_RTC` continues to accept Unix seconds plus milliseconds. The
+corresponding `MSP_RTC` read now follows Betaflight's current wire layout:
+UTC year/month/day/hour/minute/second plus milliseconds. The value remains a
+software timestamp only; `MSP_TX_INFO` still reports hardware RTC support as
+unavailable.

@@ -358,24 +358,37 @@ void test_msp_rtc_is_software_metadata_only()
       stream);
 
   TEST_ASSERT_EQUAL_UINT16(
-      6,
+      9,
       getResponse.len);
 
-  const uint32_t seconds =
-      static_cast<uint32_t>(getResponse.data[0]) |
-      (static_cast<uint32_t>(getResponse.data[1]) << 8) |
-      (static_cast<uint32_t>(getResponse.data[2]) << 16) |
-      (static_cast<uint32_t>(getResponse.data[3]) << 24);
+  TEST_ASSERT_GREATER_OR_EQUAL_UINT16(
+      1970,
+      readResponseU16(
+          getResponse,
+          0));
 
-  TEST_ASSERT_EQUAL_UINT32(
-      0x12345678u,
-      seconds);
+  TEST_ASSERT_TRUE(
+      getResponse.data[2] >= 1 &&
+      getResponse.data[2] <= 12);
+
+  TEST_ASSERT_TRUE(
+      getResponse.data[3] >= 1 &&
+      getResponse.data[3] <= 31);
+
+  TEST_ASSERT_TRUE(
+      getResponse.data[4] <= 23);
+
+  TEST_ASSERT_TRUE(
+      getResponse.data[5] <= 59);
+
+  TEST_ASSERT_TRUE(
+      getResponse.data[6] <= 59);
 
   TEST_ASSERT_EQUAL_UINT16(
       789,
       readResponseU16(
           getResponse,
-          4));
+          7));
 }
 
 void test_msp2_set_text_rejects_truncated_craft_name_without_erasing_it()

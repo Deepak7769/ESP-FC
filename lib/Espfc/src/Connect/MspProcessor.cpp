@@ -235,6 +235,97 @@ static uint8_t fromAccHw(uint8_t dev)
   return dev;
 }
 
+struct MspRtcDateTime
+{
+  uint16_t year;
+  uint8_t month;
+  uint8_t day;
+  uint8_t hour;
+  uint8_t minute;
+  uint8_t second;
+};
+
+static MspRtcDateTime unixSecondsToUtc(uint32_t seconds)
+{
+  const uint32_t days =
+      seconds /
+      86400u;
+
+  const uint32_t secondsOfDay =
+      seconds %
+      86400u;
+
+  // Gregorian civil date conversion adapted from the well-known
+  // civil_from_days arithmetic. Input is non-negative Unix epoch seconds.
+  const int64_t z =
+      static_cast<int64_t>(days) +
+      719468;
+
+  const int64_t era =
+      z /
+      146097;
+
+  const uint32_t doe =
+      static_cast<uint32_t>(
+          z -
+          era * 146097);
+
+  const uint32_t yoe =
+      (doe -
+       doe / 1460 +
+       doe / 36524 -
+       doe / 146096) /
+      365;
+
+  int32_t year =
+      static_cast<int32_t>(
+          yoe +
+          era * 400);
+
+  const uint32_t doy =
+      doe -
+      (365 * yoe +
+       yoe / 4 -
+       yoe / 100);
+
+  const uint32_t mp =
+      (5 * doy + 2) /
+      153;
+
+  const uint8_t day =
+      static_cast<uint8_t>(
+          doy -
+          (153 * mp + 2) / 5 +
+          1);
+
+  const uint8_t month =
+      static_cast<uint8_t>(
+          mp +
+          (mp < 10 ? 3 : -9));
+
+  year +=
+      month <= 2;
+
+  MspRtcDateTime result{};
+  result.year =
+      static_cast<uint16_t>(year);
+  result.month =
+      month;
+  result.day =
+      day;
+  result.hour =
+      static_cast<uint8_t>(
+          secondsOfDay / 3600u);
+  result.minute =
+      static_cast<uint8_t>(
+          (secondsOfDay % 3600u) / 60u);
+  result.second =
+      static_cast<uint8_t>(
+          secondsOfDay % 60u);
+
+  return result;
+}
+
 } // namespace
 
 namespace Espfc::Connect {
@@ -2840,18 +2931,36 @@ constexpr int REQUIRED_PID_BYTES =
       break; // software timestamp only; no hardware RTC is implied
 
     case MSP_RTC:
-      // Configurator round-trip for the software timestamp. Zero means that no
-      // RTC value has been supplied since defaults/load; this still does not
-      // claim a battery-backed hardware clock.
-      r.writeU32(
-          _model.config.compat.rtcValid
-              ? _model.config.compat.rtcSeconds
-              : 0u);
+      // Betaflight's GET layout is civil UTC date/time even though SET uses
+      // Unix seconds + milliseconds. Keep the software timestamp compatible
+      // without claiming a battery-backed RTC.
+      if (_model.config.compat.rtcValid)
+      {
+        const auto dt =
+            unixSecondsToUtc(
+                _model.config.compat.rtcSeconds);
 
-      r.writeU16(
-          _model.config.compat.rtcValid
-              ? _model.config.compat.rtcMillis
-              : 0u);
+        r.writeU16(
+            dt.year);
+
+        r.writeU8(
+            dt.month);
+
+        r.writeU8(
+            dt.day);
+
+        r.writeU8(
+            dt.hour);
+
+        r.writeU8(
+            dt.minute);
+
+        r.writeU8(
+            dt.second);
+
+        r.writeU16(
+            _model.config.compat.rtcMillis);
+      }
       break;
 
     // Explicitly unsupported Configurator subsystems. Keep these cases named
