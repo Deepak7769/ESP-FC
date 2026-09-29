@@ -42,6 +42,23 @@ FORBIDDEN_INCLUDES = [
     "Output/Output",
 ]
 
+SHADOW_MODE_SYMBOLS = [
+    "MODE_HORIZON_SHADOW",
+    "MODE_GPS_RESCUE_SHADOW",
+    "MODE_POSHOLD_SHADOW",
+    "MODE_HEADFREE_SHADOW",
+    "MODE_ACRO_TRAINER_SHADOW",
+    "MODE_WAYPOINT_SHADOW",
+]
+
+# These directories own actuator/control authority. Shadow mode identifiers
+# must never be consumed there. Actuator.cpp remains generic: it evaluates
+# configured mode rows but has no shadow-specific behavior.
+AUTHORITY_DIRS = [
+    ROOT / "lib/Espfc/src/Control",
+    ROOT / "lib/Espfc/src/Output",
+]
+
 
 def strip_comments(source: str) -> str:
     source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
@@ -96,6 +113,40 @@ def main() -> int:
                     f"{path.relative_to(ROOT)}:{line}: "
                     f"forbidden control/output include {include}"
                 )
+
+    shadow_paths = {
+        path.resolve()
+        for path in FILES
+    }
+
+    for directory in AUTHORITY_DIRS:
+        if not directory.exists():
+            continue
+
+        for path in directory.rglob("*"):
+            if (
+                not path.is_file()
+                or path.suffix not in {".h", ".hpp", ".c", ".cpp"}
+                or path.resolve() in shadow_paths
+            ):
+                continue
+
+            code = strip_comments(
+                path.read_text(encoding="utf-8")
+            )
+
+            for symbol in SHADOW_MODE_SYMBOLS:
+                if symbol in code:
+                    line = code.count(
+                        "\n",
+                        0,
+                        code.index(symbol),
+                    ) + 1
+
+                    errors.append(
+                        f"{path.relative_to(ROOT)}:{line}: "
+                        f"shadow mode consumed by authority code: {symbol}"
+                    )
 
     if errors:
         print("Shadow authority boundary violation(s):", file=sys.stderr)
