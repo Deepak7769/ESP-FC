@@ -101,3 +101,12 @@ Shadow horizontal navigation now requires a fresh GPS solution, an accepted
 degree bounds before capturing or using a position. Diagnostic waypoints
 outside ±90 degrees latitude or ±180 degrees longitude are rejected rather
 than being propagated into navigation math.
+
+
+## CI authority guard
+
+In addition to runtime regression tests, CI runs
+`tools/check_shadow_authority.py`. The check rejects direct assignments from
+the shadow subsystem into setpoints, PID state, Angle V2, Assisted V2,
+failsafe, mixer or output state; it also rejects authority-changing Model
+calls and direct control/output includes. Debug telemetry remains permitted.

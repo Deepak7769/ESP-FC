@@ -25,6 +25,8 @@ jobs:
           python-version: '3.12'
       - name: Install Dependencies
         run: python -m pip install --upgrade "platformio==6.2.0"
+      - name: Enforce shadow authority boundary
+        run: python tools/check_shadow_authority.py
       - name: Run PlatformIO Tests
         run: |
           platformio test -e native
