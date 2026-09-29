@@ -34,6 +34,8 @@ In this repository you can find firmware code that allows you to build your own 
  * [CLI Commands](/docs/cli.md)
  * [MSP Companion Current Meter](/docs/MSP_CURRENT_METER.md)
  * [Assisted V2 integration and validation status](/docs/ASSISTED_V2_INTEGRATION.md)
+ * [Configurator compatibility matrix](/docs/CONFIGURATOR_SUPPORT.md)
+ * [Non-actuating shadow features](/docs/SHADOW_FEATURES.md)
  * [WIFI and ESP-NOW Receiver](/docs/wireless.md)
 
 Join our **[Discord Channel](https://discord.gg/jhyPPM5UEH)** to get help
@@ -45,7 +47,7 @@ The current Assisted V2 implementation is treated as **software-validated** in t
 * **ANGLE V2** — implemented and covered by native/controller regression tests.
 * **ALTHOLD V2** — implemented, including centered-stick handling, estimator health gates, bumpless controller entry, and vertical PID ownership tests.
 * **Failsafe LAND V2** — implemented, including supervisor authorization, estimator-fault fallback, touchdown dwell/hysteresis, timeout termination, and receiver-recovery behavior tests.
-* **Anti-Gravity** — feature/mode/MSP/configuration path and transient detector are implemented and regression-tested; rate-PID authority is limited to `ESPFC_SAFE_BENCH_BUILD` validation firmware, while the standard motor-driving firmware remains diagnostic-only.
+* **Anti-Gravity** — feature/mode/MSP/configuration and controller paths are compiled in the standard ESP32 target and regression-tested. This is software validation only; known gain-unit and aircraft-validation items remain documented in the project issue register.
 * **MSP current meter / INA219 companion path** — implemented with freshness timeout, source sanitization, one-way companion push, and regression coverage.
 
 The corresponding native tests and ESP32 Assisted V2 validation targets are part of the automated test/build workflow.
@@ -85,7 +87,7 @@ After flashing you need to configure few things first:
  4. Have fun ;)
 
 > [!NOTE]
-> Not all functions displayed in configurator are avalable in firmware. The rule of thumb is if you cannot change specific option in Betaflight Configurator, that means it is not supported. It usually rolls back to previous value after save. It is strongly recommended to follow [setup guide](/docs/setup.md).
+> Betaflight Configurator exposes a larger feature surface than ESP-FC. Some fields are active, some are non-actuating shadow calculations, some are stored only for compatibility, and some require hardware/runtime subsystems that ESP-FC does not provide. See the [Configurator compatibility matrix](/docs/CONFIGURATOR_SUPPORT.md) rather than inferring support from whether a value remains visible after save.
 
 ## Wiring diagrams
 
@@ -108,7 +110,7 @@ After flashing you need to configure few things first:
  * Magnetometers: HMC5883, QMC5883, AK8963, QMC5883P
  * Receivers: PPM, SBUS, IBUS, CRSF/ELRS
  * Esc Protocols: PWM, BRUSHED, ONESHOT125, ONESHOT42, MULTISHOT, DSHOT150, DSHOT300, DSHOT600
- * GPS: M8, M9, F9 & M10(dual band, all constellations configurable by cli)
+ * GPS: u-blox M6/NEO-6M sensing path plus M8, M9, F9 and M10 families; receiver capabilities differ by generation
  * Other protocols: MSP, CLI, BLACKBOX, ESPNOW
  * Battery current: ADC or MSP companion telemetry (including INA219 on a companion processor)
 
@@ -125,7 +127,7 @@ You can also join our [Discord Channel](https://discord.gg/jhyPPM5UEH)
 
 ## Todo
 
-* GPS Navigation
+* GPS Navigation actuator authority (current Horizon/RTH/POSHOLD/waypoint work is non-actuating shadow/diagnostic only)
 * MS5611 barometer
 * Balancing robot controller
 
