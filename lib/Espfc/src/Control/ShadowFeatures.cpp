@@ -226,20 +226,60 @@ void ShadowFeatures::geoDeltaMeters(
       1.0e-7 *
       DEG_TO_RAD_D;
 
-  const double meanLat =
-      0.5 *
-      (lat0 + lat1);
+  // Great-circle distance + initial bearing keeps the diagnostic N/E vector
+  // well behaved for long baselines, high latitudes and date-line crossings.
+  // This remains a shadow-only navigation measurement: it is never converted
+  // into attitude, thrust or mixer authority.
+  const double sinHalfLat =
+      std::sin(
+          0.5 * dLat);
+
+  const double sinHalfLon =
+      std::sin(
+          0.5 * dLon);
+
+  const double haversine =
+      std::clamp(
+          sinHalfLat * sinHalfLat +
+              std::cos(lat0) *
+                  std::cos(lat1) *
+                  sinHalfLon *
+                  sinHalfLon,
+          0.0,
+          1.0);
+
+  const double centralAngle =
+      2.0 *
+      std::atan2(
+          std::sqrt(haversine),
+          std::sqrt(
+              std::max(
+                  0.0,
+                  1.0 - haversine)));
+
+  const double distance =
+      EARTH_RADIUS_M_D *
+      centralAngle;
+
+  const double bearing =
+      std::atan2(
+          std::sin(dLon) *
+              std::cos(lat1),
+          std::cos(lat0) *
+                  std::sin(lat1) -
+              std::sin(lat0) *
+                  std::cos(lat1) *
+                  std::cos(dLon));
 
   northM =
       static_cast<float>(
-          dLat *
-          EARTH_RADIUS_M_D);
+          distance *
+          std::cos(bearing));
 
   eastM =
       static_cast<float>(
-          dLon *
-          std::cos(meanLat) *
-          EARTH_RADIUS_M_D);
+          distance *
+          std::sin(bearing));
 }
 
 void ShadowFeatures::setWaypoint(

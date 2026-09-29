@@ -8475,6 +8475,40 @@ void test_shadow_navigation_rejects_invalid_fix_and_waypoint_coordinates()
       0.0f);
 }
 
+
+void test_shadow_geo_delta_global_baseline_is_finite()
+{
+  float north = 0.0f;
+  float east = 0.0f;
+
+  Control::ShadowFeatures::geoDeltaMeters(
+      850000000,
+      1700000000,
+      850000000,
+      -1700000000,
+      north,
+      east);
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(north));
+
+  TEST_ASSERT_TRUE(
+      std::isfinite(east));
+
+  const float distance =
+      std::hypot(
+          north,
+          east);
+
+  TEST_ASSERT_TRUE(
+      distance >
+      100000.0f);
+
+  TEST_ASSERT_TRUE(
+      distance <
+      300000.0f);
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
@@ -8730,5 +8764,6 @@ RUN_TEST(
   RUN_TEST(test_shadow_gps_navigation_has_no_control_authority);
   RUN_TEST(test_shadow_geo_delta_wraps_international_date_line);
   RUN_TEST(test_shadow_navigation_rejects_invalid_fix_and_waypoint_coordinates);
+  RUN_TEST(test_shadow_geo_delta_global_baseline_is_finite);
   return UNITY_END();
 }

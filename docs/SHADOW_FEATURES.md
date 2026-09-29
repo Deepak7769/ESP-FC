@@ -122,3 +122,9 @@ regressions and future diagnostic integrations. There is currently no
 Configurator mission-upload protocol, persistent mission store, path planner,
 or autonomous waypoint executor. The visible WAYPOINT SHADOW mode therefore
 does not imply a working mission system.
+
+
+Global shadow-navigation deltas now use great-circle distance and initial
+bearing, then project that diagnostic vector into local north/east components.
+The calculation remains non-actuating but no longer relies on a short-baseline
+flat-Earth approximation for high-latitude or long-distance targets.
