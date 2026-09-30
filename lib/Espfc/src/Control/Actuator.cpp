@@ -763,24 +763,6 @@ const bool altHoldHealthy =
 
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE) || \
     defined(ESPFC_LAND_V2_ACTIVE)
-  // If the pilot explicitly requests AltHold, do not allow an ARM transition
-  // without a trustworthy vertical estimate. Likewise, an AUTO_LAND
-  // failsafe configuration is only meaningful when the aircraft is armed
-  // with a healthy altitude estimator.
-  const bool assistedAltitudeRequired =
-      altHoldRequested
-#if defined(ESPFC_LAND_V2_ACTIVE)
-      ||
-      (_model.config.failsafe.procedure ==
-           FAILSAFE_PROCEDURE_AUTO_LAND &&
-       (newMask &
-        (uint32_t{1} << MODE_ARMED)))
-#endif
-      ;
-
-  const bool altHoldWasActive =
-      _model.isModeActive(
-          MODE_ALTHOLD);
 
   const bool altHoldPilotValid =
       !altHoldRequested ||
@@ -791,26 +773,25 @@ const bool altHoldHealthy =
   // is the intended climb/descent command and must not be treated as a fault.
   const bool altHoldEntryUnsafe =
       altHoldRequested &&
-      !altHoldWasActive &&
+      !_model.isModeActive(
+          MODE_ALTHOLD) &&
       !altHoldPilotStickCentered(
           _model);
 
-  _model.setArmingDisabled(
-      ARMING_DISABLED_ALTHOLD,
-      (assistedAltitudeRequired &&
-       !altHoldHealthy) ||
-      !altHoldPilotValid ||
-      altHoldEntryUnsafe);
+  // AltHold is a MODE condition, not an arming-disable condition.
+  // Runtime health/entry validation is handled by canActivateMode(MODE_ALTHOLD)
+  // and the AltHold fault latch below.
+  (void)altHoldPilotValid;
+  (void)altHoldEntryUnsafe;
+
 #else
+
   constexpr bool altHoldPilotValid =
       true;
 
-  _model.setArmingDisabled(
-      ARMING_DISABLED_ALTHOLD,
-      false);
+  (void)altHoldPilotValid;
+
 #endif
-
-
   // -----------------------------------------------------
   // ANGLE fault latch
   // -----------------------------------------------------
