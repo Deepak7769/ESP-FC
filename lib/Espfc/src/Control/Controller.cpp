@@ -68,8 +68,10 @@ int Controller::begin()
   reload(MODEL_CHANGE_FILTER);
   reload(MODEL_CHANGE_PID);
 
-_angleV2WasActive =
-    false;
+_landWasActive = false;
+_manualHandoff = false;
+_model.state.output.managedThrust = false;
+_angleV2WasActive = false;
 
 _altHoldWasActive =
     false;
@@ -549,6 +551,7 @@ const bool altHoldV2OutputActive =
     (_model.isModeActive(MODE_ALTHOLD) ||
      landingV2Requested);
 #else
+constexpr bool landingV2Requested = false;
 constexpr bool altHoldV2OutputActive =
     false;
 #endif
@@ -560,8 +563,10 @@ const bool legacyAltHoldActive =
 auto& verticalPid =
     innerPid[AXIS_THRUST];
 
+output.managedThrust = altHoldV2OutputActive || landingV2Requested;
 if (altHoldV2OutputActive)
 {
+  _manualHandoff = false;
   if (!_altHoldV2OutputWasActive)
   {
     // --------------------------------------------------
@@ -676,9 +681,31 @@ else
           verticalPid.iLimitLow,
           verticalPid.iLimitHigh);
 
-  output.ch[AXIS_THRUST] =
-      setpoint.rate[
-          AXIS_THRUST];
+  const float manualThrust = setpoint.rate[AXIS_THRUST];
+  if (!_model.isModeActive(MODE_ARMED) || landingV2Requested)
+  {
+    _manualHandoff = false;
+  }
+  else if (_altHoldV2OutputWasActive)
+  {
+    _manualHandoff = true;
+    _handoffStartUs = _assistedLastUpdateUs;
+    _handoffThrust = output.ch[AXIS_THRUST];
+  }
+
+  output.ch[AXIS_THRUST] = manualThrust;
+  if (_manualHandoff)
+  {
+    constexpr uint32_t HANDOFF_US = 500000;
+    const uint32_t elapsed = _assistedLastUpdateUs - _handoffStartUs;
+    _manualHandoff = elapsed < HANDOFF_US;
+    if (_manualHandoff)
+    {
+      const float fraction = static_cast<float>(elapsed) / HANDOFF_US;
+      output.ch[AXIS_THRUST] = _handoffThrust + fraction * (manualThrust - _handoffThrust);
+      output.managedThrust = true;
+    }
+  }
 
   _altHoldV2OutputWasActive =
       false;
@@ -1386,16 +1413,14 @@ const bool altActive =
           ? LAND_DESCENT_RATE_MS
           : calculatePilotClimbRate();
 
-  if (altActive &&
-      !_altHoldWasActive)
+  if (altActive && (!_altHoldWasActive || (landingV2Requested && !_landWasActive)))
   {
     // Capture current estimated altitude.
     _altHoldAltitudeTarget =
         altitude.height;
 
     // Begin from current vertical velocity.
-    _altHoldVerticalRateTarget =
-        altitude.vario;
+    _altHoldVerticalRateTarget = landingV2Requested ? std::min(altitude.vario, 0.f) : altitude.vario;
 
     assisted.altitudeTargetValid =
         true;
@@ -1468,7 +1493,7 @@ const bool altActive =
             pilotVz +
                 velocityCorrection,
             -MAX_DESCENT_MS,
-            MAX_CLIMB_MS);
+            landingV2Requested ? 0.f : MAX_CLIMB_MS);
 
     // Smooth vertical acceleration.
     constexpr float VERTICAL_ACCEL_LIMIT_MSS =
@@ -1524,8 +1549,8 @@ const bool altActive =
   assisted.altitudeActive =
       altActive;
 
-  _altHoldWasActive =
-      altActive;
+  _altHoldWasActive = altActive;
+  _landWasActive = altActive && landingV2Requested;
 
 
   // =====================================================

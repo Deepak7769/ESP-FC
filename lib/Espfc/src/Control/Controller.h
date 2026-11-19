@@ -50,6 +50,10 @@ private:
 
   // AltHold V2 transition state.
   bool _altHoldWasActive = false;
+  bool _landWasActive = false;
+  bool _manualHandoff = false;
+  uint32_t _handoffStartUs = 0;
+  float _handoffThrust = 0.f;
 
   // Tracks ownership of thrust output so AltHold V2
   // can enter without a thrust discontinuity.

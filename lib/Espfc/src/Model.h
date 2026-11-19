@@ -190,19 +190,6 @@ class Model
       return state.mode.armingDisabledFlags & flag;
     }
 
-void setOutputSaturated(bool val)
-{
-  state.output.saturated = val;
-
-for(size_t i = 0; i < AXIS_COUNT_RPY; i++)
-{
-  state.innerPid[i].outputSaturated = val;
-}
-
-  // Prevent vertical I-term accumulation while the mixer
-  // has no additional actuator authority.
-  state.innerPid[AXIS_THRUST].outputSaturated = val;
-}
     bool areMotorsRunning() const
     {
       size_t count = state.currentMixer.count;

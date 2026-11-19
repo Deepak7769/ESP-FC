@@ -9,7 +9,7 @@ Pid::Pid()
     : rate(1.0f), dt(1.0f), Kp(0.1), Ki(0.f), Kd(0.f), Kf(0.0f), iLimitLow(-0.3f), iLimitHigh(0.3f), iReset(0.0f),
       oLimitLow(-1.f), oLimitHigh(1.f), pScale(1.f), iScale(1.f), dScale(1.f), fScale(1.f), error(0.f), iTermError(0.f),
       pTerm(0.f), iTerm(0.f), dTerm(0.f), fTerm(0.f), prevMeasurement(0.f), prevError(0.f), prevSetpoint(0.f),
-      ftermDerivative(true), outputSaturated(false), itermRelax(ITERM_RELAX_OFF), itermRelaxFactor(1.0f),
+      ftermDerivative(true), itermRelax(ITERM_RELAX_OFF), itermRelaxFactor(1.0f),
       itermRelaxBase(0.f)
 {
 }
@@ -60,7 +60,7 @@ float FAST_CODE_ATTR Pid::update(
 
   if (effectiveIGain > 0.f)
   {
-    if (!outputSaturated)
+    if (!(iTermError > 0.f && blockPositiveI) && !(iTermError < 0.f && blockNegativeI))
     {
       // I-term relax
       if (itermRelax)

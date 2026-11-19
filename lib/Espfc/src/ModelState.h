@@ -280,6 +280,7 @@ struct OutputState
   int16_t us[OUTPUT_CHANNELS];
   int16_t disarmed[OUTPUT_CHANNELS];
   bool saturated;
+  bool managedThrust = false; // Assisted output or its handoff to manual throttle.
   OutputTelemetryState telemetry;
 };
 

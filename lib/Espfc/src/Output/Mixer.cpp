@@ -336,6 +336,8 @@ void FAST_CODE_ATTR Mixer::updateMixer(const MixerConfig& mixer, float* outputs)
   }
 
   bool saturated = false;
+  bool upper[OUTPUT_CHANNELS] = {};
+  bool lower[OUTPUT_CHANNELS] = {};
 
   for (size_t i = 0; i < mixerCount; i++)
   {
@@ -354,6 +356,8 @@ void FAST_CODE_ATTR Mixer::updateMixer(const MixerConfig& mixer, float* outputs)
         const bool limited =
            std::fabs(limitedOutput - rawOutput) > 0.0001f;
 
+        upper[i] = upperSaturation || limitedOutput < rawOutput - 0.0001f;
+        lower[i] = lowerSaturation || limitedOutput > rawOutput + 0.0001f;
         if (upperSaturation || lowerSaturation || limited)
         {
           saturated = true;
@@ -363,7 +367,38 @@ void FAST_CODE_ATTR Mixer::updateMixer(const MixerConfig& mixer, float* outputs)
       outputs[i] = limitedOutput;
     }
 
-  _model.setOutputSaturated(saturated);
+  _model.state.output.saturated = saturated;
+  for (size_t axis = 0; axis < AXIS_COUNT_RPYT; ++axis)
+  {
+    auto& pid = _model.state.innerPid[axis];
+    pid.blockPositiveI = false;
+    pid.blockNegativeI = false;
+  }
+  if (!saturated) return;
+
+  // Sum duplicate rules before deciding which PID direction pushes a
+  // limited motor farther into its stop.
+  int32_t weights[OUTPUT_CHANNELS][AXIS_COUNT_RPYT] = {};
+  for (size_t i = 0; i < MIXER_RULE_MAX; ++i)
+  {
+    const auto& rule = mixer.mixes[i];
+    if (rule.src == MIXER_SOURCE_NULL) break;
+    if (rule.dst < 0 || static_cast<size_t>(rule.dst) >= mixerCount ||
+        rule.src < MIXER_SOURCE_ROLL || rule.src > MIXER_SOURCE_THRUST) continue;
+    weights[rule.dst][rule.src - MIXER_SOURCE_ROLL] += rule.rate;
+  }
+  for (size_t motor = 0; motor < mixerCount; ++motor)
+  {
+    if (!upper[motor] && !lower[motor]) continue;
+    for (size_t axis = 0; axis < AXIS_COUNT_RPYT; ++axis)
+    {
+      int32_t weight = weights[motor][axis];
+      if (axis == AXIS_YAW && !_model.config.mixer.yawReverse) weight = -weight;
+      auto& pid = _model.state.innerPid[axis];
+      pid.blockPositiveI |= (upper[motor] && weight > 0) || (lower[motor] && weight < 0);
+      pid.blockNegativeI |= (upper[motor] && weight < 0) || (lower[motor] && weight > 0);
+    }
+  }
 }
 
 float FAST_CODE_ATTR Mixer::limitThrust(float thrust, ThrottleLimitType type, int8_t limit)
@@ -618,7 +653,7 @@ float inline Mixer::erpmToRpm(float erpm)
 bool Mixer::_stop(void)
 {
   if (!_model.isModeActive(MODE_ARMED)) return true;
-  if (_model.isFeatureActive(FEATURE_MOTOR_STOP) && _model.isThrottleLow()) return true;
+  if (!_model.state.output.managedThrust && _model.isFeatureActive(FEATURE_MOTOR_STOP) && _model.isThrottleLow()) return true;
   return false;
 }
 

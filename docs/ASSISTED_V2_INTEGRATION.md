@@ -51,12 +51,15 @@ The FC applies its own deadband and climb/descent scaling. The transmitter
 should therefore send the raw centered stick rather than another integrated
 or rate-shaped throttle value.
 
+On AltHold exit while armed, manual throttle resumes through a 0.5 s blend
+from the last assisted thrust command. Disarm takes effect immediately.
+
 ## Failsafe LAND ownership
 
 Once Stage-2 AUTO_LAND begins, LAND remains authoritative for that armed flight.
 A recovered receiver is still qualified, but pilot throttle is not handed back
-during the descent. LAND ends only through estimator failure fallback,
-touchdown confirmation, or the bounded LAND timeout, all of which disarm.
+during the descent. Confirmed touchdown and estimator failure trigger disarm.
+An overdue descent sets the LAND fault diagnostic and continues under supervision.
 
 This avoids a thrust discontinuity when the custom transmitter's manual
 throttle channel contains an accumulated value unrelated to the current
@@ -173,8 +176,8 @@ evidence, reduced commanded thrust, and a dwell period. The independent timeout
 uses the same selected descent-rate constant:
 
 ```
-timeout = clamp(entry_height / selected_descent_rate + 10 s, 15 s, 60 s)
+deadline = max(entry_height / selected_descent_rate + 10 s, 15 s)
 ```
 
-If the estimator becomes invalid or the timeout expires, LAND disarms through
-the failsafe path rather than remaining armed indefinitely.
+An expired deadline records a LAND fault while descent and touchdown monitoring
+continue. Estimator failure still triggers failsafe disarm.

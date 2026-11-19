@@ -2830,9 +2830,7 @@ void test_controller_althold_v2_active_path_is_bumpless_and_corrective()
       AXIS_THRUST] =
       ENTRY_THRUST;
 
-  model.updateModes(
-      uint32_t{1} <<
-      MODE_ALTHOLD);
+  model.updateModes((1u << MODE_ARMED) | (1u << MODE_ALTHOLD));
 
   controller.update();
 
@@ -2882,6 +2880,20 @@ void test_controller_althold_v2_active_path_is_bumpless_and_corrective()
       model.state.output.ch[
           AXIS_THRUST] >
       ENTRY_THRUST);
+
+  const float assisted = model.state.output.ch[AXIS_THRUST];
+  model.updateModes(1u << MODE_ARMED);
+  model.state.input.ch[AXIS_THRUST] = -1.f;
+  controller.update();
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f, assisted, model.state.output.ch[AXIS_THRUST]);
+  TEST_ASSERT_TRUE(model.state.output.managedThrust);
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(NOW_US + 250000);
+  controller.update();
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f, (assisted - 1.f) / 2.f, model.state.output.ch[AXIS_THRUST]);
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(NOW_US + 500000);
+  controller.update();
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f, -1.f, model.state.output.ch[AXIS_THRUST]);
+  TEST_ASSERT_FALSE(model.state.output.managedThrust);
 }
 
 void test_controller_althold_v2_low_manual_throttle_preserves_rate_iterm()
@@ -3695,6 +3707,13 @@ void test_controller_land_v2_levels_and_requests_descent()
       AXIS_THRUST] =
       0.30f;
 
+  // Enter LAND from AltHold with an elevated target and upward momentum.
+  model.updateModes((1u << MODE_ARMED) | (1u << MODE_ALTHOLD));
+  model.state.altitude.height = 4.0f;
+  model.state.altitude.vario = 0.4f;
+  controller.update();
+  model.state.altitude.height = 3.0f;
+
   model.state.failsafe.rxEverValid =
       true;
 
@@ -4236,33 +4255,16 @@ void test_failsafe_land_v2_near_ground_hover_does_not_disarm()
           .landingTouchdownCandidate);
 }
 
-void test_failsafe_land_v2_timeout_disarms()
+void test_failsafe_land_v2_timeout_keeps_descent_active()
 {
   ArduinoFakeReset();
 
   constexpr float ENTRY_HEIGHT_M =
-      1.0f;
-
-  constexpr float RAW_TIMEOUT_S =
-      ENTRY_HEIGHT_M /
-          static_cast<float>(
-              ESPFC_LAND_V2_DESCENT_RATE_MS) +
       10.0f;
 
-  constexpr float TIMEOUT_S =
-      RAW_TIMEOUT_S < 15.0f
-          ? 15.0f
-          : (RAW_TIMEOUT_S > 60.0f
-                 ? 60.0f
-                 : RAW_TIMEOUT_S);
-
-  constexpr uint32_t TIMEOUT_US =
-      static_cast<uint32_t>(
-          TIMEOUT_S *
-          1000000.0f);
-
-  constexpr uint32_t NOW_US =
-      70000000;
+  constexpr uint32_t NOW_US = 150000000;
+  constexpr uint32_t EXPECTED_US = static_cast<uint32_t>(
+      (ENTRY_HEIGHT_M / ESPFC_LAND_V2_DESCENT_RATE_MS + 10.0f) * 1000000.f);
 
   When(
       Method(
@@ -4284,7 +4286,7 @@ void test_failsafe_land_v2_timeout_disarms()
       NOW_US;
 
   model.state.altitude.height =
-      0.80f;
+      4.0f;
 
   model.state.altitude.vario =
       -0.40f;
@@ -4295,11 +4297,7 @@ void test_failsafe_land_v2_timeout_disarms()
   model.state.failsafe.landingRequested =
       true;
 
-  // Cross the same bounded timeout that the LAND supervisor derives from
-  // the selected production descent rate.
-  model.state.failsafe.landingRequestedUs =
-      NOW_US -
-      TIMEOUT_US;
+  model.state.failsafe.landingRequestedUs = NOW_US - 60000000;
 
   model.state.failsafe.landingEntryHeight =
       ENTRY_HEIGHT_M;
@@ -4316,11 +4314,16 @@ void test_failsafe_land_v2_timeout_disarms()
 
   actuator.updateFailsafeLand();
 
-  TEST_ASSERT_FALSE(
+  TEST_ASSERT_TRUE(model.isModeActive(MODE_ARMED));
+  TEST_ASSERT_FALSE(model.state.failsafe.landingFault);
+  model.state.failsafe.landingRequestedUs = NOW_US - EXPECTED_US - 1000000;
+  actuator.updateFailsafeLand();
+
+  TEST_ASSERT_TRUE(
       model.isModeActive(
           MODE_ARMED));
 
-  TEST_ASSERT_FALSE(
+  TEST_ASSERT_TRUE(
       model.state.failsafe
           .landingRequested);
 
@@ -4328,12 +4331,10 @@ void test_failsafe_land_v2_timeout_disarms()
       model.state.failsafe
           .landingFault);
 
-  TEST_ASSERT_TRUE(
-      model.state.failsafe
-          .landingOutputBlocked);
+  TEST_ASSERT_FALSE(model.state.failsafe.landingOutputBlocked);
 
   TEST_ASSERT_EQUAL(
-      FC_FAILSAFE_LANDED,
+      FC_FAILSAFE_LANDING,
       model.state.failsafe.phase);
 }
 
@@ -4973,6 +4974,59 @@ void test_actuator_arming_throttle()
   actuator.updateArmingDisabled();
 
   TEST_ASSERT_EQUAL_UINT32(ARMING_DISABLED_THROTTLE, model.state.mode.armingDisabledFlags);
+}
+
+void test_mixer_control_authority_at_motor_limits()
+{
+  Model model;
+  Output::Mixer mixer(model);
+  MixerEntry rules[] = { {MIXER_SOURCE_ROLL, 0, 100}, {MIXER_SOURCE_THRUST, 0, 100}, {} };
+  MixerConfig config(1, rules);
+  float outputs[OUTPUT_CHANNELS] = {};
+  model.state.output.ch[AXIS_ROLL] = 0.5f;
+  model.state.output.ch[AXIS_THRUST] = 0.6f;
+  mixer.updateMixer(config, outputs);
+  auto& roll = model.state.innerPid[AXIS_ROLL];
+  TEST_ASSERT_TRUE(roll.blockPositiveI);
+  TEST_ASSERT_FALSE(roll.blockNegativeI);
+  TEST_ASSERT_FALSE(model.state.innerPid[AXIS_PITCH].blockPositiveI);
+  roll.Ki = 1.f;
+  roll.rate = 100.f;
+  roll.begin();
+  roll.iTerm = 0.1f;
+  roll.update(1.f, 0.f);
+  TEST_ASSERT_FLOAT_WITHIN(0.00001f, 0.1f, roll.iTerm);
+  roll.update(-1.f, 0.f);
+  TEST_ASSERT_TRUE(roll.iTerm < 0.1f);
+  model.state.output.ch[AXIS_THRUST] = 0.f;
+  mixer.updateMixer(config, outputs);
+  TEST_ASSERT_FALSE(roll.blockPositiveI);
+}
+
+void test_motor_stop_respects_assisted_thrust_and_disarm()
+{
+  Model model;
+  Output::Mixer mixer(model);
+  MixerEntry rules[] = { {MIXER_SOURCE_THRUST, 0, 100}, {} };
+  MixerConfig config(1, rules);
+  float outputs[OUTPUT_CHANNELS] = {};
+  model.state.mixer.minThrottle = 1100;
+  model.state.mixer.maxThrottle = 1900;
+  model.state.output.disarmed[0] = 1000;
+  model.state.input.us[AXIS_THRUST] = 1000;
+  model.config.input.minCheck = 1050;
+  model.config.featureMask |= FEATURE_MOTOR_STOP;
+  model.updateModes(1u << MODE_ARMED);
+  model.state.output.managedThrust = true;
+  mixer.writeOutput(config, outputs);
+  TEST_ASSERT_EQUAL(1500, model.state.output.us[0]);
+  model.state.output.managedThrust = false;
+  mixer.writeOutput(config, outputs);
+  TEST_ASSERT_EQUAL(1000, model.state.output.us[0]);
+  model.state.output.managedThrust = true;
+  model.updateModes(0);
+  mixer.writeOutput(config, outputs);
+  TEST_ASSERT_EQUAL(1000, model.state.output.us[0]);
 }
 
 void test_mixer_invalid_custom_entries_are_ignored()
@@ -7968,7 +8022,7 @@ RUN_TEST(
     test_failsafe_land_v2_near_ground_hover_does_not_disarm);
 
 RUN_TEST(
-    test_failsafe_land_v2_timeout_disarms);
+    test_failsafe_land_v2_timeout_keeps_descent_active);
 
 RUN_TEST(
     test_auto_land_arm_request_requires_healthy_altitude_estimator);
@@ -8097,6 +8151,8 @@ RUN_TEST(
 RUN_TEST(
     test_actuator_arming_failsafe);
   RUN_TEST(test_actuator_arming_throttle);
+  RUN_TEST(test_mixer_control_authority_at_motor_limits);
+  RUN_TEST(test_motor_stop_respects_assisted_thrust_and_disarm);
   RUN_TEST(test_mixer_invalid_custom_entries_are_ignored);
   RUN_TEST(test_mixer_invalid_output_count_fails_closed);
   RUN_TEST(test_mixer_throttle_limit_none);

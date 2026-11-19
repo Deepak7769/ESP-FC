@@ -90,7 +90,8 @@ public:
   float prevSetpoint;
 
   bool ftermDerivative;
-  bool outputSaturated;
+  bool blockPositiveI = false;
+  bool blockNegativeI = false;
   int8_t itermRelax;
   float itermRelaxFactor;
   float itermRelaxBase;

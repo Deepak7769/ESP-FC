@@ -1172,53 +1172,12 @@ void Actuator::updateFailsafeLand()
                 failsafe.landingRequestedUs);
 
         // -------------------------------------------------
-        // LAND TERMINATION TIMEOUT
-        //
-        // Touchdown is primarily confirmed from near-ground height + low
-        // vertical speed. A bounded timeout prevents a failed/noisy ground
-        // detector from leaving the aircraft in LAND forever after RX loss.
-        // The timeout scales with the entry height at the selected LAND V2
-        // descent rate, then adds a generous ten-second margin.
-        // -------------------------------------------------
-
-        constexpr float
-            LAND_COMMAND_DESCENT_RATE_MS =
-                static_cast<float>(
-                    ESPFC_LAND_V2_DESCENT_RATE_MS);
-
-        constexpr float
-            LAND_TIMEOUT_MARGIN_S =
-                10.0f;
-
-        constexpr float
-            LAND_TIMEOUT_MIN_S =
-                15.0f;
-
-        constexpr float
-            LAND_TIMEOUT_MAX_S =
-                60.0f;
-
-        const float nonNegativeEntryHeight =
-            std::max(
-                failsafe.landingEntryHeight,
-                0.0f);
-
-        const float landingTimeoutS =
-            std::clamp(
-                nonNegativeEntryHeight /
-                    LAND_COMMAND_DESCENT_RATE_MS +
-                    LAND_TIMEOUT_MARGIN_S,
-                LAND_TIMEOUT_MIN_S,
-                LAND_TIMEOUT_MAX_S);
-
-        const uint32_t landingTimeoutUs =
-            static_cast<uint32_t>(
-                landingTimeoutS *
-                1000000.0f);
-
-        const bool landingTimedOut =
-            landingElapsedUs >=
-            landingTimeoutUs;
+        // Expected descent duration is diagnostic only. Compare in seconds
+        // so long descents do not overflow a microsecond deadline.
+        const float entryHeight = std::max(failsafe.landingEntryHeight, 0.0f);
+        const float expectedSeconds = std::max(
+            15.0f, entryHeight / ESPFC_LAND_V2_DESCENT_RATE_MS + 10.0f);
+        const bool landingTimedOut = landingElapsedUs * 1e-6f >= expectedSeconds;
 
         const float descendedM =
             failsafe.landingEntryHeight -
@@ -1329,39 +1288,11 @@ void Actuator::updateFailsafeLand()
                 touchdownReferenceThrust -
                     TOUCHDOWN_HOLD_THRUST_MARGIN;
 
-        if (landingTimedOut)
-        {
-          failsafe.landingFault =
-              true;
+        // An overdue descent is diagnostic. Only touchdown evidence (or
+        // estimator failure above) can end LAND while it owns thrust.
+        if (landingTimedOut) failsafe.landingFault = true;
 
-          failsafe.landingRequested =
-              false;
-
-          failsafe.landingActive =
-              false;
-
-          failsafe.landingLevelRequested =
-              false;
-
-          failsafe.landingDescentRequested =
-              false;
-
-          failsafe.landingOutputBlocked =
-              true;
-
-          failsafe.landingTouchdownCandidate =
-              false;
-
-          failsafe.landingTouchdownStartedUs =
-              0;
-
-          failsafe.phase =
-              FC_FAILSAFE_LANDED;
-
-          _model.disarm(
-              DISARM_REASON_FAILSAFE);
-        }
-        else if (!failsafe.landingTouchdownCandidate)
+        if (!failsafe.landingTouchdownCandidate)
         {
           if (touchdownEvidence)
           {

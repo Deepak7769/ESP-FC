@@ -743,7 +743,8 @@ void test_pid_init()
   TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.0f, pid.prevError);
   TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.0f, pid.prevSetpoint);
 
-  TEST_ASSERT_FALSE(pid.outputSaturated);
+  TEST_ASSERT_FALSE(pid.blockPositiveI);
+  TEST_ASSERT_FALSE(pid.blockNegativeI);
 
   TEST_ASSERT_EQUAL(0, pid.itermRelax);
   TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.0f, pid.itermRelaxBase);
