@@ -51,6 +51,9 @@ The FC applies its own deadband and climb/descent scaling. The transmitter
 should therefore send the raw centered stick rather than another integrated
 or rate-shaped throttle value.
 
+Arm in manual thrust with the AltHold request off, then select AltHold in flight.
+An active AltHold request blocks arming.
+
 On AltHold exit while armed, manual throttle resumes through a 0.5 s blend
 from the last assisted thrust command. Disarm takes effect immediately.
 
@@ -172,7 +175,10 @@ ESPFC_LAND_V2_DESCENT_RATE_MS = 0.10f
 ```
 
 Touchdown confirmation uses near-ground altitude, low vertical speed, descent
-evidence, reduced commanded thrust, and a dwell period. The independent timeout
+evidence, reduced commanded thrust, and a dwell period. When LAND begins
+near minimum thrust, its vertical integrator can unwind below the usual
+AltHold hover range. The touchdown thrust threshold stops at the mixer's
+lower saturation boundary. The independent timeout
 uses the same selected descent-rate constant:
 
 ```

@@ -48,8 +48,7 @@ bool assistedVerticalControlOwnsThrust(
   #endif
 
   return
-      altHold ||
-      land;
+      model.state.output.managedThrust || altHold || land;
 #else
   (void)model;
   return false;
@@ -341,6 +340,7 @@ else
 
 #if defined(ESPFC_ALTHOLD_V2_ACTIVE)
   const bool altHoldV2Active =
+      _model.isModeActive(MODE_ARMED) &&
       _model.state.assistedMode.altitudeActive &&
       (_model.isModeActive(MODE_ALTHOLD) ||
        landingV2Requested);
@@ -547,6 +547,7 @@ constexpr bool landingV2Requested =
   #endif
 
 const bool altHoldV2OutputActive =
+    _model.isModeActive(MODE_ARMED) &&
     _model.state.assistedMode.altitudeActive &&
     (_model.isModeActive(MODE_ALTHOLD) ||
      landingV2Requested);
@@ -567,6 +568,15 @@ output.managedThrust = altHoldV2OutputActive || landingV2Requested;
 if (altHoldV2OutputActive)
 {
   _manualHandoff = false;
+  // LAND must be able to unwind below the AltHold hover trim once the
+  // aircraft has settled. Keep the usual mixer anti-windup active.
+  const float hoverIntegralFloor = verticalPid.iLimitLow;
+  if (landingV2Requested && std::isfinite(_model.state.failsafe.landingEntryThrust))
+  {
+    const float touchdownFloor = std::max(verticalPid.oLimitLow,
+        _model.state.failsafe.landingEntryThrust - LAND_TOUCHDOWN_THRUST_MARGIN);
+    verticalPid.iLimitLow = std::min(hoverIntegralFloor, touchdownFloor);
+  }
   if (!_altHoldV2OutputWasActive)
   {
     // --------------------------------------------------
@@ -651,6 +661,7 @@ if (altHoldV2OutputActive)
             altitude.vario);
   }
 
+  verticalPid.iLimitLow = hoverIntegralFloor;
   _altHoldV2OutputWasActive =
       true;
 }
@@ -1347,11 +1358,19 @@ if (angleActive)
         axis] +=
         change;
 
-    const float angleError =
+    float angleError =
         angleV2.angleTarget[
             axis] -
         attitude.euler[
             axis];
+
+    // Roll is reported by atan2 on [-pi, pi]. Both endpoints describe
+    // the same orientation, including when the entry target is slewing.
+    if (axis == AXIS_ROLL)
+    {
+      if (angleError > Utils::pi()) angleError -= Utils::twoPi();
+      else if (angleError < -Utils::pi()) angleError += Utils::twoPi();
+    }
 
     const float levelKp =
         baseLevelKp *

@@ -185,6 +185,7 @@ void test_timer_check()
 
 void test_timer_check_micros()
 {
+  ArduinoFakeReset();
   When(Method(ArduinoFake(), micros)).Return(1000, 1500, 2000, 3000, 3999, 4050);
 
   Timer timer;
@@ -368,6 +369,140 @@ void test_controller_rates_limit()
   TEST_ASSERT_FLOAT_WITHIN(0.01f, -2.79f, controller.calculateSetpointRate(AXIS_YAW, 0.5f));
   TEST_ASSERT_FLOAT_WITHIN(0.01f, -6.98f, controller.calculateSetpointRate(AXIS_YAW, 1.0f));
 }
+
+static void prepareTransitionTest(Model& model, Controller& controller)
+{
+  ArduinoFakeReset();
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(1000000u);
+  model.state.gyro.clock = 1000;
+  model.config.gyro.dlpf = GYRO_DLPF_256;
+  model.config.loopSync = 1;
+  model.config.mixerSync = 1;
+  model.begin();
+  controller.begin();
+  setHealthyAssistedEstimatorState(model, 1000000u);
+  model.state.altitude.healthy = true;
+  model.state.input.us[AXIS_THRUST] = 1000;
+  model.state.input.ch[AXIS_THRUST] = -1.f;
+}
+
+void test_angle_roll_wrap_uses_small_corrective_rate()
+{
+  for (float sign : {-1.f, 1.f})
+  {
+    Model model;
+    Controller controller(model);
+    prepareTransitionTest(model, controller);
+    model.updateModes((1u << MODE_ARMED) | (1u << MODE_ANGLE));
+    model.state.attitude.euler.set(AXIS_ROLL, Utils::toRad(sign * 179.f));
+    controller.update();
+    model.state.attitude.euler.set(AXIS_ROLL, Utils::toRad(-sign * 179.f));
+    controller.update();
+    const float rate = Utils::toDeg(model.state.angleV2.rateTarget[AXIS_ROLL]);
+    TEST_ASSERT_TRUE(sign * rate < 0.f);
+    TEST_ASSERT_TRUE(std::fabs(rate) < 20.f);
+  }
+}
+
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
+void test_althold_selected_before_arm_cannot_preload_thrust()
+{
+  Model model;
+  Controller controller(model);
+  prepareTransitionTest(model, controller);
+  Actuator actuator(model);
+  actuator.begin();
+  auto& arm = model.config.conditions[0];
+  arm.id = MODE_ARMED;
+  arm.ch = AXIS_AUX_1;
+  arm.min = 1700;
+  arm.max = 2100;
+  auto& hold = model.config.conditions[1];
+  hold = arm;
+  hold.id = MODE_ALTHOLD;
+  hold.ch = AXIS_AUX_2;
+  model.state.input.channelCount = AXIS_COUNT;
+  model.state.input.us[AXIS_AUX_2] = 1900;
+  actuator.updateModeMask();
+  model.state.input.us[AXIS_AUX_1] = 1900;
+  actuator.updateModeMask();
+  TEST_ASSERT_TRUE(model.getArmingDisabled(ARMING_DISABLED_ALTHOLD));
+  TEST_ASSERT_FALSE(model.isModeActive(MODE_ARMED));
+  for (int cycle = 0; cycle < 5; ++cycle) controller.update();
+  TEST_ASSERT_FALSE(model.state.output.managedThrust);
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, -1.f, model.state.output.ch[AXIS_THRUST]);
+
+  model.state.input.us[AXIS_AUX_1] = 1000;
+  model.state.input.us[AXIS_AUX_2] = 1000;
+  actuator.updateModeMask();
+  model.state.input.us[AXIS_AUX_1] = 1900;
+  actuator.updateModeMask();
+  TEST_ASSERT_TRUE(model.isModeActive(MODE_ARMED));
+  TEST_ASSERT_FALSE(model.isModeActive(MODE_ALTHOLD));
+  controller.update();
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, -1.f, model.state.output.ch[AXIS_THRUST]);
+}
+
+void test_althold_handoff_preserves_roll_trim_until_manual_throttle_returns()
+{
+  Model model;
+  Controller controller(model);
+  prepareTransitionTest(model, controller);
+  model.config.iterm.lowThrottleZeroIterm = true;
+  model.updateModes((1u << MODE_ARMED) | (1u << MODE_ALTHOLD));
+  model.state.output.ch[AXIS_THRUST] = 0.2f;
+  controller.update();
+  model.state.innerPid[AXIS_ROLL].iTerm = 0.2f;
+  model.updateModes(1u << MODE_ARMED);
+  for (uint32_t now : {1000000u, 1250000u, 1499999u})
+  {
+    When(Method(ArduinoFake(), micros)).AlwaysReturn(now);
+    controller.update();
+    TEST_ASSERT_TRUE(model.state.output.managedThrust);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.2f, model.state.innerPid[AXIS_ROLL].iTerm);
+  }
+  When(Method(ArduinoFake(), micros)).AlwaysReturn(1500000u);
+  controller.update();
+  TEST_ASSERT_FALSE(model.state.output.managedThrust);
+  controller.update();
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.f, model.state.innerPid[AXIS_ROLL].iTerm);
+}
+#endif
+
+#if defined(ESPFC_LAND_V2_ACTIVE)
+void test_land_minimum_entry_thrust_disarms_only_after_ground_dwell()
+{
+  Model model;
+  Controller controller(model);
+  prepareTransitionTest(model, controller);
+  Actuator actuator(model);
+  model.updateModes(1u << MODE_ARMED);
+  auto& land = model.state.failsafe;
+  land.phase = FC_FAILSAFE_LANDING;
+  land.rxEverValid = true;
+  land.landingRequested = true;
+  land.landingRequestedUs = 1000000u;
+  land.landingEntryHeight = 2.f;
+  land.landingEntryThrust = -1.f;
+  model.state.output.ch[AXIS_THRUST] = -1.f;
+  for (uint32_t now : {3000000u, 3100000u, 3199000u, 4100000u})
+  {
+    When(Method(ArduinoFake(), micros)).AlwaysReturn(now);
+    setHealthyAssistedEstimatorState(model, now);
+    model.state.altitude.height = now == 3000000u ? 2.f : 0.f;
+    model.state.altitude.vario = 0.f;
+    actuator.updateFailsafeLand();
+    if (now < 4100000u)
+    {
+      TEST_ASSERT_TRUE(model.isModeActive(MODE_ARMED));
+      TEST_ASSERT_EQUAL(now != 3000000u, land.landingTouchdownCandidate);
+      controller.update();
+    }
+  }
+  TEST_ASSERT_FALSE(model.isModeActive(MODE_ARMED));
+  TEST_ASSERT_EQUAL(FC_FAILSAFE_LANDED, land.phase);
+}
+#endif
 
 void test_controller_angle_mode_does_not_latch_fterm_scale()
 {
@@ -3198,8 +3333,7 @@ void test_controller_althold_v2_debug_exposes_vertical_control_chain()
       0.0f;
 
   model.updateModes(
-      uint32_t{1} <<
-      MODE_ALTHOLD);
+      (1u << MODE_ARMED) | (1u << MODE_ALTHOLD));
 
   controller.update();
 
@@ -7917,6 +8051,14 @@ void test_fusion_mode_name_rejects_negative_enum()
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
+  RUN_TEST(test_angle_roll_wrap_uses_small_corrective_rate);
+#if defined(ESPFC_ALTHOLD_V2_ACTIVE)
+  RUN_TEST(test_althold_selected_before_arm_cannot_preload_thrust);
+  RUN_TEST(test_althold_handoff_preserves_roll_trim_until_manual_throttle_returns);
+#endif
+#if defined(ESPFC_LAND_V2_ACTIVE)
+  RUN_TEST(test_land_minimum_entry_thrust_disarms_only_after_ground_dwell);
+#endif
   RUN_TEST(test_timer_rate_100hz);
   RUN_TEST(test_timer_rate_100hz_div2);
   RUN_TEST(test_timer_interval_10ms);

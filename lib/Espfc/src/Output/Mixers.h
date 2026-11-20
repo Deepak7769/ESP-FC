@@ -60,6 +60,9 @@ enum ThrottleLimitType
   THROTTLE_LIMIT_TYPE_MAX,
 };
 
+// Normalized motor command at which the mixer reports lower saturation.
+constexpr float MOTOR_LOW_RAIL = -0.98f;
+
 constexpr size_t MIXER_RULE_MAX = 64;
 
 class MixerEntry

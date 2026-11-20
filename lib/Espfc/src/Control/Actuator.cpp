@@ -253,8 +253,7 @@ bool assistedVerticalControlOwnsThrust(
 #endif
 
   return
-      altHold ||
-      land;
+      model.state.output.managedThrust || altHold || land;
 }
 #endif
 
@@ -795,8 +794,11 @@ const bool altHoldHealthy =
       !altHoldPilotStickCentered(
           _model);
 
+  const bool tryingToArmInAltHold = altHoldRequested &&
+      (newMask & (uint32_t{1} << MODE_ARMED)) && !_model.isModeActive(MODE_ARMED);
   _model.setArmingDisabled(
       ARMING_DISABLED_ALTHOLD,
+      tryingToArmInAltHold ||
       (assistedAltitudeRequired &&
        !altHoldHealthy) ||
       !altHoldPilotValid ||
@@ -1234,10 +1236,6 @@ void Actuator::updateFailsafeLand()
                 configuredHoverThrust,
                 entryThrust);
 
-        constexpr float
-            TOUCHDOWN_THRUST_MARGIN =
-                0.05f;
-
         const float commandedThrust =
             _model.state.output.ch[
                 AXIS_THRUST];
@@ -1246,8 +1244,7 @@ void Actuator::updateFailsafeLand()
             std::isfinite(
                 commandedThrust) &&
             commandedThrust <=
-                touchdownReferenceThrust -
-                    TOUCHDOWN_THRUST_MARGIN;
+                std::max(MOTOR_LOW_RAIL, touchdownReferenceThrust - LAND_TOUCHDOWN_THRUST_MARGIN);
 
         const bool touchdownEvidence =
             landingElapsedUs >=
@@ -1285,8 +1282,7 @@ void Actuator::updateFailsafeLand()
             std::isfinite(
                 commandedThrust) &&
             commandedThrust <=
-                touchdownReferenceThrust -
-                    TOUCHDOWN_HOLD_THRUST_MARGIN;
+                std::max(MOTOR_LOW_RAIL, touchdownReferenceThrust - TOUCHDOWN_HOLD_THRUST_MARGIN);
 
         // An overdue descent is diagnostic. Only touchdown evidence (or
         // estimator failure above) can end LAND while it owns thrust.

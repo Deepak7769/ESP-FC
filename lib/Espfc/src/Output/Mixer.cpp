@@ -351,7 +351,7 @@ void FAST_CODE_ATTR Mixer::updateMixer(const MixerConfig& mixer, float* outputs)
      if (!occ.servo)
      {
         const bool upperSaturation = rawOutput >= 0.98f;
-        const bool lowerSaturation = rawOutput <= -0.98f;
+        const bool lowerSaturation = rawOutput <= MOTOR_LOW_RAIL;
 
         const bool limited =
            std::fabs(limitedOutput - rawOutput) > 0.0001f;

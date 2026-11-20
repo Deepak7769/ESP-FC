@@ -75,3 +75,7 @@
 #ifndef ESPFC_LAND_V2_DESCENT_RATE_MS
 #define ESPFC_LAND_V2_DESCENT_RATE_MS 0.10f
 #endif
+
+namespace Espfc::Control {
+constexpr float LAND_TOUCHDOWN_THRUST_MARGIN = 0.05f;
+}
