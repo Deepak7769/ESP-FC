@@ -2,6 +2,7 @@
 #include <algorithm>
 #include "Device/Baro/BaroBMP085.hpp"
 #include "Device/Baro/BaroMS5611.hpp"
+#include "Device/Baro/BaroLPS.hpp"
 #include "Device/Baro/BaroBMP280.hpp"
 #include "Device/Baro/BaroSPL06.hpp"
 #include "Device/BaroDevice.hpp"
@@ -52,6 +53,7 @@ static Espfc::Device::Mag::MagQMC5883P qmc5883p;
 static Espfc::Device::Mag::MagAK8963 ak8963;
 static Espfc::Device::Baro::BaroBMP085 bmp085;
 static Espfc::Device::Baro::BaroMS5611 ms5611;
+static Espfc::Device::Baro::BaroLPS lps;
 static Espfc::Device::Baro::BaroBMP280 bmp280;
 static Espfc::Device::Baro::BaroSPL06 spl06;
 static bool busAllowed(
@@ -588,6 +590,8 @@ void Hardware::detectBaro()
     }
     if (!detectedBaro && deviceAllowed(configuredDev, BARO_DEFAULT, BARO_MS5611) &&
         detectDevice(ms5611, spiBus, cs)) detectedBaro = &ms5611;
+    if (!detectedBaro && deviceAllowed(configuredDev, BARO_DEFAULT, BARO_LPS) &&
+        detectDevice(lps, spiBus, cs)) detectedBaro = &lps;
   }
 #endif
 
@@ -627,6 +631,8 @@ void Hardware::detectBaro()
     }
     if (!detectedBaro && deviceAllowed(configuredDev, BARO_DEFAULT, BARO_MS5611) &&
         detectDevice(ms5611, i2cBus)) detectedBaro = &ms5611;
+    if (!detectedBaro && deviceAllowed(configuredDev, BARO_DEFAULT, BARO_LPS) &&
+        detectDevice(lps, i2cBus)) detectedBaro = &lps;
   }
 #endif
 

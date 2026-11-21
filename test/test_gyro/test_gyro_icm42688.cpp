@@ -1,6 +1,7 @@
 #include "Device/Baro/BaroBMP280.hpp"
 #include "Device/Baro/BaroBMP085.hpp"
 #include "Device/Baro/BaroMS5611.hpp"
+#include "Device/Baro/BaroLPS.hpp"
 #include "Device/Gyro/GyroICM42688.hpp"
 #include "Device/GyroDevice.hpp"
 #include "Device/Mag/MagHMC5883L.hpp"
@@ -422,6 +423,39 @@ static void test_bmp085_factory_calibration_and_failed_transactions()
   TEST_ASSERT_FALSE(dev.begin(&bus));
 }
 
+static void test_lps_temperature_pressure_and_status()
+{
+  for (uint8_t id : {0xbd, 0xb1, 0xb4})
+  {
+    MockBusDevice bus;
+    BaroLPS dev;
+    bus.readRegs[0x0f] = id;
+    const uint8_t ctrl1 = id == 0xbd ? 0x20 : 0x10;
+    const uint8_t config = id == 0xbd ? 0xc4 : id == 0xb1 ? 0x32 : 0x22;
+    bus.readRegs[ctrl1] = config;
+    TEST_ASSERT_TRUE(dev.begin(&bus, 10));
+    TEST_ASSERT_EQUAL_HEX8(config, bus.writeRegs[ctrl1]);
+    TEST_ASSERT_TRUE(std::isnan(dev.readPressure()));
+    bus.readRegs[0x27] = 3;
+    bus.readRegs[0x28] = 0;
+    bus.readRegs[0x29] = 0x80;
+    bus.readRegs[0x2a] = 0x3e; // 1000 hPa
+    const int16_t temperature = id == 0xbd ? -25200 : -1000;
+    bus.readRegs[0x2b] = static_cast<uint8_t>(temperature);
+    bus.readRegs[0x2c] = static_cast<uint16_t>(temperature) >> 8;
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -10.f, dev.readTemperature());
+    TEST_ASSERT_FLOAT_WITHIN(0.1f, 100000.f, dev.readPressure());
+    bus.failReadReg = 0x29;
+    TEST_ASSERT_TRUE(std::isnan(dev.readPressure()));
+    bus.failReadReg = -1;
+    bus.readRegs[0x27] = 1;
+    TEST_ASSERT_TRUE(std::isnan(dev.readTemperature()));
+    bus.readRegs[ctrl1 + 1] = 4; // reset never completed
+    TEST_ASSERT_FALSE(dev.begin(&bus, 10));
+    TEST_ASSERT_TRUE(std::isnan(dev.readPressure()));
+  }
+}
+
 static void test_ms5611_factory_crc_and_second_order_compensation()
 {
   MockBusDevice bus;
@@ -452,6 +486,7 @@ static void test_ms5611_factory_crc_and_second_order_compensation()
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
+  RUN_TEST(test_lps_temperature_pressure_and_status);
   RUN_TEST(test_bmp085_factory_calibration_and_failed_transactions);
   RUN_TEST(test_ms5611_factory_crc_and_second_order_compensation);
   RUN_TEST(test_whoami_match);
