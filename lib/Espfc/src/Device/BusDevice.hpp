@@ -29,6 +29,12 @@ public:
 
   virtual int8_t read(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8_t* data) = 0;
 
+  // Command-based devices such as MS5611 supply the entire SPI opcode.
+  virtual int8_t readCommand(uint8_t devAddr, uint8_t command, uint8_t length, uint8_t* data)
+  {
+    return read(devAddr, command, length, data);
+  }
+
   virtual int8_t readFast(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8_t* data) = 0;
 
   virtual bool write(uint8_t devAddr, uint8_t regAddr, uint8_t length, const uint8_t* data) = 0;

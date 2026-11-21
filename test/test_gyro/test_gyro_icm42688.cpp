@@ -1,4 +1,6 @@
 #include "Device/Baro/BaroBMP280.hpp"
+#include "Device/Baro/BaroBMP085.hpp"
+#include "Device/Baro/BaroMS5611.hpp"
 #include "Device/Gyro/GyroICM42688.hpp"
 #include "Device/GyroDevice.hpp"
 #include "Device/Mag/MagHMC5883L.hpp"
@@ -381,9 +383,77 @@ void test_name_table()
   TEST_ASSERT_EQUAL_STRING("ICM42688", name);
 }
 
+static void setWord(MockBusDevice& bus, size_t reg, uint16_t value)
+{
+  bus.readRegs[reg] = value >> 8;
+  bus.readRegs[reg + 1] = value;
+}
+
+static void setAdc(MockBusDevice& bus, size_t reg, uint32_t value)
+{
+  bus.readRegs[reg] = value >> 16;
+  setWord(bus, reg + 1, value);
+}
+
+static void test_bmp085_factory_calibration_and_failed_transactions()
+{
+  MockBusDevice bus;
+  BaroBMP085 dev;
+  bus.readRegs[0xd0] = 0x55;
+  const int32_t calibration[] = {408,-72,-14383,32741,32757,23153,6190,4,-32768,-8711,2868};
+  for (unsigned i = 0; i < 11; ++i) setWord(bus,0xaa + 2*i, calibration[i]);
+  TEST_ASSERT_TRUE(dev.begin(&bus));
+  dev.setMode(BARO_MODE_TEMP);
+  setWord(bus,0xf6,27898);
+  TEST_ASSERT_FLOAT_WITHIN(0.01f,15.f,dev.readTemperature());
+  dev.setMode(BARO_MODE_PRESS);
+  setAdc(bus,0xf6,23843u << 8);
+  // The datasheet vector uses OSS=0. At the runtime's OSS=3 the same
+  // sample has three more bits and rounds within a few pascals.
+  TEST_ASSERT_FLOAT_WITHIN(4.f,69964.f,dev.readPressure());
+  bus.failReadReg = 0xf6;
+  TEST_ASSERT_TRUE(std::isnan(dev.readPressure()));
+  dev.setMode(BARO_MODE_TEMP);
+  TEST_ASSERT_TRUE(std::isnan(dev.readTemperature()));
+  bus.failReadReg = -1;
+  dev.setMode(BARO_MODE_PRESS);
+  TEST_ASSERT_TRUE(std::isnan(dev.readPressure()));
+  bus.failReadReg = 0xaa;
+  TEST_ASSERT_FALSE(dev.begin(&bus));
+}
+
+static void test_ms5611_factory_crc_and_second_order_compensation()
+{
+  MockBusDevice bus;
+  BaroMS5611 dev;
+  const uint16_t words[] = {0,40127,36924,23317,23282,33464,28312,0};
+  for (unsigned i = 0; i < 8; ++i) setWord(bus,0xa0 + 2*i,words[i]);
+  TEST_ASSERT_TRUE(dev.begin(&bus,7));
+  struct Sample { uint32_t d2; float celsius; int pascals; };
+  const Sample samples[] = {{8569150,20.07f,100009},{8069150,2.05f,96512},{7369150,-27.10f,90613}};
+  for (const auto& sample : samples)
+  {
+    dev.setMode(BARO_MODE_TEMP);
+    setAdc(bus,0,sample.d2);
+    TEST_ASSERT_FLOAT_WITHIN(0.005f,sample.celsius,dev.readTemperature());
+    dev.setMode(BARO_MODE_PRESS);
+    setAdc(bus,0,9085466);
+    TEST_ASSERT_EQUAL_FLOAT(sample.pascals,dev.readPressure());
+  }
+  bus.failWriteReg = 0x58;
+  dev.setMode(BARO_MODE_TEMP);
+  TEST_ASSERT_TRUE(std::isnan(dev.readTemperature()));
+  dev.setMode(BARO_MODE_PRESS);
+  TEST_ASSERT_TRUE(std::isnan(dev.readPressure()));
+  bus.readRegs[0xaf] = 1; // wrong PROM checksum
+  TEST_ASSERT_FALSE(dev.begin(&bus,7));
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
+  RUN_TEST(test_bmp085_factory_calibration_and_failed_transactions);
+  RUN_TEST(test_ms5611_factory_crc_and_second_order_compensation);
   RUN_TEST(test_whoami_match);
   RUN_TEST(test_whoami_mismatch);
   RUN_TEST(test_chip_id_is_empty_before_connection);

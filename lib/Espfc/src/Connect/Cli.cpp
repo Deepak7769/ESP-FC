@@ -353,7 +353,7 @@ Cli::Cli(Model& model): _model(model), _ignore(false), _active(false), _interact
   _params = initialize(_model.config);
 }
 
-const Cli::Param* Cli::initialize(ModelConfig& c)
+const Cli::Setting* Cli::initialize(ModelConfig& c)
 {
   const char** busDevChoices = Device::BusDevice::getNames();
   const char** gyroDevChoices = Device::GyroDevice::getNames();
@@ -364,8 +364,8 @@ const Cli::Param* Cli::initialize(ModelConfig& c)
   static const char* const* protocolChoices = EscDriver::getProtocolNames();
 
   // clang-format off
-  static const char* gyroDlpfChoices[]   = { "256Hz", "188Hz", "98Hz", "42Hz", "20Hz", "10Hz", "5Hz", "EXPERIMENTAL", nullptr };
-  static const char* debugModeChoices[]  = {  "NONE", "CYCLETIME", "BATTERY", "GYRO_FILTERED", "ACCELEROMETER", "PIDLOOP", "RC_INTERPOLATION",
+  static const char* const gyroDlpfChoices[]   = { "256Hz", "188Hz", "98Hz", "42Hz", "20Hz", "10Hz", "5Hz", "EXPERIMENTAL", nullptr };
+  static const char* const debugModeChoices[]  = {  "NONE", "CYCLETIME", "BATTERY", "GYRO_FILTERED", "ACCELEROMETER", "PIDLOOP", "RC_INTERPOLATION",
                                               "ANGLERATE", "ESC_SENSOR", "SCHEDULER", "STACK", "ESC_SENSOR_RPM", "ESC_SENSOR_TMP", "ALTITUDE", "FFT",
                                               "FFT_TIME", "FFT_FREQ", "RX_FRSKY_SPI", "RX_SFHSS_SPI", "GYRO_RAW", "MULTI_GYRO_RAW", "MULTI_GYRO_DIFF",
                                               "MAX7456_SIGNAL", "MAX7456_SPICLOCK", "SBUS", "FPORT", "RANGEFINDER", "RANGEFINDER_QUALITY", "OPTICALFLOW", "LIDAR_TF",
@@ -380,26 +380,26 @@ const Cli::Param* Cli::initialize(ModelConfig& c)
                                               "CURRENT_ANGLE", "DSHOT_TELEMETRY_COUNTS", "RPM_LIMIT", "RC_STATS", "MAG_CALIB", "MAG_TASK_RATE", "EZLANDING", "TPA",
                                               "S_TERM", "SPA", "TASK", "GIMBAL", "WING_SETPOINT", "CHIRP", "FLASH_TEST_PRBS", "MAVLINK_TELEMETRY",
                                               "AUTOPILOT_PID", "POSITION_NAV", "AUTOPILOT_STOP", "PITOT", nullptr };
-  static const char* filterTypeChoices[] = { "PT1", "BIQUAD", "PT2", "PT3", "NOTCH", "NOTCH_DF1", "BPF", "FO", "FIR2", "MEDIAN3", "NONE", nullptr };
-  static const char* alignChoices[]      = { "DEFAULT", "CW0", "CW90", "CW180", "CW270", "CW0_FLIP", "CW90_FLIP", "CW180_FLIP", "CW270_FLIP", "CUSTOM", nullptr };
-  static const char* mixerTypeChoices[]  = { "NONE", "TRI", "QUADP", "QUADX", "BI",
+  static const char* const filterTypeChoices[] = { "PT1", "BIQUAD", "PT2", "PT3", "NOTCH", "NOTCH_DF1", "BPF", "FO", "FIR2", "MEDIAN3", "NONE", nullptr };
+  static const char* const alignChoices[]      = { "DEFAULT", "CW0", "CW90", "CW180", "CW270", "CW0_FLIP", "CW90_FLIP", "CW180_FLIP", "CW270_FLIP", "CUSTOM", nullptr };
+  static const char* const mixerTypeChoices[]  = { "NONE", "TRI", "QUADP", "QUADX", "BI",
                                               "GIMBAL", "Y6", "HEX6", "FWING", "Y4",
                                               "HEX6X", "OCTOX8", "OCTOFLATP", "OCTOFLATX", "AIRPLANE",
                                               "HELI120", "HELI90", "VTAIL4", "HEX6H", "PPMSERVO",
                                               "DUALCOPTER", "SINGLECOPTER", "ATAIL4", "CUSTOM", "CUSTOMAIRPLANE",
                                               "CUSTOMTRI", "QUADX1234", nullptr };
-  static const char* inputRateTypeChoices[] = { "BETAFLIGHT", "RACEFLIGHT", "KISS", "ACTUAL", "QUICK", nullptr };
-  static const char* throtleLimitTypeChoices[] = { "NONE", "SCALE", "CLIP", nullptr };
-  static const char* inputItermRelaxChoices[] = { "OFF", "RP", "RPY", "RP_INC", "RPY_INC", nullptr };
+  static const char* const inputRateTypeChoices[] = { "BETAFLIGHT", "RACEFLIGHT", "KISS", "ACTUAL", "QUICK", nullptr };
+  static const char* const throtleLimitTypeChoices[] = { "NONE", "SCALE", "CLIP", nullptr };
+  static const char* const inputItermRelaxChoices[] = { "OFF", "RP", "RPY", "RP_INC", "RPY_INC", nullptr };
 
-  static const char* voltageSourceChoices[] = { "NONE", "ADC", "ESC", nullptr };
-  static const char* currentSourceChoices[] = { "NONE", "ADC", "VIRTUAL", "ESC", "MSP", nullptr };
-  static const char* blackboxDevChoices[] = { "NONE", "FLASH", "SD_CARD", "SERIAL", nullptr };
-  static const char* blackboxModeChoices[] = { "NORMAL", "TEST", "ALWAYS", nullptr };
-  static const char* ledTypeChoices[] = { "SIMPLE", "STRIP", nullptr };
-  static const char* simplifiedTunigModeChoices[] = { "OFF", "RP", "RPY", nullptr };
-  static const char* tpaModeChoices[] = { "PD", "D", nullptr };
-static const char*
+  static const char* const voltageSourceChoices[] = { "NONE", "ADC", "ESC", nullptr };
+  static const char* const currentSourceChoices[] = { "NONE", "ADC", "VIRTUAL", "ESC", "MSP", nullptr };
+  static const char* const blackboxDevChoices[] = { "NONE", "FLASH", "SD_CARD", "SERIAL", nullptr };
+  static const char* const blackboxModeChoices[] = { "NORMAL", "TEST", "ALWAYS", nullptr };
+  static const char* const ledTypeChoices[] = { "SIMPLE", "STRIP", nullptr };
+  static const char* const simplifiedTunigModeChoices[] = { "OFF", "RP", "RPY", nullptr };
+  static const char* const tpaModeChoices[] = { "PD", "D", nullptr };
+static const char* const
 failsafeProcedureChoices[] = {
     "AUTO-LAND",
     "DROP",
@@ -407,487 +407,484 @@ failsafeProcedureChoices[] = {
 };
 
   size_t i = 0;
-  static const Param params[] = {
+  static_assert(sizeof(ModelConfig) <= UINT16_MAX, "CLI configuration offsets must fit");
+  const auto setting = [&c](auto... args) -> Setting {
+    const Param param(args...);
+    const auto offset = reinterpret_cast<uintptr_t>(param.addr) - reinterpret_cast<uintptr_t>(&c);
+    return {param.name, param.choices, static_cast<uint16_t>(offset), param.type, param.maxLen};
+  };
+  static const Setting params[] = {
 
-      Param("feature_gps", &c.featureMask, 7),
-      Param("feature_motor_stop", &c.featureMask, 4),
-      Param("feature_rx_ppm", &c.featureMask, 0),
-      Param("feature_rx_serial", &c.featureMask, 3),
-      Param("feature_rx_spi", &c.featureMask, 25),
-      Param("feature_soft_serial", &c.featureMask, 6),
-      Param("feature_telemetry", &c.featureMask, 10),
+      setting("feature_gps", &c.featureMask, 7),
+      setting("feature_motor_stop", &c.featureMask, 4),
+      setting("feature_rx_ppm", &c.featureMask, 0),
+      setting("feature_rx_serial", &c.featureMask, 3),
+      setting("feature_rx_spi", &c.featureMask, 25),
+      setting("feature_soft_serial", &c.featureMask, 6),
+      setting("feature_telemetry", &c.featureMask, 10),
 
-      Param("debug_mode", &c.debug.mode, debugModeChoices),
-      Param("debug_axis", &c.debug.axis),
+      setting("debug_mode", &c.debug.mode, debugModeChoices),
+      setting("debug_axis", &c.debug.axis),
 
-      Param("gyro_bus", &c.gyro.bus, busDevChoices),
-      Param("gyro_dev", &c.gyro.dev, gyroDevChoices),
-      Param("gyro_dlpf", &c.gyro.dlpf, gyroDlpfChoices),
-      Param("gyro_align", &c.gyro.align, alignChoices),
-      Param("gyro_lpf_type", &c.gyro.filter.type, filterTypeChoices),
-      Param("gyro_lpf_freq", &c.gyro.filter.freq),
-      Param("gyro_lpf2_type", &c.gyro.filter2.type, filterTypeChoices),
-      Param("gyro_lpf2_freq", &c.gyro.filter2.freq),
-      Param("gyro_lpf3_type", &c.gyro.filter3.type, filterTypeChoices),
-      Param("gyro_lpf3_freq", &c.gyro.filter3.freq),
-      Param("gyro_notch1_freq", &c.gyro.notch1Filter.freq),
-      Param("gyro_notch1_cutoff", &c.gyro.notch1Filter.cutoff),
-      Param("gyro_notch2_freq", &c.gyro.notch2Filter.freq),
-      Param("gyro_notch2_cutoff", &c.gyro.notch2Filter.cutoff),
-      Param("gyro_dyn_lpf_min", &c.gyro.dynLpfFilter.cutoff),
-      Param("gyro_dyn_lpf_max", &c.gyro.dynLpfFilter.freq),
-      Param("gyro_dyn_notch_count", &c.gyro.dynamicFilter.count),
-      Param("gyro_dyn_notch_q", &c.gyro.dynamicFilter.q),
-      Param("gyro_dyn_notch_min", &c.gyro.dynamicFilter.min_freq),
-      Param("gyro_dyn_notch_max", &c.gyro.dynamicFilter.max_freq),
-      Param("gyro_rpm_harmonics", &c.gyro.rpmFilter.harmonics),
-      Param("gyro_rpm_q", &c.gyro.rpmFilter.q),
-      Param("gyro_rpm_min_freq", &c.gyro.rpmFilter.minFreq),
-      Param("gyro_rpm_fade", &c.gyro.rpmFilter.fade),
-      Param("gyro_rpm_weight_1", &c.gyro.rpmFilter.weights[0]),
-      Param("gyro_rpm_weight_2", &c.gyro.rpmFilter.weights[1]),
-      Param("gyro_rpm_weight_3", &c.gyro.rpmFilter.weights[2]),
-      Param("gyro_rpm_tlm_lpf_freq", &c.gyro.rpmFilter.freqLpf),
-      Param("gyro_offset_x", &c.gyro.bias[0]),
-      Param("gyro_offset_y", &c.gyro.bias[1]),
-      Param("gyro_offset_z", &c.gyro.bias[2]),
+      setting("gyro_bus", &c.gyro.bus, busDevChoices),
+      setting("gyro_dev", &c.gyro.dev, gyroDevChoices),
+      setting("gyro_dlpf", &c.gyro.dlpf, gyroDlpfChoices),
+      setting("gyro_align", &c.gyro.align, alignChoices),
+      setting("gyro_lpf_type", &c.gyro.filter.type, filterTypeChoices),
+      setting("gyro_lpf_freq", &c.gyro.filter.freq),
+      setting("gyro_lpf2_type", &c.gyro.filter2.type, filterTypeChoices),
+      setting("gyro_lpf2_freq", &c.gyro.filter2.freq),
+      setting("gyro_lpf3_type", &c.gyro.filter3.type, filterTypeChoices),
+      setting("gyro_lpf3_freq", &c.gyro.filter3.freq),
+      setting("gyro_notch1_freq", &c.gyro.notch1Filter.freq),
+      setting("gyro_notch1_cutoff", &c.gyro.notch1Filter.cutoff),
+      setting("gyro_notch2_freq", &c.gyro.notch2Filter.freq),
+      setting("gyro_notch2_cutoff", &c.gyro.notch2Filter.cutoff),
+      setting("gyro_dyn_lpf_min", &c.gyro.dynLpfFilter.cutoff),
+      setting("gyro_dyn_lpf_max", &c.gyro.dynLpfFilter.freq),
+      setting("gyro_dyn_notch_count", &c.gyro.dynamicFilter.count),
+      setting("gyro_dyn_notch_q", &c.gyro.dynamicFilter.q),
+      setting("gyro_dyn_notch_min", &c.gyro.dynamicFilter.min_freq),
+      setting("gyro_dyn_notch_max", &c.gyro.dynamicFilter.max_freq),
+      setting("gyro_rpm_harmonics", &c.gyro.rpmFilter.harmonics),
+      setting("gyro_rpm_q", &c.gyro.rpmFilter.q),
+      setting("gyro_rpm_min_freq", &c.gyro.rpmFilter.minFreq),
+      setting("gyro_rpm_fade", &c.gyro.rpmFilter.fade),
+      setting("gyro_rpm_weight_1", &c.gyro.rpmFilter.weights[0]),
+      setting("gyro_rpm_weight_2", &c.gyro.rpmFilter.weights[1]),
+      setting("gyro_rpm_weight_3", &c.gyro.rpmFilter.weights[2]),
+      setting("gyro_rpm_tlm_lpf_freq", &c.gyro.rpmFilter.freqLpf),
+      setting("gyro_offset_x", &c.gyro.bias[0]),
+      setting("gyro_offset_y", &c.gyro.bias[1]),
+      setting("gyro_offset_z", &c.gyro.bias[2]),
 
-      Param("gyro_tuning", &c.simplifiedTuning.gyroFilter),
-      Param("gyro_tuning_gain", &c.simplifiedTuning.gyroFilterMultiplier),
+      setting("gyro_tuning", &c.simplifiedTuning.gyroFilter),
+      setting("gyro_tuning_gain", &c.simplifiedTuning.gyroFilterMultiplier),
 
-      Param("accel_bus", &c.accel.bus, busDevChoices),
-      Param("accel_dev", &c.accel.dev, gyroDevChoices),
-      Param("accel_lpf_type", &c.accel.filter.type, filterTypeChoices),
-      Param("accel_lpf_freq", &c.accel.filter.freq),
-      Param("accel_offset_x", &c.accel.bias[0]),
-      Param("accel_offset_y", &c.accel.bias[1]),
-      Param("accel_offset_z", &c.accel.bias[2]),
-      Param("accel_trim_roll", &c.accel.trim[1]),
-      Param("accel_trim_pitch", &c.accel.trim[0]),
+      setting("accel_bus", &c.accel.bus, busDevChoices),
+      setting("accel_dev", &c.accel.dev, gyroDevChoices),
+      setting("accel_lpf_type", &c.accel.filter.type, filterTypeChoices),
+      setting("accel_lpf_freq", &c.accel.filter.freq),
+      setting("accel_offset_x", &c.accel.bias[0]),
+      setting("accel_offset_y", &c.accel.bias[1]),
+      setting("accel_offset_z", &c.accel.bias[2]),
+      setting("accel_trim_roll", &c.accel.trim[1]),
+      setting("accel_trim_pitch", &c.accel.trim[0]),
 
-      Param("mag_bus", &c.mag.bus, busDevChoices),
-      Param("mag_dev", &c.mag.dev, magDevChoices),
-      Param("mag_align", &c.mag.align, alignChoices),
-      Param("mag_declination", &c.mag.declination),
-      Param("mag_filter_type", &c.mag.filter.type, filterTypeChoices),
-      Param("mag_filter_lpf", &c.mag.filter.freq),
-      Param("mag_offset_x", &c.mag.offset[0]),
-      Param("mag_offset_y", &c.mag.offset[1]),
-      Param("mag_offset_z", &c.mag.offset[2]),
-      Param("mag_scale_x", &c.mag.scale[0]),
-      Param("mag_scale_y", &c.mag.scale[1]),
-      Param("mag_scale_z", &c.mag.scale[2]),
+      setting("mag_bus", &c.mag.bus, busDevChoices),
+      setting("mag_dev", &c.mag.dev, magDevChoices),
+      setting("mag_align", &c.mag.align, alignChoices),
+      setting("mag_declination", &c.mag.declination),
+      setting("mag_filter_type", &c.mag.filter.type, filterTypeChoices),
+      setting("mag_filter_lpf", &c.mag.filter.freq),
+      setting("mag_offset_x", &c.mag.offset[0]),
+      setting("mag_offset_y", &c.mag.offset[1]),
+      setting("mag_offset_z", &c.mag.offset[2]),
+      setting("mag_scale_x", &c.mag.scale[0]),
+      setting("mag_scale_y", &c.mag.scale[1]),
+      setting("mag_scale_z", &c.mag.scale[2]),
 
-      Param("baro_bus", &c.baro.bus, busDevChoices),
-      Param("baro_dev", &c.baro.dev, baroDevChoices),
-      Param("baro_lpf_type", &c.baro.filter.type, filterTypeChoices),
-      Param("baro_lpf_freq", &c.baro.filter.freq),
+      setting("baro_bus", &c.baro.bus, busDevChoices),
+      setting("baro_dev", &c.baro.dev, baroDevChoices),
+      setting("baro_lpf_type", &c.baro.filter.type, filterTypeChoices),
+      setting("baro_lpf_freq", &c.baro.filter.freq),
 
-      Param("gps_min_sats", &c.gps.minSats),
-      Param("gps_set_home_once", &c.gps.setHomeOnce),
+      setting("gps_min_sats", &c.gps.minSats),
+      setting("gps_set_home_once", &c.gps.setHomeOnce),
 
-      Param("gps_gnss_mode", &c.gps.gnssMode),
-      Param("gps_enable_dual_band", &c.gps.enableDualBand),
-      Param("gps_enable_gps", &c.gps.enableGPS),
-      Param("gps_enable_glonass", &c.gps.enableGLONASS),
-      Param("gps_enable_galileo", &c.gps.enableGalileo),
-      Param("gps_enable_beidou", &c.gps.enableBeiDou),
-      Param("gps_enable_qzss", &c.gps.enableQZSS),
-      Param("gps_enable_sbas", &c.gps.enableSBAS),
+      setting("gps_gnss_mode", &c.gps.gnssMode),
+      setting("gps_enable_dual_band", &c.gps.enableDualBand),
+      setting("gps_enable_gps", &c.gps.enableGPS),
+      setting("gps_enable_glonass", &c.gps.enableGLONASS),
+      setting("gps_enable_galileo", &c.gps.enableGalileo),
+      setting("gps_enable_beidou", &c.gps.enableBeiDou),
+      setting("gps_enable_qzss", &c.gps.enableQZSS),
+      setting("gps_enable_sbas", &c.gps.enableSBAS),
 
-      Param("board_align_roll", &c.boardAlignment[0]),
-      Param("board_align_pitch", &c.boardAlignment[1]),
-      Param("board_align_yaw", &c.boardAlignment[2]),
+      setting("board_align_roll", &c.boardAlignment[0]),
+      setting("board_align_pitch", &c.boardAlignment[1]),
+      setting("board_align_yaw", &c.boardAlignment[2]),
 
-      Param("vbat_source", &c.vbat.source, voltageSourceChoices),
-      Param("vbat_scale", &c.vbat.scale),
-      Param("vbat_mul", &c.vbat.resMult),
-      Param("vbat_div", &c.vbat.resDiv),
-      Param("battery_capacity", &c.batteryProfile.capacity),
-      Param("vbat_cell_min", &c.batteryProfile.cellMin),
-      Param("vbat_cell_max", &c.batteryProfile.cellMax),
-      Param("ibat_virtual_scale", &c.batteryProfile.virtualScale),
-      Param("ibat_virtual_offset", &c.batteryProfile.virtualOffset),
-      Param("vbat_cell_warn", &c.vbat.cellWarning),
+      setting("vbat_source", &c.vbat.source, voltageSourceChoices),
+      setting("vbat_scale", &c.vbat.scale),
+      setting("vbat_mul", &c.vbat.resMult),
+      setting("vbat_div", &c.vbat.resDiv),
+      setting("battery_capacity", &c.batteryProfile.capacity),
+      setting("vbat_cell_min", &c.batteryProfile.cellMin),
+      setting("vbat_cell_max", &c.batteryProfile.cellMax),
+      setting("ibat_virtual_scale", &c.batteryProfile.virtualScale),
+      setting("ibat_virtual_offset", &c.batteryProfile.virtualOffset),
+      setting("vbat_cell_warn", &c.vbat.cellWarning),
 
-      Param("ibat_source", &c.ibat.source, currentSourceChoices),
-      Param("ibat_scale", &c.ibat.scale),
-      Param("ibat_offset", &c.ibat.offset),
+      setting("ibat_source", &c.ibat.source, currentSourceChoices),
+      setting("ibat_scale", &c.ibat.scale),
+      setting("ibat_offset", &c.ibat.offset),
 
-      Param("fusion_mode", &c.fusion.mode, fusionModeChoices),
-      Param("fusion_gain_p", &c.fusion.gain),
-      Param("fusion_gain_i", &c.fusion.gainI),
-      Param("fusion_use_mag", &c.fusion.useMag),
+      setting("fusion_mode", &c.fusion.mode, fusionModeChoices),
+      setting("fusion_gain_p", &c.fusion.gain),
+      setting("fusion_gain_i", &c.fusion.gainI),
+      setting("fusion_use_mag", &c.fusion.useMag),
 
-      Param("thr_mid", &c.throttleCurve.mid),
-      Param("thr_expo", &c.throttleCurve.expo),
-      Param("thr_hover", &c.throttleCurve.hover),
-      Param("input_rate_type", &c.input.rateType, inputRateTypeChoices),
+      setting("thr_mid", &c.throttleCurve.mid),
+      setting("thr_expo", &c.throttleCurve.expo),
+      setting("thr_hover", &c.throttleCurve.hover),
+      setting("input_rate_type", &c.input.rateType, inputRateTypeChoices),
 
-      Param("input_roll_rate", &c.input.rate[0]),
-      Param("input_roll_srate", &c.input.superRate[0]),
-      Param("input_roll_expo", &c.input.expo[0]),
-      Param("input_roll_limit", &c.input.rateLimit[0]),
+      setting("input_roll_rate", &c.input.rate[0]),
+      setting("input_roll_srate", &c.input.superRate[0]),
+      setting("input_roll_expo", &c.input.expo[0]),
+      setting("input_roll_limit", &c.input.rateLimit[0]),
 
-      Param("input_pitch_rate", &c.input.rate[1]),
-      Param("input_pitch_srate", &c.input.superRate[1]),
-      Param("input_pitch_expo", &c.input.expo[1]),
-      Param("input_pitch_limit", &c.input.rateLimit[1]),
+      setting("input_pitch_rate", &c.input.rate[1]),
+      setting("input_pitch_srate", &c.input.superRate[1]),
+      setting("input_pitch_expo", &c.input.expo[1]),
+      setting("input_pitch_limit", &c.input.rateLimit[1]),
 
-      Param("input_yaw_rate", &c.input.rate[2]),
-      Param("input_yaw_srate", &c.input.superRate[2]),
-      Param("input_yaw_expo", &c.input.expo[2]),
-      Param("input_yaw_limit", &c.input.rateLimit[2]),
+      setting("input_yaw_rate", &c.input.rate[2]),
+      setting("input_yaw_srate", &c.input.superRate[2]),
+      setting("input_yaw_expo", &c.input.expo[2]),
+      setting("input_yaw_limit", &c.input.rateLimit[2]),
 
-      Param("input_deadband", &c.input.deadband),
-      Param("input_airmode_threshold", &c.input.airModeActivateThreshold),
+      setting("input_deadband", &c.input.deadband),
+      setting("input_airmode_threshold", &c.input.airModeActivateThreshold),
 
-      Param("input_min", &c.input.minRc),
-      Param("input_mid", &c.input.midRc),
-      Param("input_max", &c.input.maxRc),
+      setting("input_min", &c.input.minRc),
+      setting("input_mid", &c.input.midRc),
+      setting("input_max", &c.input.maxRc),
 
-      Param("input_filter", &c.input.filterEnable),
-      Param("input_lpf_type", &c.input.filter.type, filterTypeChoices),
-      Param("input_lpf_freq", &c.input.filter.freq),
-      Param("input_lpf_factor", &c.input.filterAutoFactor),
-      Param("input_lpf_throttle_type", &c.input.filterThrottle.type, filterTypeChoices),
-      Param("input_lpf_throttle_freq", &c.input.filterThrottle.freq),
-      Param("input_lpf_throttle_factor", &c.input.filterAutoThrottleFactor),
-      Param("input_ff_lpf_type", &c.input.filterDerivative.type, filterTypeChoices),
-      Param("input_ff_lpf_freq", &c.input.filterDerivative.freq),
+      setting("input_filter", &c.input.filterEnable),
+      setting("input_lpf_type", &c.input.filter.type, filterTypeChoices),
+      setting("input_lpf_freq", &c.input.filter.freq),
+      setting("input_lpf_factor", &c.input.filterAutoFactor),
+      setting("input_lpf_throttle_type", &c.input.filterThrottle.type, filterTypeChoices),
+      setting("input_lpf_throttle_freq", &c.input.filterThrottle.freq),
+      setting("input_lpf_throttle_factor", &c.input.filterAutoThrottleFactor),
+      setting("input_ff_lpf_type", &c.input.filterDerivative.type, filterTypeChoices),
+      setting("input_ff_lpf_freq", &c.input.filterDerivative.freq),
 
-      Param("input_rssi_channel", &c.input.rssiChannel),
+      setting("input_rssi_channel", &c.input.rssiChannel),
 
-      Param("input_0", &c.input.channel[0]),
-      Param("input_1", &c.input.channel[1]),
-      Param("input_2", &c.input.channel[2]),
-      Param("input_3", &c.input.channel[3]),
-      Param("input_4", &c.input.channel[4]),
-      Param("input_5", &c.input.channel[5]),
-      Param("input_6", &c.input.channel[6]),
-      Param("input_7", &c.input.channel[7]),
-      Param("input_8", &c.input.channel[8]),
-      Param("input_9", &c.input.channel[9]),
-      Param("input_10", &c.input.channel[10]),
-      Param("input_11", &c.input.channel[11]),
-      Param("input_12", &c.input.channel[12]),
-      Param("input_13", &c.input.channel[13]),
-      Param("input_14", &c.input.channel[14]),
-      Param("input_15", &c.input.channel[15]),
+      setting("input_0", &c.input.channel[0]),
+      setting("input_1", &c.input.channel[1]),
+      setting("input_2", &c.input.channel[2]),
+      setting("input_3", &c.input.channel[3]),
+      setting("input_4", &c.input.channel[4]),
+      setting("input_5", &c.input.channel[5]),
+      setting("input_6", &c.input.channel[6]),
+      setting("input_7", &c.input.channel[7]),
+      setting("input_8", &c.input.channel[8]),
+      setting("input_9", &c.input.channel[9]),
+      setting("input_10", &c.input.channel[10]),
+      setting("input_11", &c.input.channel[11]),
+      setting("input_12", &c.input.channel[12]),
+      setting("input_13", &c.input.channel[13]),
+      setting("input_14", &c.input.channel[14]),
+      setting("input_15", &c.input.channel[15]),
 
-Param(
-    "failsafe_delay",
-    &c.failsafe.delay),
+      setting("failsafe_delay", &c.failsafe.delay),
+      setting("failsafe_kill_switch", &c.failsafe.killSwitch),
+      setting("failsafe_procedure", &c.failsafe.procedure, failsafeProcedureChoices),
 
-Param(
-    "failsafe_kill_switch",
-    &c.failsafe.killSwitch),
+      setting("arming_small_angle", &c.arming.smallAngle),
 
-Param(
-    "failsafe_procedure",
-    &c.failsafe.procedure,
-    failsafeProcedureChoices),
-
-      Param("arming_small_angle", &c.arming.smallAngle),
-
-      Param("vtx_power", &c.vtx.power),
-      Param("vtx_channel", &c.vtx.channel),
-      Param("vtx_band", &c.vtx.band),
-      Param("vtx_low_power_disarm", &c.vtx.lowPowerDisarm),
+      setting("vtx_power", &c.vtx.power),
+      setting("vtx_channel", &c.vtx.channel),
+      setting("vtx_band", &c.vtx.band),
+      setting("vtx_low_power_disarm", &c.vtx.lowPowerDisarm),
 
 #ifdef ESPFC_SERIAL_0
-      Param("serial_0", &c.serial[SERIAL_UART_0]),
+      setting("serial_0", &c.serial[SERIAL_UART_0]),
 #endif
 #ifdef ESPFC_SERIAL_1
-      Param("serial_1", &c.serial[SERIAL_UART_1]),
+      setting("serial_1", &c.serial[SERIAL_UART_1]),
 #endif
 #ifdef ESPFC_SERIAL_2
-      Param("serial_2", &c.serial[SERIAL_UART_2]),
+      setting("serial_2", &c.serial[SERIAL_UART_2]),
 #endif
 #ifdef ESPFC_SERIAL_SOFT_0
-      Param("serial_soft_0", &c.serial[SERIAL_SOFT_0]),
+      setting("serial_soft_0", &c.serial[SERIAL_SOFT_0]),
 #endif
 #ifdef ESPFC_SERIAL_USB
-      Param("serial_usb", &c.serial[SERIAL_USB]),
+      setting("serial_usb", &c.serial[SERIAL_USB]),
 #endif
 
-      Param("scaler_0", &c.scaler[0]),
-      Param("scaler_1", &c.scaler[1]),
-      Param("scaler_2", &c.scaler[2]),
+      setting("scaler_0", &c.scaler[0]),
+      setting("scaler_1", &c.scaler[1]),
+      setting("scaler_2", &c.scaler[2]),
 
-      Param("mode_0", &c.conditions[0]),
-      Param("mode_1", &c.conditions[1]),
-      Param("mode_2", &c.conditions[2]),
-      Param("mode_3", &c.conditions[3]),
-      Param("mode_4", &c.conditions[4]),
-      Param("mode_5", &c.conditions[5]),
-      Param("mode_6", &c.conditions[6]),
-      Param("mode_7", &c.conditions[7]),
+      setting("mode_0", &c.conditions[0]),
+      setting("mode_1", &c.conditions[1]),
+      setting("mode_2", &c.conditions[2]),
+      setting("mode_3", &c.conditions[3]),
+      setting("mode_4", &c.conditions[4]),
+      setting("mode_5", &c.conditions[5]),
+      setting("mode_6", &c.conditions[6]),
+      setting("mode_7", &c.conditions[7]),
 
-      Param("pid_sync", &c.loopSync),
-      Param("pid_tuning", &c.simplifiedTuning.pidsMode, simplifiedTunigModeChoices),
-      Param("pid_tuning_gain", &c.simplifiedTuning.masterMultiplier),
-      Param("pid_tuning_rp_ratio", &c.simplifiedTuning.rollPitchRatio),
-      Param("pid_tuning_i_gain", &c.simplifiedTuning.iGain),
-      Param("pid_tuning_d_gain", &c.simplifiedTuning.dGain),
-      Param("pid_tuning_pi_gain", &c.simplifiedTuning.piGain),
+      setting("pid_sync", &c.loopSync),
+      setting("pid_tuning", &c.simplifiedTuning.pidsMode, simplifiedTunigModeChoices),
+      setting("pid_tuning_gain", &c.simplifiedTuning.masterMultiplier),
+      setting("pid_tuning_rp_ratio", &c.simplifiedTuning.rollPitchRatio),
+      setting("pid_tuning_i_gain", &c.simplifiedTuning.iGain),
+      setting("pid_tuning_d_gain", &c.simplifiedTuning.dGain),
+      setting("pid_tuning_pi_gain", &c.simplifiedTuning.piGain),
       // Param("pid_tuning_d_max_gain", &c.simplifiedTuning.dMaxGain),
-      Param("pid_tuning_ff_gain", &c.simplifiedTuning.ffGain),
-      Param("pid_tuning_pitch_pi_gain", &c.simplifiedTuning.pitchPiGain),
+      setting("pid_tuning_ff_gain", &c.simplifiedTuning.ffGain),
+      setting("pid_tuning_pitch_pi_gain", &c.simplifiedTuning.pitchPiGain),
 
-      Param("pid_roll_p", &c.pid[FC_PID_ROLL].P),
-      Param("pid_roll_i", &c.pid[FC_PID_ROLL].I),
-      Param("pid_roll_d", &c.pid[FC_PID_ROLL].D),
-      Param("pid_roll_f", &c.pid[FC_PID_ROLL].F),
+      setting("pid_roll_p", &c.pid[FC_PID_ROLL].P),
+      setting("pid_roll_i", &c.pid[FC_PID_ROLL].I),
+      setting("pid_roll_d", &c.pid[FC_PID_ROLL].D),
+      setting("pid_roll_f", &c.pid[FC_PID_ROLL].F),
 
-      Param("pid_pitch_p", &c.pid[FC_PID_PITCH].P),
-      Param("pid_pitch_i", &c.pid[FC_PID_PITCH].I),
-      Param("pid_pitch_d", &c.pid[FC_PID_PITCH].D),
-      Param("pid_pitch_f", &c.pid[FC_PID_PITCH].F),
+      setting("pid_pitch_p", &c.pid[FC_PID_PITCH].P),
+      setting("pid_pitch_i", &c.pid[FC_PID_PITCH].I),
+      setting("pid_pitch_d", &c.pid[FC_PID_PITCH].D),
+      setting("pid_pitch_f", &c.pid[FC_PID_PITCH].F),
 
-      Param("pid_yaw_p", &c.pid[FC_PID_YAW].P),
-      Param("pid_yaw_i", &c.pid[FC_PID_YAW].I),
-      Param("pid_yaw_d", &c.pid[FC_PID_YAW].D),
-      Param("pid_yaw_f", &c.pid[FC_PID_YAW].F),
+      setting("pid_yaw_p", &c.pid[FC_PID_YAW].P),
+      setting("pid_yaw_i", &c.pid[FC_PID_YAW].I),
+      setting("pid_yaw_d", &c.pid[FC_PID_YAW].D),
+      setting("pid_yaw_f", &c.pid[FC_PID_YAW].F),
 
-      Param("pid_level_p", &c.pid[FC_PID_LEVEL].P),
-      Param("pid_level_i", &c.pid[FC_PID_LEVEL].I),
-      Param("pid_level_d", &c.pid[FC_PID_LEVEL].D),
-      Param("pid_level_f", &c.pid[FC_PID_LEVEL].F),
+      setting("pid_level_p", &c.pid[FC_PID_LEVEL].P),
+      setting("pid_level_i", &c.pid[FC_PID_LEVEL].I),
+      setting("pid_level_d", &c.pid[FC_PID_LEVEL].D),
+      setting("pid_level_f", &c.pid[FC_PID_LEVEL].F),
 
-      Param("pid_level_angle_limit", &c.level.angleLimit),
-      Param("pid_level_rate_limit", &c.level.rateLimit),
-      Param("pid_level_lpf_type", &c.level.ptermFilter.type, filterTypeChoices),
-      Param("pid_level_lpf_freq", &c.level.ptermFilter.freq),
+      setting("pid_level_angle_limit", &c.level.angleLimit),
+      setting("pid_level_rate_limit", &c.level.rateLimit),
+      setting("pid_level_lpf_type", &c.level.ptermFilter.type, filterTypeChoices),
+      setting("pid_level_lpf_freq", &c.level.ptermFilter.freq),
 
-      Param("pid_althold_vel_p", &c.pid[FC_PID_VEL].P),
-      Param("pid_althold_vel_i", &c.pid[FC_PID_VEL].I),
-      Param("pid_althold_vel_d", &c.pid[FC_PID_VEL].D),
-      Param("pid_althold_vel_f", &c.pid[FC_PID_VEL].F),
-      Param("pid_althold_iterm_center", &c.altHold.itermCenter),
-      Param("pid_althold_iterm_range", &c.altHold.itermRange),
-      Param("pid_althold_baro_tau", &c.altHold.baroTau),
+      setting("pid_althold_vel_p", &c.pid[FC_PID_VEL].P),
+      setting("pid_althold_vel_i", &c.pid[FC_PID_VEL].I),
+      setting("pid_althold_vel_d", &c.pid[FC_PID_VEL].D),
+      setting("pid_althold_vel_f", &c.pid[FC_PID_VEL].F),
+      setting("pid_althold_iterm_center", &c.altHold.itermCenter),
+      setting("pid_althold_iterm_range", &c.altHold.itermRange),
+      setting("pid_althold_baro_tau", &c.altHold.baroTau),
 
-      Param("pid_yaw_lpf_type", &c.yaw.filter.type, filterTypeChoices),
-      Param("pid_yaw_lpf_freq", &c.yaw.filter.freq),
+      setting("pid_yaw_lpf_type", &c.yaw.filter.type, filterTypeChoices),
+      setting("pid_yaw_lpf_freq", &c.yaw.filter.freq),
 
-      Param("pid_dterm_lpf_type", &c.dterm.filter.type, filterTypeChoices),
-      Param("pid_dterm_lpf_freq", &c.dterm.filter.freq),
-      Param("pid_dterm_lpf2_type", &c.dterm.filter2.type, filterTypeChoices),
-      Param("pid_dterm_lpf2_freq", &c.dterm.filter2.freq),
-      Param("pid_dterm_notch_freq", &c.dterm.notchFilter.freq),
-      Param("pid_dterm_notch_cutoff", &c.dterm.notchFilter.cutoff),
-      Param("pid_dterm_dyn_lpf_min", &c.dterm.dynLpfFilter.cutoff),
-      Param("pid_dterm_dyn_lpf_max", &c.dterm.dynLpfFilter.freq),
-      Param("pid_dterm_tuning", &c.simplifiedTuning.dtermFilter),
-      Param("pid_dterm_tuning_gain", &c.simplifiedTuning.dtermFilterMultiplier),
+      setting("pid_dterm_lpf_type", &c.dterm.filter.type, filterTypeChoices),
+      setting("pid_dterm_lpf_freq", &c.dterm.filter.freq),
+      setting("pid_dterm_lpf2_type", &c.dterm.filter2.type, filterTypeChoices),
+      setting("pid_dterm_lpf2_freq", &c.dterm.filter2.freq),
+      setting("pid_dterm_notch_freq", &c.dterm.notchFilter.freq),
+      setting("pid_dterm_notch_cutoff", &c.dterm.notchFilter.cutoff),
+      setting("pid_dterm_dyn_lpf_min", &c.dterm.dynLpfFilter.cutoff),
+      setting("pid_dterm_dyn_lpf_max", &c.dterm.dynLpfFilter.freq),
+      setting("pid_dterm_tuning", &c.simplifiedTuning.dtermFilter),
+      setting("pid_dterm_tuning_gain", &c.simplifiedTuning.dtermFilterMultiplier),
 
-      Param("pid_iterm_limit", &c.iterm.limit),
-      Param("pid_iterm_zero", &c.iterm.lowThrottleZeroIterm),
-      Param("pid_iterm_relax", &c.iterm.relax, inputItermRelaxChoices),
-      Param("pid_iterm_relax_cutoff", &c.iterm.relaxCutoff),
+      setting("pid_iterm_limit", &c.iterm.limit),
+      setting("pid_iterm_zero", &c.iterm.lowThrottleZeroIterm),
+      setting("pid_iterm_relax", &c.iterm.relax, inputItermRelaxChoices),
+      setting("pid_iterm_relax_cutoff", &c.iterm.relaxCutoff),
 
-      Param("pid_tpa_mode", &c.controller.tpaMode, tpaModeChoices),
-      Param("pid_tpa_scale", &c.controller.tpaScale),
-      Param("pid_tpa_breakpoint", &c.controller.tpaBreakpoint),
+      setting("pid_tpa_mode", &c.controller.tpaMode, tpaModeChoices),
+      setting("pid_tpa_scale", &c.controller.tpaScale),
+      setting("pid_tpa_breakpoint", &c.controller.tpaBreakpoint),
 
-      Param("mixer_sync", &c.mixerSync),
-      Param("mixer_type", &c.mixer.type, mixerTypeChoices),
-      Param("mixer_yaw_reverse", &c.mixer.yawReverse),
-      Param("mixer_throttle_limit_type", &c.output.throttleLimitType, throtleLimitTypeChoices),
-      Param("mixer_throttle_limit_percent", &c.output.throttleLimitPercent),
-      Param("mixer_output_limit", &c.output.motorLimit),
+      setting("mixer_sync", &c.mixerSync),
+      setting("mixer_type", &c.mixer.type, mixerTypeChoices),
+      setting("mixer_yaw_reverse", &c.mixer.yawReverse),
+      setting("mixer_throttle_limit_type", &c.output.throttleLimitType, throtleLimitTypeChoices),
+      setting("mixer_throttle_limit_percent", &c.output.throttleLimitPercent),
+      setting("mixer_output_limit", &c.output.motorLimit),
 
-      Param("output_motor_protocol", &c.output.protocol, protocolChoices),
-      Param("output_motor_async", &c.output.async),
-      Param("output_motor_rate", &c.output.rate),
-      Param("output_motor_idle", &c.output.motorIdle),
+      setting("output_motor_protocol", &c.output.protocol, protocolChoices),
+      setting("output_motor_async", &c.output.async),
+      setting("output_motor_rate", &c.output.rate),
+      setting("output_motor_idle", &c.output.motorIdle),
 #ifdef ESPFC_DSHOT_TELEMETRY
-      Param("output_motor_poles", &c.output.motorPoles),
-      Param("output_dshot_telemetry", &c.output.dshotTelemetry),
+      setting("output_motor_poles", &c.output.motorPoles),
+      setting("output_dshot_telemetry", &c.output.dshotTelemetry),
 #endif
-      Param("output_servo_rate", &c.output.servoRate),
+      setting("output_servo_rate", &c.output.servoRate),
 
-      Param("output_min_command", &c.output.minCommand),
-      Param("output_max_throttle", &c.output.maxThrottle),
-      Param("output_0", &c.output.channel[0]),
-      Param("output_1", &c.output.channel[1]),
-      Param("output_2", &c.output.channel[2]),
-      Param("output_3", &c.output.channel[3]),
+      setting("output_min_command", &c.output.minCommand),
+      setting("output_max_throttle", &c.output.maxThrottle),
+      setting("output_0", &c.output.channel[0]),
+      setting("output_1", &c.output.channel[1]),
+      setting("output_2", &c.output.channel[2]),
+      setting("output_3", &c.output.channel[3]),
 #if ESPFC_OUTPUT_COUNT > 4
-      Param("output_4", &c.output.channel[4]),
+      setting("output_4", &c.output.channel[4]),
 #endif
 #if ESPFC_OUTPUT_COUNT > 5
-      Param("output_5", &c.output.channel[5]),
+      setting("output_5", &c.output.channel[5]),
 #endif
 #if ESPFC_OUTPUT_COUNT > 6
-      Param("output_6", &c.output.channel[6]),
+      setting("output_6", &c.output.channel[6]),
 #endif
 #if ESPFC_OUTPUT_COUNT > 7
-      Param("output_7", &c.output.channel[7]),
+      setting("output_7", &c.output.channel[7]),
 #endif
 #ifdef ESPFC_INPUT
-      Param("pin_input_rx", &c.pin[PIN_INPUT_RX]),
+      setting("pin_input_rx", &c.pin[PIN_INPUT_RX]),
 #endif
-      Param("pin_output_0", &c.pin[PIN_OUTPUT_0]),
-      Param("pin_output_1", &c.pin[PIN_OUTPUT_1]),
-      Param("pin_output_2", &c.pin[PIN_OUTPUT_2]),
-      Param("pin_output_3", &c.pin[PIN_OUTPUT_3]),
+      setting("pin_output_0", &c.pin[PIN_OUTPUT_0]),
+      setting("pin_output_1", &c.pin[PIN_OUTPUT_1]),
+      setting("pin_output_2", &c.pin[PIN_OUTPUT_2]),
+      setting("pin_output_3", &c.pin[PIN_OUTPUT_3]),
 #if ESPFC_OUTPUT_COUNT > 4
-      Param("pin_output_4", &c.pin[PIN_OUTPUT_4]),
+      setting("pin_output_4", &c.pin[PIN_OUTPUT_4]),
 #endif
 #if ESPFC_OUTPUT_COUNT > 5
-      Param("pin_output_5", &c.pin[PIN_OUTPUT_5]),
+      setting("pin_output_5", &c.pin[PIN_OUTPUT_5]),
 #endif
 #if ESPFC_OUTPUT_COUNT > 6
-      Param("pin_output_6", &c.pin[PIN_OUTPUT_6]),
+      setting("pin_output_6", &c.pin[PIN_OUTPUT_6]),
 #endif
 #if ESPFC_OUTPUT_COUNT > 7
-      Param("pin_output_7", &c.pin[PIN_OUTPUT_7]),
+      setting("pin_output_7", &c.pin[PIN_OUTPUT_7]),
 #endif
-      Param("pin_range_trigger", &c.surface.triggerPin),
-      Param("pin_range_echo", &c.surface.echoPin),
-      Param("pin_button", &c.pin[PIN_BUTTON]),
-      Param("pin_buzzer", &c.pin[PIN_BUZZER]),
-      Param("pin_led", &c.pin[PIN_LED_BLINK]),
+      setting("pin_range_trigger", &c.surface.triggerPin),
+      setting("pin_range_echo", &c.surface.echoPin),
+      setting("pin_button", &c.pin[PIN_BUTTON]),
+      setting("pin_buzzer", &c.pin[PIN_BUZZER]),
+      setting("pin_led", &c.pin[PIN_LED_BLINK]),
 #if defined(ESPFC_SERIAL_0) && defined(ESPFC_SERIAL_REMAP_PINS)
-      Param("pin_serial_0_tx", &c.pin[PIN_SERIAL_0_TX]),
-      Param("pin_serial_0_rx", &c.pin[PIN_SERIAL_0_RX]),
+      setting("pin_serial_0_tx", &c.pin[PIN_SERIAL_0_TX]),
+      setting("pin_serial_0_rx", &c.pin[PIN_SERIAL_0_RX]),
 #endif
 #if defined(ESPFC_SERIAL_1) && defined(ESPFC_SERIAL_REMAP_PINS)
-      Param("pin_serial_1_tx", &c.pin[PIN_SERIAL_1_TX]),
-      Param("pin_serial_1_rx", &c.pin[PIN_SERIAL_1_RX]),
+      setting("pin_serial_1_tx", &c.pin[PIN_SERIAL_1_TX]),
+      setting("pin_serial_1_rx", &c.pin[PIN_SERIAL_1_RX]),
 #endif
 #if defined(ESPFC_SERIAL_2) && defined(ESPFC_SERIAL_REMAP_PINS)
-      Param("pin_serial_2_tx", &c.pin[PIN_SERIAL_2_TX]),
-      Param("pin_serial_2_rx", &c.pin[PIN_SERIAL_2_RX]),
+      setting("pin_serial_2_tx", &c.pin[PIN_SERIAL_2_TX]),
+      setting("pin_serial_2_rx", &c.pin[PIN_SERIAL_2_RX]),
 #endif
 #ifdef ESPFC_I2C_0
-      Param("pin_i2c_scl", &c.pin[PIN_I2C_0_SCL]),
-      Param("pin_i2c_sda", &c.pin[PIN_I2C_0_SDA]),
+      setting("pin_i2c_scl", &c.pin[PIN_I2C_0_SCL]),
+      setting("pin_i2c_sda", &c.pin[PIN_I2C_0_SDA]),
 #endif
 #ifdef ESPFC_ADC_0
-      Param("pin_input_adc_0", &c.pin[PIN_INPUT_ADC_0]),
+      setting("pin_input_adc_0", &c.pin[PIN_INPUT_ADC_0]),
 #endif
 #ifdef ESPFC_ADC_1
-      Param("pin_input_adc_1", &c.pin[PIN_INPUT_ADC_1]),
+      setting("pin_input_adc_1", &c.pin[PIN_INPUT_ADC_1]),
 #endif
 #ifdef ESPFC_SPI_0
-      Param("pin_spi_0_sck", &c.pin[PIN_SPI_0_SCK]),
-      Param("pin_spi_0_mosi", &c.pin[PIN_SPI_0_MOSI]),
-      Param("pin_spi_0_miso", &c.pin[PIN_SPI_0_MISO]),
-      Param("pin_spi_cs_0", &c.pin[PIN_SPI_CS0]),
-      Param("pin_spi_cs_1", &c.pin[PIN_SPI_CS1]),
-      Param("pin_spi_cs_2", &c.pin[PIN_SPI_CS2]),
+      setting("pin_spi_0_sck", &c.pin[PIN_SPI_0_SCK]),
+      setting("pin_spi_0_mosi", &c.pin[PIN_SPI_0_MOSI]),
+      setting("pin_spi_0_miso", &c.pin[PIN_SPI_0_MISO]),
+      setting("pin_spi_cs_0", &c.pin[PIN_SPI_CS0]),
+      setting("pin_spi_cs_1", &c.pin[PIN_SPI_CS1]),
+      setting("pin_spi_cs_2", &c.pin[PIN_SPI_CS2]),
 #endif
-      Param("pin_buzzer_invert", &c.buzzer.inverted),
-      Param("pin_led_invert", &c.led.invert),
-      Param("pin_led_type", &c.led.type, ledTypeChoices),
+      setting("pin_buzzer_invert", &c.buzzer.inverted),
+      setting("pin_led_invert", &c.led.invert),
+      setting("pin_led_type", &c.led.type, ledTypeChoices),
 
 #ifdef ESPFC_I2C_0
-      Param("i2c_speed", &c.i2cSpeed),
+      setting("i2c_speed", &c.i2cSpeed),
 #endif
-      Param("rescue_config_delay", &c.rescueConfigDelay),
+      setting("rescue_config_delay", &c.rescueConfigDelay),
 
       // Param("telemetry", &c.telemetry),
-      Param("telemetry_interval", &c.telemetryInterval),
+      setting("telemetry_interval", &c.telemetryInterval),
 
-      Param("blackbox_dev", &c.blackbox.dev, blackboxDevChoices),
-      Param("blackbox_mode", &c.blackbox.mode, blackboxModeChoices),
-      Param("blackbox_rate", &c.blackbox.pDenom),
-      Param("blackbox_log_acc", &c.blackbox.fieldsMask, BLACKBOX_FIELD_ACC),
-      Param("blackbox_log_alt", &c.blackbox.fieldsMask, BLACKBOX_FIELD_ALTITUDE),
-      Param("blackbox_log_atti", &c.blackbox.fieldsMask, BLACKBOX_FIELD_ATTITUDE),
-      Param("blackbox_log_bat", &c.blackbox.fieldsMask, BLACKBOX_FIELD_BATTERY),
-      Param("blackbox_log_debug", &c.blackbox.fieldsMask, BLACKBOX_FIELD_DEBUG_LOG),
-      Param("blackbox_log_gps", &c.blackbox.fieldsMask, BLACKBOX_FIELD_GPS),
-      Param("blackbox_log_gyro", &c.blackbox.fieldsMask, BLACKBOX_FIELD_GYRO),
-      Param("blackbox_log_gyro_raw", &c.blackbox.fieldsMask, BLACKBOX_FIELD_GYROUNFILT),
-      Param("blackbox_log_mag", &c.blackbox.fieldsMask, BLACKBOX_FIELD_MAG),
-      Param("blackbox_log_motor", &c.blackbox.fieldsMask, BLACKBOX_FIELD_MOTOR),
-      Param("blackbox_log_pid", &c.blackbox.fieldsMask, BLACKBOX_FIELD_PID),
-      Param("blackbox_log_pitot", &c.blackbox.fieldsMask, BLACKBOX_FIELD_PITOT),
-      Param("blackbox_log_rc", &c.blackbox.fieldsMask, BLACKBOX_FIELD_RC_COMMANDS),
-      Param("blackbox_log_rpm", &c.blackbox.fieldsMask, BLACKBOX_FIELD_RPM),
-      Param("blackbox_log_rssi", &c.blackbox.fieldsMask, BLACKBOX_FIELD_RSSI),
-      Param("blackbox_log_servo", &c.blackbox.fieldsMask, BLACKBOX_FIELD_SERVO),
-      Param("blackbox_log_sp", &c.blackbox.fieldsMask, BLACKBOX_FIELD_SETPOINT),
+      setting("blackbox_dev", &c.blackbox.dev, blackboxDevChoices),
+      setting("blackbox_mode", &c.blackbox.mode, blackboxModeChoices),
+      setting("blackbox_rate", &c.blackbox.pDenom),
+      setting("blackbox_log_acc", &c.blackbox.fieldsMask, BLACKBOX_FIELD_ACC),
+      setting("blackbox_log_alt", &c.blackbox.fieldsMask, BLACKBOX_FIELD_ALTITUDE),
+      setting("blackbox_log_atti", &c.blackbox.fieldsMask, BLACKBOX_FIELD_ATTITUDE),
+      setting("blackbox_log_bat", &c.blackbox.fieldsMask, BLACKBOX_FIELD_BATTERY),
+      setting("blackbox_log_debug", &c.blackbox.fieldsMask, BLACKBOX_FIELD_DEBUG_LOG),
+      setting("blackbox_log_gps", &c.blackbox.fieldsMask, BLACKBOX_FIELD_GPS),
+      setting("blackbox_log_gyro", &c.blackbox.fieldsMask, BLACKBOX_FIELD_GYRO),
+      setting("blackbox_log_gyro_raw", &c.blackbox.fieldsMask, BLACKBOX_FIELD_GYROUNFILT),
+      setting("blackbox_log_mag", &c.blackbox.fieldsMask, BLACKBOX_FIELD_MAG),
+      setting("blackbox_log_motor", &c.blackbox.fieldsMask, BLACKBOX_FIELD_MOTOR),
+      setting("blackbox_log_pid", &c.blackbox.fieldsMask, BLACKBOX_FIELD_PID),
+      setting("blackbox_log_pitot", &c.blackbox.fieldsMask, BLACKBOX_FIELD_PITOT),
+      setting("blackbox_log_rc", &c.blackbox.fieldsMask, BLACKBOX_FIELD_RC_COMMANDS),
+      setting("blackbox_log_rpm", &c.blackbox.fieldsMask, BLACKBOX_FIELD_RPM),
+      setting("blackbox_log_rssi", &c.blackbox.fieldsMask, BLACKBOX_FIELD_RSSI),
+      setting("blackbox_log_servo", &c.blackbox.fieldsMask, BLACKBOX_FIELD_SERVO),
+      setting("blackbox_log_sp", &c.blackbox.fieldsMask, BLACKBOX_FIELD_SETPOINT),
 
-      Param("model_name", PARAM_STRING, &c.modelName[0], nullptr, MODEL_NAME_LEN),
+      setting("model_name", PARAM_STRING, &c.modelName[0], nullptr, MODEL_NAME_LEN),
 
 #ifdef ESPFC_SERIAL_SOFT_0_WIFI
-      Param("wifi_ssid", PARAM_STRING, &c.wireless.ssid[0], nullptr, WirelessConfig::MAX_LEN),
-      Param("wifi_pass", PARAM_STRING, &c.wireless.pass[0], nullptr, WirelessConfig::MAX_LEN),
-      Param("wifi_tcp_port", &c.wireless.port),
+      setting("wifi_ssid", PARAM_STRING, &c.wireless.ssid[0], nullptr, WirelessConfig::MAX_LEN),
+      setting("wifi_pass", PARAM_STRING, &c.wireless.pass[0], nullptr, WirelessConfig::MAX_LEN),
+      setting("wifi_tcp_port", &c.wireless.port),
 #endif
 
-      Param("mix_outputs", &c.customMixerCount),
-      Param("mix_0", &c.customMixes[i++]),
-      Param("mix_1", &c.customMixes[i++]),
-      Param("mix_2", &c.customMixes[i++]),
-      Param("mix_3", &c.customMixes[i++]),
-      Param("mix_4", &c.customMixes[i++]),
-      Param("mix_5", &c.customMixes[i++]),
-      Param("mix_6", &c.customMixes[i++]),
-      Param("mix_7", &c.customMixes[i++]),
-      Param("mix_8", &c.customMixes[i++]),
-      Param("mix_9", &c.customMixes[i++]),
-      Param("mix_10", &c.customMixes[i++]),
-      Param("mix_11", &c.customMixes[i++]),
-      Param("mix_12", &c.customMixes[i++]),
-      Param("mix_13", &c.customMixes[i++]),
-      Param("mix_14", &c.customMixes[i++]),
-      Param("mix_15", &c.customMixes[i++]),
-      Param("mix_16", &c.customMixes[i++]),
-      Param("mix_17", &c.customMixes[i++]),
-      Param("mix_18", &c.customMixes[i++]),
-      Param("mix_19", &c.customMixes[i++]),
-      Param("mix_20", &c.customMixes[i++]),
-      Param("mix_21", &c.customMixes[i++]),
-      Param("mix_22", &c.customMixes[i++]),
-      Param("mix_23", &c.customMixes[i++]),
-      Param("mix_24", &c.customMixes[i++]),
-      Param("mix_25", &c.customMixes[i++]),
-      Param("mix_26", &c.customMixes[i++]),
-      Param("mix_27", &c.customMixes[i++]),
-      Param("mix_28", &c.customMixes[i++]),
-      Param("mix_29", &c.customMixes[i++]),
-      Param("mix_30", &c.customMixes[i++]),
-      Param("mix_31", &c.customMixes[i++]),
-      Param("mix_32", &c.customMixes[i++]),
-      Param("mix_33", &c.customMixes[i++]),
-      Param("mix_34", &c.customMixes[i++]),
-      Param("mix_35", &c.customMixes[i++]),
-      Param("mix_36", &c.customMixes[i++]),
-      Param("mix_37", &c.customMixes[i++]),
-      Param("mix_38", &c.customMixes[i++]),
-      Param("mix_39", &c.customMixes[i++]),
-      Param("mix_40", &c.customMixes[i++]),
-      Param("mix_41", &c.customMixes[i++]),
-      Param("mix_42", &c.customMixes[i++]),
-      Param("mix_43", &c.customMixes[i++]),
-      Param("mix_44", &c.customMixes[i++]),
-      Param("mix_45", &c.customMixes[i++]),
-      Param("mix_46", &c.customMixes[i++]),
-      Param("mix_47", &c.customMixes[i++]),
-      Param("mix_48", &c.customMixes[i++]),
-      Param("mix_49", &c.customMixes[i++]),
-      Param("mix_50", &c.customMixes[i++]),
-      Param("mix_51", &c.customMixes[i++]),
-      Param("mix_52", &c.customMixes[i++]),
-      Param("mix_53", &c.customMixes[i++]),
-      Param("mix_54", &c.customMixes[i++]),
-      Param("mix_55", &c.customMixes[i++]),
-      Param("mix_56", &c.customMixes[i++]),
-      Param("mix_57", &c.customMixes[i++]),
-      Param("mix_58", &c.customMixes[i++]),
-      Param("mix_59", &c.customMixes[i++]),
-      Param("mix_60", &c.customMixes[i++]),
-      Param("mix_61", &c.customMixes[i++]),
-      Param("mix_62", &c.customMixes[i++]),
-      Param("mix_63", &c.customMixes[i++]),
+      setting("mix_outputs", &c.customMixerCount),
+      setting("mix_0", &c.customMixes[i++]),
+      setting("mix_1", &c.customMixes[i++]),
+      setting("mix_2", &c.customMixes[i++]),
+      setting("mix_3", &c.customMixes[i++]),
+      setting("mix_4", &c.customMixes[i++]),
+      setting("mix_5", &c.customMixes[i++]),
+      setting("mix_6", &c.customMixes[i++]),
+      setting("mix_7", &c.customMixes[i++]),
+      setting("mix_8", &c.customMixes[i++]),
+      setting("mix_9", &c.customMixes[i++]),
+      setting("mix_10", &c.customMixes[i++]),
+      setting("mix_11", &c.customMixes[i++]),
+      setting("mix_12", &c.customMixes[i++]),
+      setting("mix_13", &c.customMixes[i++]),
+      setting("mix_14", &c.customMixes[i++]),
+      setting("mix_15", &c.customMixes[i++]),
+      setting("mix_16", &c.customMixes[i++]),
+      setting("mix_17", &c.customMixes[i++]),
+      setting("mix_18", &c.customMixes[i++]),
+      setting("mix_19", &c.customMixes[i++]),
+      setting("mix_20", &c.customMixes[i++]),
+      setting("mix_21", &c.customMixes[i++]),
+      setting("mix_22", &c.customMixes[i++]),
+      setting("mix_23", &c.customMixes[i++]),
+      setting("mix_24", &c.customMixes[i++]),
+      setting("mix_25", &c.customMixes[i++]),
+      setting("mix_26", &c.customMixes[i++]),
+      setting("mix_27", &c.customMixes[i++]),
+      setting("mix_28", &c.customMixes[i++]),
+      setting("mix_29", &c.customMixes[i++]),
+      setting("mix_30", &c.customMixes[i++]),
+      setting("mix_31", &c.customMixes[i++]),
+      setting("mix_32", &c.customMixes[i++]),
+      setting("mix_33", &c.customMixes[i++]),
+      setting("mix_34", &c.customMixes[i++]),
+      setting("mix_35", &c.customMixes[i++]),
+      setting("mix_36", &c.customMixes[i++]),
+      setting("mix_37", &c.customMixes[i++]),
+      setting("mix_38", &c.customMixes[i++]),
+      setting("mix_39", &c.customMixes[i++]),
+      setting("mix_40", &c.customMixes[i++]),
+      setting("mix_41", &c.customMixes[i++]),
+      setting("mix_42", &c.customMixes[i++]),
+      setting("mix_43", &c.customMixes[i++]),
+      setting("mix_44", &c.customMixes[i++]),
+      setting("mix_45", &c.customMixes[i++]),
+      setting("mix_46", &c.customMixes[i++]),
+      setting("mix_47", &c.customMixes[i++]),
+      setting("mix_48", &c.customMixes[i++]),
+      setting("mix_49", &c.customMixes[i++]),
+      setting("mix_50", &c.customMixes[i++]),
+      setting("mix_51", &c.customMixes[i++]),
+      setting("mix_52", &c.customMixes[i++]),
+      setting("mix_53", &c.customMixes[i++]),
+      setting("mix_54", &c.customMixes[i++]),
+      setting("mix_55", &c.customMixes[i++]),
+      setting("mix_56", &c.customMixes[i++]),
+      setting("mix_57", &c.customMixes[i++]),
+      setting("mix_58", &c.customMixes[i++]),
+      setting("mix_59", &c.customMixes[i++]),
+      setting("mix_60", &c.customMixes[i++]),
+      setting("mix_61", &c.customMixes[i++]),
+      setting("mix_62", &c.customMixes[i++]),
+      setting("mix_63", &c.customMixes[i++]),
 
-      Param() // terminate
+      {} // terminate
   };
   // clang-format on
 
@@ -1106,7 +1103,7 @@ void Cli::execute(CliCmd& cmd, Stream::Printer& s)
     {
       if (!cmd.args[1] || std::strstr(_params[i].name, cmd.args[1]) != nullptr)
       {
-        print(_params[i], s);
+        print(_params[i].bind(_model.config), s);
         found = true;
       }
     }
@@ -1130,8 +1127,9 @@ void Cli::execute(CliCmd& cmd, Stream::Printer& s)
     {
       if (std::strcmp(cmd.args[1], _params[i].name) == 0)
       {
-        _params[i].update(cmd.args);
-        print(_params[i], s);
+        const auto param = _params[i].bind(_model.config);
+        param.update(cmd.args);
+        print(param, s);
         found = true;
         break;
       }
@@ -1147,29 +1145,26 @@ void Cli::execute(CliCmd& cmd, Stream::Printer& s)
     s.println("defaults");
     for (size_t i = 0; _params[i].name; ++i)
     {
-      print(_params[i], s);
+      print(_params[i].bind(_model.config), s);
     }
     s.println("save");
   }
   else if (std::strcmp(cmd.args[0], "sensor_hardware") == 0)
   {
     // BF specific required by configurator
-    s.print("gyro: ");
     const auto* gyroAccNames = Device::GyroDevice::getNames();
-    for (size_t i = 0; gyroAccNames[i]; ++i)
+    for (const char* label : {"gyro", "acc"})
     {
-      if (i) s.print(',');
-      s.print(gyroAccNames[i]);
+      // MSP uses AUTO=0, NONE=1; the internal gyro enum uses the reverse.
+      s.print(label);
+      s.print(": AUTO,NONE");
+      for (size_t i = 2; gyroAccNames[i]; ++i)
+      {
+        s.print(',');
+        s.print(gyroAccNames[i]);
+      }
+      s.println();
     }
-    s.println();
-
-    s.print("acc: ");
-    for (size_t i = 0; gyroAccNames[i]; i++)
-    {
-      if (i) s.print(',');
-      s.print(gyroAccNames[i]);
-    }
-    s.println();
 
     s.print("baro: ");
     const auto* baroNames = Device::BaroDevice::getNames();

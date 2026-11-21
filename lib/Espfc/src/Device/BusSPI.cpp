@@ -29,6 +29,12 @@ int8_t BusSPI::read(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8_t* d
   return length;
 }
 
+int8_t BusSPI::readCommand(uint8_t devAddr, uint8_t command, uint8_t length, uint8_t* data)
+{
+  transfer(devAddr, command, length, nullptr, data, SPI_SPEED_NORMAL);
+  return length;
+}
+
 int8_t FAST_CODE_ATTR BusSPI::readFast(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8_t* data)
 {
   transfer(devAddr, regAddr | SPI_READ, length, nullptr, data, SPI_SPEED_FAST);
@@ -48,10 +54,10 @@ void FAST_CODE_ATTR BusSPI::transfer(uint8_t devAddr, uint8_t regAddr, uint8_t l
   Hal::Gpio::digitalWrite(devAddr, Hal::Gpio::Low);
 #if defined(ARCH_RP2040)
   _dev.transfer(regAddr);
-  _dev.transfer(in, out, length);
+  if (length) _dev.transfer(in, out, length);
 #else
   _dev.transfer(regAddr);
-  _dev.transferBytes(in, out, length);
+  if (length) _dev.transferBytes(in, out, length);
 #endif
   Hal::Gpio::digitalWrite(devAddr, Hal::Gpio::High);
   _dev.endTransaction();

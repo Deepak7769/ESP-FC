@@ -7,7 +7,7 @@ namespace Espfc::Connect {
 class Cli
 {
 public:
-  enum ParamType
+  enum ParamType : uint8_t
   {
     PARAM_NONE,           // unused
     PARAM_BOOL,           // boolean
@@ -30,9 +30,9 @@ public:
   {
   public:
     Param(): Param(nullptr, PARAM_NONE, nullptr, nullptr) {}
-    Param(const Param& p): Param(p.name, p.type, p.addr, p.choices) {}
+    Param(const Param&) = default;
 
-    Param(const char* n, ParamType t, char* a, const char* const* c, size_t l = 16)
+    Param(const char* n, ParamType t, char* a, const char* const* c, uint8_t l = 16)
         : name(n), type(t), addr(a), choices(c), maxLen(l)
     {
     }
@@ -95,11 +95,27 @@ public:
     ParamType type;
     char* addr;
     const char* const* choices;
-    size_t maxLen;
+    uint8_t maxLen;
+  };
+
+  // A shared table describes offsets in persistent configuration. Each CLI
+  // binds an entry to its own model when the command is executed.
+  struct Setting
+  {
+    const char* name;
+    const char* const* choices;
+    uint16_t offset;
+    ParamType type;
+    uint8_t maxLen;
+
+    Param bind(ModelConfig& config) const
+    {
+      return Param(name, type, reinterpret_cast<char*>(&config) + offset, choices, maxLen);
+    }
   };
 
   Cli(Model& model);
-  static const Param* initialize(ModelConfig& c);
+  static const Setting* initialize(ModelConfig& c);
   bool process(const char c, CliCmd& cmd, Stream::Printer& stream);
   void parse(CliCmd& cmd);
   void execute(CliCmd& cmd, Stream::Printer& s);
@@ -113,7 +129,7 @@ private:
   void printStats(Stream::Printer& s) const;
 
   Model& _model;
-  const Param* _params;
+  const Setting* _params;
   bool _ignore;
   bool _active;
   bool _interactive;

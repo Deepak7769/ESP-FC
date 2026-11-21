@@ -88,7 +88,13 @@ struct CrsfLinkStats
   int8_t downlink_SNR;
 } __attribute__((__packed__));
 
+// MinGW defaults to MS bit-field allocation even on packed structs. Select
+// the GCC wire layout used by the MCU toolchains and check the protocol size.
+#if defined(__MINGW32__)
+struct __attribute__((gcc_struct)) CrsfData
+#else
 struct CrsfData
+#endif
 {
   unsigned int chan0 : 11;
   unsigned int chan1 : 11;
@@ -107,6 +113,7 @@ struct CrsfData
   unsigned int chan14 : 11;
   unsigned int chan15 : 11;
 } __attribute__((__packed__));
+static_assert(sizeof(CrsfData) == 22, "CRSF packs 16 eleven-bit channels in 22 bytes");
 
 /*
  * Every frame has the structure:

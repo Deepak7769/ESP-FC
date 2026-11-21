@@ -30,10 +30,22 @@ int BaroBMP085::begin(BusDevice* bus, uint8_t addr)
 
   if (!testConnection()) return 0;
 
-  _bus->writeByte(_addr, BMP085_RESET_REG, 0xB6); // device reset
+  _temperatureValid = false;
+  _conversionStarted = false;
+  if (!_bus->writeByte(_addr, BMP085_RESET_REG, 0xB6)) return 0;
   delay(10);
 
-  _bus->read(_addr, BMP085_CALIB_REG, sizeof(CalibrationData), (uint8_t*)&_cal);
+  uint8_t data[22];
+  if (_bus->read(_addr, BMP085_CALIB_REG, sizeof(data), data) != sizeof(data)) return 0;
+  uint16_t words[11];
+  for (unsigned i = 0; i < 11; ++i)
+  {
+    words[i] = static_cast<uint16_t>(data[2*i]) << 8 | data[2*i+1];
+    if (words[i] == 0 || words[i] == 0xffff) return 0;
+  }
+  _cal = {static_cast<int16_t>(words[0]), static_cast<int16_t>(words[1]), static_cast<int16_t>(words[2]),
+          words[3], words[4], words[5], static_cast<int16_t>(words[6]), static_cast<int16_t>(words[7]),
+          static_cast<int16_t>(words[8]), static_cast<int16_t>(words[9]), static_cast<int16_t>(words[10])};
 
   return 1;
 }
@@ -45,64 +57,50 @@ BaroDeviceType BaroBMP085::getType() const
 
 float BaroBMP085::readTemperature()
 {
+  _temperatureValid = false;
   uint8_t buffer[2];
-  _bus->read(_addr, BMP085_MEASUREMENT_REG, 2, buffer);
-
-  // calbrate temp
-  int32_t ut = ((uint16_t)buffer[0] << 8) + buffer[1];
-  if (ut == 0) return NAN;
-
-  int32_t x1 = ((ut - (int32_t)_cal.ac6) * (int32_t)_cal.ac5) >> 15;
-  int32_t x2 = ((int32_t)_cal.mc << 11) / (x1 + _cal.md);
-  _t_fine = x1 + x2;
-  //_t_fine = (_t_fine + x1 + x2 + 1) >> 1; // avg of last two samples
-  return (float)((_t_fine + 8) >> 4) * 0.1f;
+  if (!_conversionStarted || _mode != BMP085_MEASURE_T ||
+      _bus->read(_addr, BMP085_MEASUREMENT_REG, 2, buffer) != 2) return NAN;
+  const int32_t ut = (buffer[0] << 8) | buffer[1];
+  if (ut == 0 || ut == 0xffff) return NAN;
+  const int64_t x1 = (static_cast<int64_t>(ut - _cal.ac6) * _cal.ac5) >> 15;
+  if (x1 + _cal.md == 0) return NAN;
+  const int64_t fine = x1 + (static_cast<int64_t>(_cal.mc) * 2048) / (x1 + _cal.md);
+  const float temperature = ((fine + 8) >> 4) * 0.1f;
+  if (temperature < -40.f || temperature > 85.f) return NAN;
+  _t_fine = fine;
+  _temperatureValid = true;
+  return temperature;
 }
 
 float BaroBMP085::readPressure()
 {
   uint8_t buffer[3];
-  _bus->read(_addr, BMP085_MEASUREMENT_REG, 3, buffer);
-
-  uint32_t up = ((uint32_t)buffer[0] << 16) | ((uint32_t)buffer[1] << 8) | buffer[2];
-
-  uint8_t oss = (_mode & 0xC0) >> 6;
-  if (_mode & 0x34) up = up >> (8 - oss);
-  if (up == 0) return NAN;
-
-  int32_t b6 = _t_fine - 4000;
-  int32_t x1 = ((int32_t)_cal.b2 * ((b6 * b6) >> 12)) >> 11;
-  int32_t x2 = ((int32_t)_cal.ac2 * b6) >> 11;
-  int32_t x3 = x1 + x2;
-  int32_t b3 = ((((int32_t)_cal.ac1 * 4 + x3) << oss) + 2) >> 2;
-  x1 = ((int32_t)_cal.ac3 * b6) >> 13;
-  x2 = ((int32_t)_cal.b1 * ((b6 * b6) >> 12)) >> 16;
-  x3 = ((x1 + x2) + 2) >> 2;
-  uint32_t b4 = ((uint32_t)_cal.ac4 * (uint32_t)(x3 + 32768)) >> 15;
-  uint32_t b7 = ((uint32_t)up - b3) * (uint32_t)(50000UL >> oss);
-
-  int32_t p = 0;
-  if (b7 < 0x80000000)
-  {
-    p = (b7 << 1) / b4;
-  }
-  else
-  {
-    p = (b7 / b4) << 1;
-  }
-  x1 = (p >> 8) * (p >> 8);
-  x1 = (x1 * 3038) >> 16;
-  x2 = (-7357 * p) >> 16;
-
-  p = p + ((x1 + x2 + (int32_t)3791) >> 4);
-
-  return p;
+  if (!_temperatureValid || !_conversionStarted || _mode == BMP085_MEASURE_T ||
+      _bus->read(_addr, BMP085_MEASUREMENT_REG, 3, buffer) != 3) return NAN;
+  const unsigned oss = _mode >> 6;
+  const int64_t up = ((buffer[0] << 16) | (buffer[1] << 8) | buffer[2]) >> (8 - oss);
+  const int64_t b6 = _t_fine - 4000;
+  const int64_t squared = (b6 * b6) >> 12;
+  int64_t x1 = (_cal.b2 * squared) >> 11;
+  int64_t x2 = (_cal.ac2 * b6) >> 11;
+  const int64_t b3 = (((_cal.ac1 * 4 + x1 + x2) * (1 << oss)) + 2) >> 2;
+  x1 = (_cal.ac3 * b6) >> 13;
+  x2 = (_cal.b1 * squared) >> 16;
+  const int64_t b4 = (_cal.ac4 * (((x1 + x2 + 2) >> 2) + 32768)) >> 15;
+  if (b4 <= 0 || up <= b3) return NAN;
+  const int64_t b7 = (up - b3) * (50000 >> oss);
+  int64_t pressure = b7 < 0x80000000LL ? b7 * 2 / b4 : b7 / b4 * 2;
+  if (pressure <= 0 || pressure > 150000) return NAN;
+  x1 = ((pressure >> 8) * (pressure >> 8) * 3038) >> 16;
+  x2 = (-7357 * pressure) >> 16;
+  return pressure + ((x1 + x2 + 3791) >> 4);
 }
 
 void BaroBMP085::setMode(BaroDeviceMode mode)
 {
   _mode = mode == BARO_MODE_TEMP ? BMP085_MEASURE_T : BMP085_MEASURE_P3;
-  _bus->writeByte(_addr, BMP085_CONTROL_REG, _mode);
+  _conversionStarted = _bus->writeByte(_addr, BMP085_CONTROL_REG, _mode);
 }
 
 int BaroBMP085::getDelay(BaroDeviceMode mode) const

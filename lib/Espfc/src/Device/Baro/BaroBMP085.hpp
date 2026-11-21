@@ -21,7 +21,7 @@ public:
     int16_t mb;
     int16_t mc;
     int16_t md;
-  } __attribute__((__packed__));
+  };
 
   int begin(BusDevice* bus) final;
   int begin(BusDevice* bus, uint8_t addr) final;
@@ -36,8 +36,10 @@ public:
   bool testConnection() final;
 
 protected:
-  int8_t _mode;
-  int32_t _t_fine;
+  uint8_t _mode = 0;
+  int32_t _t_fine = 0;
+  bool _temperatureValid = false;
+  bool _conversionStarted = false;
   CalibrationData _cal;
 };
 

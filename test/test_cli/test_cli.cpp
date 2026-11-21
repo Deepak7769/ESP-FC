@@ -283,16 +283,30 @@ void test_cli_bf_sensor_hardware()
 
   auto result = stream.str();
   TEST_ASSERT_NOT_EQUAL(0, result.length());
-  TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("gyro: NONE,"));
-  TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("acc: NONE,"));
+  TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("gyro: AUTO,NONE,"));
+  TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("acc: AUTO,NONE,"));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("baro: AUTO,"));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, result.find("mag: AUTO,"));
+}
+
+void test_cli_config_writes_stay_with_the_selected_model()
+{
+  Model first, second;
+  first.config.throttleCurve.expo = 0;
+  second.config.throttleCurve.expo = 10;
+  Cli a(first), b(second);
+  CliCmd cmdA, cmdB;
+  for (char c : std::string("set thr_expo 35\n")) a.process(c,cmdA,printer);
+  for (char c : std::string("set thr_expo 70\n")) b.process(c,cmdB,printer);
+  TEST_ASSERT_EQUAL(35, first.config.throttleCurve.expo);
+  TEST_ASSERT_EQUAL(70, second.config.throttleCurve.expo);
 }
 
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
   RUN_TEST(test_cli_init);
+  RUN_TEST(test_cli_config_writes_stay_with_the_selected_model);
   RUN_TEST(test_cli_enter_interactive);
   RUN_TEST(test_cli_enter_leave_non_interactive);
   RUN_TEST(test_cli_configurator_handshake);

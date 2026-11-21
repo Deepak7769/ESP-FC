@@ -24,6 +24,8 @@ public:
 
   int8_t read(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8_t* data) override;
 
+  int8_t readCommand(uint8_t devAddr, uint8_t command, uint8_t length, uint8_t* data) override;
+
   int8_t readFast(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8_t* data) override;
 
   bool write(uint8_t devAddr, uint8_t regAddr, uint8_t length, const uint8_t* data) override;
