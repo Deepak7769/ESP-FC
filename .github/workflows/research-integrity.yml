@@ -1,0 +1,38 @@
+name: Independent firmware research integrity
+
+on:
+  push:
+    branches:
+      - 'development/betaflight-full-compatibility'
+  pull_request:
+    branches:
+      - '**'
+
+permissions:
+  contents: read
+
+jobs:
+  research-catalog:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify research-only baseline and source inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import csv
+          import pathlib
+          from urllib.parse import urlparse
+          root = pathlib.Path(".")
+          rows = list(csv.DictReader((root/"docs/firmware-research-catalog.csv").open(encoding="utf-8",newline="")))
+          assert len(rows) >= 25, f"Only {len(rows)} source entries"
+          assert len({row["id"] for row in rows}) == len(rows)
+          assert len({row["primary_source"] for row in rows}) == len(rows)
+          assert all(row["review_status"] == "source-identified-only" for row in rows)
+          assert all(urlparse(row["primary_source"]).scheme == "https" for row in rows)
+          for p in ["docs/firmware-research-charter.md", "docs/original-firmware-architecture.md"]:
+              assert (root/p).is_file(), p
+          assert not (root/".gitmodules").exists(), "No vendor submodule should be in the independent baseline"
+          print(f"Validated {len(rows)} research sources. No external code imported.")
+          PY

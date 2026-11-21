@@ -1,0 +1,32 @@
+id,project,group,review_topics,primary_source,review_status
+01,Betaflight,active-ecosystem,fpv;hardware-drivers;msp;esc,https://github.com/betaflight/betaflight,source-identified-only
+02,INAV,active-ecosystem,gps-navigation;fixed-wing;return-to-home,https://github.com/iNavFlight/inav,source-identified-only
+03,ArduPilot,active-ecosystem,navigation;mission;redundancy;failsafe,https://github.com/ArduPilot/ardupilot,source-identified-only
+04,PX4,active-ecosystem,hal;uorb;estimators;simulation,https://github.com/PX4/PX4-Autopilot,source-identified-only
+05,Rotorflight,specialized,helicopter;governor;esc-telemetry,https://github.com/rotorflight/rotorflight-firmware,source-identified-only
+06,EmuFlight,specialized,multirotor;filtering;tuning,https://github.com/emuflight/EmuFlight,source-identified-only
+07,Quicksilver,specialized,whoop;compact-flight-control;stm32;at32,https://github.com/BossHobby/QUICKSILVER,source-identified-only
+08,ROSflight,research,estimation;control;ros-integration;testing,https://github.com/rosflight/rosflight_firmware,source-identified-only
+09,Paparazzi UAV,research,multi-vehicle;autopilot;ground-control,https://github.com/paparazzi/paparazzi,source-identified-only
+10,Crazyflie firmware,research,microdrone;estimation;position-control,https://github.com/bitcraze/crazyflie-firmware,source-identified-only
+11,Espressif ESP-Drone,embedded-esp,esp32;esp-idf;height-hold;position-hold,https://github.com/espressif/esp-drone,source-identified-only
+12,ESP-FC upstream,embedded-esp,esp32;rp2040;msp;arduino-platformio,https://github.com/rtlopez/esp-fc,source-identified-only
+13,LibrePilot,historical,uavobjects;ground-control;stabilization,https://github.com/librepilot/LibrePilot,source-identified-only
+14,dRonin,historical,autotune;stabilization;uavobjects,https://github.com/d-ronin/dRonin,source-identified-only
+15,Tau Labs,historical,openpilot-family;telemetry;estimation,https://github.com/TauLabs/TauLabs,source-identified-only
+16,Cleanflight,historical,msp;mixer;flight-loop,https://github.com/cleanflight/cleanflight,source-identified-only
+17,Baseflight,historical,multirotor;stm32;msp,https://github.com/multiwii/baseflight,source-identified-only
+18,MultiWii,historical,pid;avr;configuration-protocol,https://github.com/multiwii/multiwii-firmware,source-identified-only
+19,Silverware,micro-whoop,tiny-whoop;lightweight-control,https://github.com/phobos-/Silverware,source-identified-only
+20,NFE Silverware,micro-whoop,tiny-whoop;controller-tuning,https://github.com/txemavs/NFE_Silverware,source-identified-only
+21,LiteSilverware,micro-whoop,brushless-whoop;resource-constraints,https://github.com/BETAFPV/LiteSilverware,source-identified-only
+22,AutoQuad,historical,autonomous-multirotor;estimation,https://autoquad.org/,source-identified-only
+23,AeroQuad,historical,modular-arduino-flight-control,https://github.com/AeroQuad/AeroQuad,source-identified-only
+24,MatrixPilot,historical,fixed-wing;navigation;fbw,https://github.com/MatrixPilot/MatrixPilot,source-identified-only
+25,FlightOne,closed-reference,fpv;ecosystem-only;no-internal-source,https://flightone.com/download/,source-identified-only
+26,KISS FC,closed-reference,minimal-configuration;fpv;no-internal-source,https://www.flyduino.net/en/product-page/kiss-fcfc-ultra,source-identified-only
+27,YaoKun ESP32-Drone,community-esp,esp32s3;independent-fc-design,https://github.com/YaoKunS/ESP32-Drone,source-identified-only
+28,Yufeng,community-esp,esp32s3;esp-idf;embedded-design,https://github.com/Hunter-Source/yufeng,source-identified-only
+29,Corvus,community,embedded-rust;quad-rate-control,https://github.com/David-OConnor/corvus,source-identified-only
+30,Qyverra FC,community,esp32;dual-core;wifi;pid,https://github.com/thedronecommunity/qyverra-fc,source-identified-only
+31,SilverLite,micro-whoop,silverware-derivative;stm32f4,https://sakitume.github.io/SilverLite-FC/,source-identified-only
