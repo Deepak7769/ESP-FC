@@ -2099,18 +2099,38 @@ constexpr int REQUIRED_PID_BYTES =
       }
       break;
 
-    case MSP_SET_GPS_CONFIG:
-      m.readU8(); // provider
-      m.readU8(); // sbas mode
-      m.readU8(); // auto config
-      m.readU8(); // auto baud
+    case MSP_SET_GPS_CONFIG: {
+      // The first four fields predate API 1.43. Reject malformed packets
+      // instead of acknowledging an incomplete Galileo configuration.
+      if (m.remain() < 4 || m.remain() == 5)
+      {
+        r.result = -1;
+        break;
+      }
+      m.readU8(); // provider (not yet configurable)
+      m.readU8(); // sbas mode (not yet configurable)
+      m.readU8(); // auto config (not yet configurable)
+      m.readU8(); // auto baud (not yet configurable)
       if (m.remain() >= 2)
       {
-        // Added in API version 1.43
-        _model.config.gps.setHomeOnce = m.readU8(); // gps_set_home_point_once
-        m.readU8();                                 // gps_ublox_use_galileo
+        // Added in API 1.43: write the same GNSS flag used by GpsSensor.
+        const uint8_t setHomeOnce = m.readU8();
+        const uint8_t enableGalileo = m.readU8();
+        if (setHomeOnce > 1 || enableGalileo > 1)
+        {
+          r.result = -1;
+          break;
+        }
+        _model.config.gps.setHomeOnce = setHomeOnce;
+        if (_model.config.gps.enableGalileo != enableGalileo)
+        {
+          _model.config.gps.enableGalileo = enableGalileo;
+          // GNSS constellation setup occurs at GPS initialization.
+          _model.setRebootRequired();
+        }
       }
       break;
+    }
 
     case MSP_GPS_CONFIG:
       r.writeU8(1); // provider
@@ -2119,7 +2139,7 @@ constexpr int REQUIRED_PID_BYTES =
       r.writeU8(1); // autoBaud, 0: off, 1: on
       // Added in API version 1.43
       r.writeU8(_model.config.gps.setHomeOnce); // gps_set_home_point_once
-      r.writeU8(1);                             // gps_ublox_use_galileo
+      r.writeU8(_model.config.gps.enableGalileo); // gps_ublox_use_galileo
       break;
 
     case MSP_RAW_GPS:

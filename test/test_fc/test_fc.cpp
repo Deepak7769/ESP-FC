@@ -2322,6 +2322,92 @@ void test_controller_anti_gravity_yields_to_assisted_vertical_control()
 #endif
 
 
+// No serial transport is used by MSP GPS configuration commands.
+class MspGpsTestStream final : public Stream::ReadWritable
+{
+public:
+  void begin(const Hal::SerialDeviceConfig&) override {}
+  void updateBaudRate(int) override {}
+  int available() override { return 0; }
+  int read() override { return -1; }
+  size_t readMany(uint8_t*, size_t) override { return 0; }
+  int peek() override { return -1; }
+  size_t write(uint8_t) override { return 1; }
+  size_t write(const uint8_t*, size_t len) override { return len; }
+  int availableForWrite() override { return 192; }
+  void flush() override {}
+  bool isTxFifoEmpty() override { return true; }
+};
+
+void test_msp_gps_galileo_setting_roundtrips_and_requires_reboot()
+{
+  ArduinoFakeReset();
+
+  Model model;
+  model.config.gps.gnssMode = 0; // Auto uses enableGalileo directly.
+  model.config.gps.enableGalileo = 1;
+
+  Connect::MspProcessor processor(model);
+  MspGpsTestStream serial;
+
+  Connect::MspMessage set;
+  set.cmd = MSP_SET_GPS_CONFIG;
+  const uint8_t payload[] = {1, 0, 1, 1, 1, 0};
+  std::copy(payload, payload + sizeof(payload), set.buffer);
+  set.received = sizeof(payload);
+
+  Connect::MspResponse write;
+  processor.processCommand(set, write, serial);
+  TEST_ASSERT_EQUAL_INT(1, write.result);
+  TEST_ASSERT_EQUAL_UINT8(0, model.config.gps.enableGalileo);
+  TEST_ASSERT_TRUE(model.getRebootRequired());
+
+  Connect::MspMessage get;
+  get.cmd = MSP_GPS_CONFIG;
+  Connect::MspResponse readback;
+  processor.processCommand(get, readback, serial);
+  TEST_ASSERT_EQUAL_INT(1, readback.result);
+  TEST_ASSERT_EQUAL_UINT16(6, readback.len);
+  TEST_ASSERT_EQUAL_UINT8(0, readback.data[5]);
+}
+
+void test_msp_gps_galileo_rejects_invalid_and_truncated_values()
+{
+  ArduinoFakeReset();
+
+  Model model;
+  model.config.gps.setHomeOnce = 1;
+  model.config.gps.enableGalileo = 1;
+
+  Connect::MspProcessor processor(model);
+  MspGpsTestStream serial;
+
+  Connect::MspMessage invalid;
+  invalid.cmd = MSP_SET_GPS_CONFIG;
+  const uint8_t invalidPayload[] = {1, 0, 1, 1, 0, 2};
+  std::copy(invalidPayload, invalidPayload + sizeof(invalidPayload), invalid.buffer);
+  invalid.received = sizeof(invalidPayload);
+
+  Connect::MspResponse invalidResponse;
+  processor.processCommand(invalid, invalidResponse, serial);
+  TEST_ASSERT_EQUAL_INT(-1, invalidResponse.result);
+  TEST_ASSERT_EQUAL_UINT8(1, model.config.gps.setHomeOnce);
+  TEST_ASSERT_EQUAL_UINT8(1, model.config.gps.enableGalileo);
+  TEST_ASSERT_FALSE(model.getRebootRequired());
+
+  Connect::MspMessage truncated;
+  truncated.cmd = MSP_SET_GPS_CONFIG;
+  const uint8_t truncatedPayload[] = {1, 0, 1, 1, 0};
+  std::copy(truncatedPayload, truncatedPayload + sizeof(truncatedPayload), truncated.buffer);
+  truncated.received = sizeof(truncatedPayload);
+
+  Connect::MspResponse truncatedResponse;
+  processor.processCommand(truncated, truncatedResponse, serial);
+  TEST_ASSERT_EQUAL_INT(-1, truncatedResponse.result);
+  TEST_ASSERT_EQUAL_UINT8(1, model.config.gps.enableGalileo);
+  TEST_ASSERT_FALSE(model.getRebootRequired());
+}
+
 void test_msp_current_meter_reply_is_ignored_when_source_is_not_msp()
 {
   ArduinoFakeReset();
@@ -8037,6 +8123,8 @@ RUN_TEST(
   RUN_TEST(test_controller_anti_gravity_tracks_manual_throttle_transient);
   RUN_TEST(test_pid_antigravity_gain_inputs_scale_p_and_add_i);
   RUN_TEST(test_controller_anti_gravity_can_be_enabled_by_mode);
+  RUN_TEST(test_msp_gps_galileo_setting_roundtrips_and_requires_reboot);
+  RUN_TEST(test_msp_gps_galileo_rejects_invalid_and_truncated_values);
   RUN_TEST(test_msp_current_meter_reply_is_ignored_when_source_is_not_msp);
   RUN_TEST(test_msp_current_meter_short_reply_is_ignored);
   RUN_TEST(test_model_sanitize_preserves_msp_current_source);
