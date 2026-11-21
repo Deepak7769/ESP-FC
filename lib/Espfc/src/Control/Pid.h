@@ -50,6 +50,10 @@ public:
     float pMultiplier = 1.0f,
     float iGainAdd = 0.0f);
   void resetIterm();
+  void configureDMax(uint8_t base, uint8_t ceiling, uint8_t gain, uint8_t advance);
+  float dMaxMultiplier = 1.f;
+  float dMaxGyroDemand = 0.f;
+  float dMaxStickDemand = 0.f;
 
   float rate;
   float dt;
@@ -95,6 +99,13 @@ public:
   int8_t itermRelax;
   float itermRelaxFactor;
   float itermRelaxBase;
+
+private:
+  Utils::FilterStatePt2 _dMaxRange{};
+  Utils::FilterStatePt2 _dMaxBoost{};
+  float _dMaxRatio = 1.f;
+  float _dMaxGyroGain = 0.f;
+  float _dMaxSetpointGain = 0.f;
 };
 
 } // namespace Control

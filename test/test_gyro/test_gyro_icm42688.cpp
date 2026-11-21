@@ -2,6 +2,8 @@
 #include "Device/Baro/BaroBMP085.hpp"
 #include "Device/Baro/BaroMS5611.hpp"
 #include "Device/Baro/BaroLPS.hpp"
+#include "Device/Baro/BaroBMP388.hpp"
+#include "Device/Baro/BaroQMP6988.hpp"
 #include "Device/Baro/BaroSPL06.hpp"
 #include "Device/BusSlave.hpp"
 #include "Device/Mag/MagQMC5883L.hpp"
@@ -29,9 +31,11 @@ public:
   int failReadReg = -1;
   int failWriteReg = -1;
 
+  BusType type = BUS_SPI;
+  bool dummyByte = false;
   BusType getType() const override
   {
-    return BUS_SPI;
+    return type;
   }
 
   int8_t read(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8_t* data) override
@@ -43,7 +47,7 @@ public:
     }
 
     for (uint8_t i = 0; i < length; i++)
-      data[i] = readRegs[(regAddr + i) & 0xFF];
+      data[i] = dummyByte && i == 0 ? 0xff : readRegs[(regAddr + i - (dummyByte ? 1 : 0)) & 0xff];
     return length;
   }
 
@@ -554,9 +558,84 @@ static void test_ms5611_factory_crc_and_second_order_compensation()
   TEST_ASSERT_FALSE(dev.begin(&bus,7));
 }
 
+static void test_bmp388_compensation_and_spi_dummy_byte()
+{
+  for (auto type : {BUS_SPI, BUS_I2C})
+  {
+    MockBusDevice bus;
+    bus.type = type;
+    bus.dummyByte = type == BUS_SPI;
+    bus.readRegs[0] = type == BUS_SPI ? 0x60 : 0x50;
+    bus.readRegs[0x1c] = 3;
+    BaroBMP388 dev;
+    TEST_ASSERT_FALSE(dev.begin(&bus, 7)); // blank trim
+    // Synthetic trim: T = rawT / 32768, P = 96000 + rawP / 1024 + 4*T.
+    bus.readRegs[0x31 + 3] = 0x80;
+    bus.readRegs[0x31 + 6] = 0x44;
+    bus.readRegs[0x31 + 8] = 0x40;
+    bus.readRegs[0x31 + 11] = 0xe0;
+    bus.readRegs[0x31 + 12] = 0x2e;
+    bus.readRegs[0x31 + 14] = 1;
+    TEST_ASSERT_TRUE(dev.begin(&bus, 7));
+    bus.readRegs[3] = 0x60;
+    bus.readRegs[6] = 0x40; // raw pressure 2^22
+    bus.readRegs[9] = 0x0c; // raw temperature 24 * 32768
+    dev.setMode(BARO_MODE_TEMP);
+    TEST_ASSERT_EQUAL_HEX8(0x13, bus.writeRegs[0x1b]);
+    TEST_ASSERT_EQUAL_FLOAT(24, dev.readTemperature());
+    TEST_ASSERT_EQUAL_FLOAT(100192, dev.readPressure());
+    TEST_ASSERT_TRUE(std::isnan(dev.readPressure()));
+    dev.setMode(BARO_MODE_TEMP);
+    bus.readRegs[3] = 0x20;
+    TEST_ASSERT_TRUE(std::isnan(dev.readTemperature()));
+    TEST_ASSERT_TRUE(std::isnan(dev.readPressure()));
+  }
+}
+
+static void test_qmp6988_and_2smpb_distinct_trim_and_freshness()
+{
+  for (auto type : {BARO_QMP6988, BARO_2SMPB_02B})
+  {
+    MockBusDevice bus;
+    bus.readRegs[0xd1] = 0x5c;
+    BaroQMP6988 dev;
+    dev.setType(type);
+    TEST_ASSERT_FALSE(dev.begin(&bus, 7)); // blank trim
+    if (type == BARO_QMP6988)
+    {
+      setWord(bus, 0xa0 + 6, uint16_t(-16384)); // signed pressure sensitivity
+      setAdc(bus, 0xf7, 0x800000 + 4000000);
+      setAdc(bus, 0xfa, 0x800000);
+    }
+    else
+    {
+      setAdc(bus, 0xa0, 1); // pressure offset, quadratic coefficients zero
+      setAdc(bus, 0xf7, 0x800000 + 3120001);
+      setAdc(bus, 0xfa, 0x800000);
+    }
+    TEST_ASSERT_TRUE(dev.begin(&bus, 7));
+    dev.setMode(BARO_MODE_TEMP);
+    TEST_ASSERT_EQUAL_HEX8(type == BARO_QMP6988 ? 0x31 : 0x75, bus.writeRegs[0xf4]);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, dev.readTemperature());
+    TEST_ASSERT_FLOAT_WITHIN(0.1f, type == BARO_QMP6988 ? 92238.84f : 100000.f, dev.readPressure());
+    TEST_ASSERT_TRUE(std::isnan(dev.readPressure()));
+    dev.setMode(BARO_MODE_TEMP);
+    bus.readRegs[0xf3] = 8; // still converting
+    TEST_ASSERT_TRUE(std::isnan(dev.readTemperature()));
+    TEST_ASSERT_TRUE(std::isnan(dev.readPressure()));
+    bus.readRegs[0xf3] = 0;
+    bus.failReadReg = 0xf7;
+    dev.setMode(BARO_MODE_TEMP);
+    TEST_ASSERT_TRUE(std::isnan(dev.readTemperature()));
+    TEST_ASSERT_TRUE(std::isnan(dev.readPressure()));
+  }
+}
+
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
+  RUN_TEST(test_bmp388_compensation_and_spi_dummy_byte);
+  RUN_TEST(test_qmp6988_and_2smpb_distinct_trim_and_freshness);
   RUN_TEST(test_dps310_spl06_compensation_and_stale_data);
   RUN_TEST(test_mpu_bridge_rejects_missing_sensor_and_chunks_long_reads);
   RUN_TEST(test_qmc5883l_field_scale_and_config_write_failure);

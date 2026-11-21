@@ -305,9 +305,9 @@ class Model
       return state.rebootRequired;
     }
 
-    void calculateSimplifiedPids(const SimplifiedTuningConfig& s, PidConfig out[3]) const
+    void calculateSimplifiedPids(const SimplifiedTuningConfig& s, PidConfig out[3], uint8_t* ceilings = nullptr) const
     {
-      // ESP-FC compile-time PID defaults for roll/pitch/yaw (no D-Max on this target)
+      // ESP-FC slider reference gains for roll, pitch and yaw.
       static const PidConfig def[3] = {
         { 45, 80, 30, 110 },
         { 47, 84, 34, 115 },
@@ -326,6 +326,12 @@ class Model
         out[axis].P = std::clamp<long>(lrintf(def[axis].P * master * pi * pitchPi), 0L, SIMPLIFIED_PID_GAIN_MAX);
         out[axis].I = std::clamp<long>(lrintf(def[axis].I * master * pi * ig * pitchPi), 0L, SIMPLIFIED_PID_GAIN_MAX);
         out[axis].D = std::clamp<long>(lrintf(def[axis].D * master * d * pitchD), 0L, SIMPLIFIED_PID_GAIN_MAX);
+        if (ceilings)
+        {
+          constexpr float maxD[] = {40.f, 46.f, 0.f};
+          const float delta = (maxD[axis] - def[axis].D) * s.dMaxGain * 0.01f;
+          ceilings[axis] = std::clamp<long>(lrintf((def[axis].D + delta) * master * d * pitchD), 0L, SIMPLIFIED_PID_GAIN_MAX);
+        }
         out[axis].F = std::clamp<long>(lrintf(def[axis].F * master * pitchPi * ff), 0L, SIMPLIFIED_F_GAIN_MAX);
       }
     }
@@ -359,7 +365,9 @@ class Model
       const auto& pids = config.pid;
       PidConfig tmp[3] = {pids[0], pids[1], pids[2]};
 
-      calculateSimplifiedPids(s, tmp);
+      const auto& activeDMax = config.dMax().ceiling;
+      uint8_t ceilings[3] = {activeDMax[0], activeDMax[1], activeDMax[2]};
+      calculateSimplifiedPids(s, tmp, ceilings);
       bool pidOk = tmp[0].P == pids[0].P && tmp[0].I == pids[0].I &&
                    tmp[0].D == pids[0].D && tmp[0].F == pids[0].F &&
                    tmp[1].P == pids[1].P && tmp[1].I == pids[1].I &&
@@ -367,6 +375,11 @@ class Model
                    tmp[2].P == pids[2].P && tmp[2].I == pids[2].I &&
                    tmp[2].D == pids[2].D && tmp[2].F == pids[2].F;
 
+      for (int axis = 0; axis < 3; ++axis)
+      {
+        // Zero and a ceiling at/below base D both disable the boost.
+        pidOk &= std::max(ceilings[axis], pids[axis].D) == std::max(activeDMax[axis], pids[axis].D);
+      }
       const auto& gyro = config.gyro;
       int16_t glpf1 = gyro.filter.freq;
       int16_t glpf2 = gyro.filter2.freq;
@@ -597,6 +610,11 @@ class Model
 
     void sanitize()
     {
+      for (auto& dMax : config.dMaxProfiles)
+      {
+        dMax.gain = std::min<uint8_t>(dMax.gain, 100);
+        dMax.advance = std::min<uint8_t>(dMax.advance, 200);
+      }
             // -------------------------------------------------
       // FAILSAFE CONFIG SANITIZATION
       // -------------------------------------------------

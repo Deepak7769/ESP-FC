@@ -702,7 +702,7 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       const auto mag = m.readU8();
       const auto range = m.remain() ? m.readU8() : _model.config.surface.rangefinder;
       const auto flow = m.remain() ? m.readU8() : _model.config.surface.opticalFlow;
-      if (range > RANGE_TFNOVA || flow > 1) { r.result = -1; break; }
+      if (accel >= GYRO_MAX || baro >= BARO_MAX || mag >= MAG_MAX || range > RANGE_TFNOVA || flow > 1) { r.result = -1; break; }
       if (_model.config.surface.rangefinder != range || _model.config.surface.opticalFlow != flow)
         _model.state.surface = {};
       _model.config.accel.dev = accel;
@@ -739,29 +739,34 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU8(_model.config.mag.align);  // mag align
       // 1.41+
       r.writeU8(_model.state.gyro.present ? 1 : 0); // gyro detection mask GYRO_1_MASK
-      r.writeU8(_model.state.gyro.present ? 1 : 0); // gyro_enable_mask, was gyro_to_use
-      r.writeU16(0);                                // mag align roll
-      r.writeU16(0);                                // mag align pitch
-      r.writeU16(0);                                // mag align yaw
+      r.writeU8(_model.config.gyro.dev != GYRO_NONE ? 1 : 0);
+      for (auto angle : _model.config.magAlignment) r.writeU16(angle);
       break;
 
     case MSP_SET_SENSOR_ALIGNMENT: {
-      uint8_t gyroAlign = m.readU8();       // gyro align
-      m.readU8();                           // discard deprecated acc align
-      _model.config.mag.align = m.readU8(); // mag align
-      // API >= 1.41 - support the gyro_to_use and alignment for gyros 1 & 2
-      if (m.remain() >= 1)
+      const auto length = m.remain();
+      if (length != 3 && length != 4 && length != 6 && length < 10) { r.result = -1; break; }
+      uint8_t gyroAlign = m.readU8();
+      m.readU8(); // accelerometer shares the gyro mounting
+      const uint8_t magAlign = m.readU8();
+      uint8_t mask = length >= 4 ? m.readU8() : (_model.config.gyro.dev != GYRO_NONE);
+      if (length == 6)
       {
-        uint8_t gyroEnableMask = m.readU8(); // gyro_enable_mask
-        _model.config.gyro.dev = gyroEnableMask & 1 ? GYRO_AUTO : GYRO_NONE;
+        // API 1.46 sent gyro_to_use (0 = first, 1 = second, 2 = both)
+        // followed by the two gyro orientations. This board has one gyro.
+        if (mask == 1 || mask > 2) { r.result = -1; break; }
+        mask = 1;
+        gyroAlign = m.readU8();
+        m.readU8();
       }
-      if (m.remain() >= 6)
-      {
-        m.readU16(); // gyro 1 roll
-        m.readU16(); // gyro 1 pitch
-        m.readU16(); // gyro 1 yaw
-      }
+      if (gyroAlign > ALIGN_CUSTOM || magAlign > ALIGN_CUSTOM || mask > 1) { r.result = -1; break; }
+      if (length >= 10)
+        for (auto& angle : _model.config.magAlignment) angle = static_cast<int16_t>(m.readU16());
+      if (!mask) _model.config.gyro.dev = GYRO_NONE;
+      else if (_model.config.gyro.dev == GYRO_NONE) _model.config.gyro.dev = GYRO_AUTO;
       _model.config.gyro.align = gyroAlign;
+      _model.config.mag.align = magAlign;
+      _model.notifyConfigChange(MODEL_CHANGE_ACCEL);
       break;
     }
 
@@ -1617,11 +1622,9 @@ constexpr int REQUIRED_PID_BYTES =
       r.writeU16(_model.config.pid[FC_PID_YAW].F);   // pid yaw f
       r.writeU8(0);                                  // antigravity mode
       // 1.41+
-      r.writeU8(0); // d max roll
-      r.writeU8(0); // d max pitch
-      r.writeU8(0); // d max yaw
-      r.writeU8(0); // d max gain
-      r.writeU8(0); // d max advance
+      for (auto ceiling : _model.config.dMax().ceiling) r.writeU8(ceiling);
+      r.writeU8(_model.config.dMax().gain);
+      r.writeU8(_model.config.dMax().advance);
       r.writeU8(0); // use_integrated_yaw
       r.writeU8(0); // integrated_yaw_relax
       // 1.42+
@@ -1644,6 +1647,16 @@ constexpr int REQUIRED_PID_BYTES =
       break;
 
     case MSP_SET_PID_ADVANCED:
+      // Historical APIs append groups of fields. Reject a partial group before
+      // changing live tuning, while accepting longer frames from newer clients.
+      switch (m.remain())
+      {
+        case 17: case 19: case 23: case 25: case 39: case 46: case 47:
+        case 50: case 55: case 56: case 57:
+          break;
+        default:
+          if (m.remain() < 61) { r.result = -1; return; }
+      }
       m.readU16();
       m.readU16();
       m.readU16(); // was pidProfile.yaw_p_limit
@@ -1691,11 +1704,10 @@ constexpr int REQUIRED_PID_BYTES =
       // 1.41+
       if (m.remain() >= 7)
       {
-        m.readU8(); // d max roll
-        m.readU8(); // d max pitch
-        m.readU8(); // d max yaw
-        m.readU8(); // d max gain
-        m.readU8(); // d max advance
+        auto& dMax = _model.config.dMax();
+        for (auto& ceiling : dMax.ceiling) ceiling = m.readU8();
+        dMax.gain = std::min<uint8_t>(100, m.readU8());
+        dMax.advance = std::min<uint8_t>(200, m.readU8());
         m.readU8(); // use_integrated_yaw
         m.readU8(); // integrated_yaw_relax
       }
@@ -1770,6 +1782,7 @@ constexpr int REQUIRED_PID_BYTES =
     }
 
     case MSP_SET_SIMPLIFIED_TUNING: {
+      if (m.remain() < 53) { r.result = -1; break; }
       auto& s = _model.config.simplifiedTuning;
       s.pidsMode = m.readU8();
       s.masterMultiplier = m.readU8();
@@ -1798,7 +1811,7 @@ constexpr int REQUIRED_PID_BYTES =
       _model.config.gyro.dynLpfFilter.freq = m.readU16();
       m.readU32();
       m.readU32();
-      _model.calculateSimplifiedPids(s, _model.config.pid);
+      _model.calculateSimplifiedPids(s, _model.config.pid, _model.config.dMax().ceiling);
       if (s.dtermFilter)
       {
         _model.calculateSimplifiedDtermFilters(
@@ -1820,6 +1833,7 @@ constexpr int REQUIRED_PID_BYTES =
     }
 
     case MSP_CALCULATE_SIMPLIFIED_PID: {
+      if (m.remain() < 17) { r.result = -1; break; }
       SimplifiedTuningConfig s;
       s.pidsMode = m.readU8();
       s.masterMultiplier = m.readU8();
@@ -1834,19 +1848,22 @@ constexpr int REQUIRED_PID_BYTES =
       m.readU32();
       PidConfig tmp[3] = {_model.config.pid[FC_PID_ROLL], _model.config.pid[FC_PID_PITCH],
                           _model.config.pid[FC_PID_YAW]};
-      _model.calculateSimplifiedPids(s, tmp);
+      const auto& active = _model.config.dMax().ceiling;
+      uint8_t ceilings[3] = {active[0], active[1], active[2]};
+      _model.calculateSimplifiedPids(s, tmp, ceilings);
       for (int i = 0; i < 3; i++)
       {
         r.writeU8(tmp[i].P);
         r.writeU8(tmp[i].I);
         r.writeU8(tmp[i].D);
-        r.writeU8(0); // d_max not supported
+        r.writeU8(ceilings[i]);
         r.writeU16(tmp[i].F);
       }
       break;
     }
 
     case MSP_CALCULATE_SIMPLIFIED_GYRO: {
+      if (m.remain() < 18) { r.result = -1; break; }
       uint8_t filter = m.readU8();
       uint8_t mult = m.readU8();
       int16_t lpf1 = m.readU16();
@@ -1868,6 +1885,7 @@ constexpr int REQUIRED_PID_BYTES =
     }
 
     case MSP_CALCULATE_SIMPLIFIED_DTERM: {
+      if (m.remain() < 18) { r.result = -1; break; }
       uint8_t filter = m.readU8();
       uint8_t mult = m.readU8();
       int16_t lpf1 = m.readU16();

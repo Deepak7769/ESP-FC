@@ -24,7 +24,8 @@ private:
   void applyCalibration();
 
   Model& _model;
-  Device::MagDevice* _mag;
+  Device::MagDevice* _mag = nullptr;
+  RotationMatrixFloat _sensorRotation;
 };
 
 } // namespace Espfc::Sensor

@@ -228,6 +228,85 @@ static void test_pid_profiles_change_active_gains_copy_reset_and_armed_guard()
   TEST_ASSERT_EQUAL(3,command(model,MSP2_GET_TEXT,{MSP2TEXT_PID_PROFILE_NAME}).data[1]);
 }
 
+static void test_sensor_alignment_preserves_explicit_gyro_and_mag_angles()
+{
+  clocks();
+  Model model;
+  model.config.gyro.dev = GYRO_ICM42688;
+  auto current = command(model, MSP_SENSOR_ALIGNMENT);
+  TEST_ASSERT_EQUAL(0, current.data[3]); // absent on this bench
+  TEST_ASSERT_EQUAL(1, current.data[4]); // still configured for detection
+  std::vector<uint8_t> wire = {ALIGN_CW90_DEG, 0, ALIGN_CUSTOM, 1, 0x85, 0xff, 0, 0, 0x84, 3};
+  TEST_ASSERT_EQUAL(1, command(model, MSP_SET_SENSOR_ALIGNMENT, wire).result);
+  TEST_ASSERT_EQUAL(GYRO_ICM42688, model.config.gyro.dev);
+  TEST_ASSERT_EQUAL(-123, model.config.magAlignment[0]);
+  TEST_ASSERT_EQUAL(900, model.config.magAlignment[2]);
+  current = command(model, MSP_SENSOR_ALIGNMENT);
+  TEST_ASSERT_EQUAL_MEMORY(wire.data() + 4, current.data + 5, 6);
+  wire.resize(7);
+  wire[3] = 0;
+  TEST_ASSERT_EQUAL(-1, command(model, MSP_SET_SENSOR_ALIGNMENT, wire).result);
+  TEST_ASSERT_EQUAL(GYRO_ICM42688, model.config.gyro.dev);
+  wire.resize(4);
+  TEST_ASSERT_EQUAL(1, command(model, MSP_SET_SENSOR_ALIGNMENT, wire).result);
+  TEST_ASSERT_EQUAL(GYRO_NONE, model.config.gyro.dev);
+}
+
+static void test_dmax_wire_profiles_and_bounded_runtime_response()
+{
+  clocks();
+  Model model;
+  auto advanced = command(model, MSP_PID_ADVANCED);
+  std::vector<uint8_t> settings(advanced.data, advanced.data + advanced.len);
+  // D-Max immediately follows the legacy anti-gravity mode byte.
+  constexpr size_t at = 39;
+  settings[at] = 60;
+  settings[at + 3] = 44;
+  settings[at + 4] = 35;
+  TEST_ASSERT_EQUAL(1,command(model,MSP_SET_PID_ADVANCED, settings).result);
+  TEST_ASSERT_EQUAL(60,model.config.dMax().ceiling[0]);
+  TEST_ASSERT_EQUAL(44,model.config.dMax().gain);
+  TEST_ASSERT_EQUAL(35,model.config.dMax().advance);
+  TEST_ASSERT_EQUAL(1,command(model,MSP_SELECT_SETTING,{1}).result);
+  TEST_ASSERT_EQUAL(0,model.config.dMax().ceiling[0]);
+  TEST_ASSERT_EQUAL(1,command(model,MSP_COPY_PROFILE,{0,1,0}).result);
+  TEST_ASSERT_EQUAL(60,command(model,MSP_PID_ADVANCED).data[at]);
+
+  auto shortAdvanced = settings;
+  shortAdvanced.resize(42);
+  shortAdvanced[17] = 7;
+  TEST_ASSERT_EQUAL(-1, command(model, MSP_SET_PID_ADVANCED, shortAdvanced).result);
+  TEST_ASSERT_EQUAL(settings[17], command(model, MSP_PID_ADVANCED).data[17]);
+
+  auto sliders = command(model, MSP_SIMPLIFIED_TUNING);
+  std::vector<uint8_t> simplified(sliders.data, sliders.data + sliders.len);
+  simplified[0] = 2;
+  simplified[6] = 100;
+  auto preview = command(model, MSP_CALCULATE_SIMPLIFIED_PID, simplified);
+  TEST_ASSERT_GREATER_THAN(preview.data[2], preview.data[3]);
+  TEST_ASSERT_EQUAL(1, command(model, MSP_SET_SIMPLIFIED_TUNING, simplified).result);
+  TEST_ASSERT_EQUAL(preview.data[3], command(model, MSP_PID_ADVANCED).data[at]);
+  TEST_ASSERT_EQUAL(1, command(model, MSP_VALIDATE_SIMPLIFIED_TUNING).data[0]);
+  simplified.pop_back();
+  simplified[1] = 0;
+  TEST_ASSERT_EQUAL(-1, command(model, MSP_SET_SIMPLIFIED_TUNING, simplified).result);
+  TEST_ASSERT_EQUAL(preview.data[3], command(model, MSP_PID_ADVANCED).data[at]);
+
+  Control::Pid pid;
+  pid.rate = 1000;
+  pid.begin();
+  pid.Kd = 0.03f;
+  pid.configureDMax(30,60,100,100);
+  for (int i = 0; i < 60; ++i) pid.update(i * 0.5f, i * 0.5f);
+  TEST_ASSERT_TRUE(pid.dMaxMultiplier > 1.5f);
+  TEST_ASSERT_TRUE(pid.dMaxMultiplier <= 2.f);
+  for (int i = 0; i < 300; ++i) pid.update(30.f,30.f);
+  TEST_ASSERT_FLOAT_WITHIN(0.001f,1.f,pid.dMaxMultiplier);
+  pid.configureDMax(30,0,100,100);
+  pid.update(0.f,0.f);
+  TEST_ASSERT_EQUAL_FLOAT(1.f,pid.dMaxMultiplier);
+}
+
 static void test_rate_profiles_switch_copy_persist_and_apply()
 {
   clocks();
@@ -266,7 +345,7 @@ static void test_rate_profiles_switch_copy_persist_and_apply()
   TEST_ASSERT_TRUE(model.config.selectPidProfile(2));
   model.config.pid[FC_PID_ROLL].P = 64;
   const auto size = sizeof(ModelConfig);
-  std::vector<uint8_t> image{0xa5,5,static_cast<uint8_t>(size),static_cast<uint8_t>(size >> 8)};
+  std::vector<uint8_t> image{0xa5,6,static_cast<uint8_t>(size),static_cast<uint8_t>(size >> 8)};
   const auto* bytes = reinterpret_cast<const uint8_t*>(&model.config);
   image.insert(image.end(), bytes, bytes + size);
   Model restored;
@@ -290,11 +369,12 @@ static void test_legacy_battery_packet_and_eeprom_migration()
   TEST_ASSERT_EQUAL(430,model.config.batteryProfile.cellMax);
   model.config.input.serialRxProvider = SERIALRX_IBUS;
   model.config.antiGravityGain = 98;
-  for (auto version : {2,3,4,5})
+  for (auto version : {2,3,4,5,6})
   {
     const size_t size = version == 2 ? offsetof(ModelConfig,batteryProfile) :
                         version == 3 ? offsetof(ModelConfig,rateProfiles) :
-                        version == 4 ? offsetof(ModelConfig,pidProfiles) : sizeof(ModelConfig);
+                        version == 4 ? offsetof(ModelConfig,pidProfiles) :
+                        version == 5 ? offsetof(ModelConfig,dMaxProfiles) : sizeof(ModelConfig);
     std::vector<uint8_t> image = {0xa5, static_cast<uint8_t>(version), static_cast<uint8_t>(size), static_cast<uint8_t>(size>>8)};
     const auto* bytes = reinterpret_cast<const uint8_t*>(&model.config);
     image.insert(image.end(), bytes, bytes + size);
@@ -660,6 +740,8 @@ int main()
   RUN_TEST(test_xbus_mode_b_and_rj01_nested_checksums);
   RUN_TEST(test_msp_receiver_selection_survives_sanitize_and_rejects_unknown);
   RUN_TEST(test_battery_wire_round_trip_alarm_and_atomic_bad_write);
+  RUN_TEST(test_sensor_alignment_preserves_explicit_gyro_and_mag_angles);
+  RUN_TEST(test_dmax_wire_profiles_and_bounded_runtime_response);
   RUN_TEST(test_pid_profiles_change_active_gains_copy_reset_and_armed_guard);
   RUN_TEST(test_rate_profiles_switch_copy_persist_and_apply);
   RUN_TEST(test_legacy_battery_packet_and_eeprom_migration);

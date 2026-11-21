@@ -4,7 +4,7 @@ namespace Espfc::Device {
 
 const char** BaroDevice::getNames()
 {
-  static const char* devChoices[] = {"AUTO", "NONE", "BMP085", "MS5611", "BMP280", "SPL06-001", "LPS", "DPS310", nullptr};
+  static const char* devChoices[] = {"AUTO", "NONE", "BMP085", "MS5611", "BMP280", "SPL06-001", "LPS", "DPS310", "BMP388", "QMP6988", "2SMPB_02B", nullptr};
   return devChoices;
 }
 

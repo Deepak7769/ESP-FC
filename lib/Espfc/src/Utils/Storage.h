@@ -37,6 +37,7 @@ public:
     if (version == 2) expected = offsetof(ModelConfig, batteryProfile);
     if (version == 3) expected = offsetof(ModelConfig, rateProfiles);
     if (version == 4) expected = offsetof(ModelConfig, pidProfiles);
+    if (version == 5) expected = offsetof(ModelConfig, dMaxProfiles);
     if (size != expected) return STORAGE_ERR_BAD_SIZE;
     auto* bytes = reinterpret_cast<uint8_t*>(&config);
     for (size_t i = 0; i < size; ++i) bytes[i] = read(i + 4);
@@ -53,6 +54,11 @@ public:
     for (auto& name : config.rateProfiles.names) name[sizeof(name) - 1] = 0;
     if (version < 5 || config.pidProfiles.selected >= PidProfileBank::COUNT) config.initializePidProfiles();
     for (auto& name : config.pidProfiles.names) name[sizeof(name) - 1] = 0;
+    if (version < 6)
+    {
+      for (auto& configDMax : config.dMaxProfiles) configDMax = {};
+      for (auto& angle : config.magAlignment) angle = 0;
+    }
     return STORAGE_LOAD_SUCCESS;
   }
 
@@ -62,7 +68,7 @@ public:
 
 private:
   static constexpr uint8_t EEPROM_MAGIC = 0xA5;
-  static constexpr uint8_t EEPROM_VERSION = 0x05;
+  static constexpr uint8_t EEPROM_VERSION = 0x06;
 
   static constexpr size_t EEPROM_SIZE = 2048;
 };

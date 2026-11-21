@@ -3,6 +3,8 @@
 #include "Device/Baro/BaroBMP085.hpp"
 #include "Device/Baro/BaroMS5611.hpp"
 #include "Device/Baro/BaroLPS.hpp"
+#include "Device/Baro/BaroBMP388.hpp"
+#include "Device/Baro/BaroQMP6988.hpp"
 #include "Device/Baro/BaroBMP280.hpp"
 #include "Device/Baro/BaroSPL06.hpp"
 #include "Device/BaroDevice.hpp"
@@ -54,6 +56,8 @@ static Espfc::Device::Mag::MagAK8963 ak8963;
 static Espfc::Device::Baro::BaroBMP085 bmp085;
 static Espfc::Device::Baro::BaroMS5611 ms5611;
 static Espfc::Device::Baro::BaroLPS lps;
+static Espfc::Device::Baro::BaroBMP388 bmp388;
+static Espfc::Device::Baro::BaroQMP6988 qmp;
 static Espfc::Device::Baro::BaroBMP280 bmp280;
 static Espfc::Device::Baro::BaroSPL06 spl06;
 static bool busAllowed(
@@ -530,6 +534,8 @@ void Hardware::detectBaro()
   // The DPS310 and SPL06-001 share product ID 0x10 and their coefficient layout.
   // Explicit selection determines the temperature sensor calibration source.
   spl06.setType(configuredDev == BARO_DPS310 ? BARO_DPS310 : BARO_SPL06);
+  const bool explicitQmp = configuredDev == BARO_QMP6988 || configuredDev == BARO_2SMPB_02B;
+  if (explicitQmp) qmp.setType(static_cast<BaroDeviceType>(configuredDev));
   if (configuredDev == BARO_NONE)
   {
     return;
@@ -591,6 +597,9 @@ void Hardware::detectBaro()
     {
       detectedBaro = &spl06;
     }
+    if (!detectedBaro && deviceAllowed(configuredDev, BARO_DEFAULT, BARO_BMP388) &&
+        detectDevice(bmp388, spiBus, cs)) detectedBaro = &bmp388;
+    if (!detectedBaro && explicitQmp && detectDevice(qmp, spiBus, cs)) detectedBaro = &qmp;
     if (!detectedBaro && deviceAllowed(configuredDev, BARO_DEFAULT, BARO_MS5611) &&
         detectDevice(ms5611, spiBus, cs)) detectedBaro = &ms5611;
     if (!detectedBaro && deviceAllowed(configuredDev, BARO_DEFAULT, BARO_LPS) &&
@@ -632,6 +641,9 @@ void Hardware::detectBaro()
     {
       detectedBaro = &spl06;
     }
+    if (!detectedBaro && deviceAllowed(configuredDev, BARO_DEFAULT, BARO_BMP388) &&
+        detectDevice(bmp388, i2cBus)) detectedBaro = &bmp388;
+    if (!detectedBaro && explicitQmp && detectDevice(qmp, i2cBus)) detectedBaro = &qmp;
     if (!detectedBaro && deviceAllowed(configuredDev, BARO_DEFAULT, BARO_MS5611) &&
         detectDevice(ms5611, i2cBus)) detectedBaro = &ms5611;
     if (!detectedBaro && deviceAllowed(configuredDev, BARO_DEFAULT, BARO_LPS) &&

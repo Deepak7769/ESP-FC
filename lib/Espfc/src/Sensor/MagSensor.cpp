@@ -23,6 +23,7 @@ int MagSensor::begin()
   _model.state.mag.calibrationValid = true;
 
   reload(MODEL_CHANGE_FILTER);
+  reload(MODEL_CHANGE_ACCEL);
 
   _model.logger.info()
       .log("MAG INIT")
@@ -46,6 +47,12 @@ int MagSensor::reload(ModelChangeEvent event)
         }
       }
       break;
+    case MODEL_CHANGE_ACCEL: {
+      const auto& angles = _model.config.magAlignment;
+      _sensorRotation.init(VectorFloat(Utils::toRad(0.1f * angles[0]), Utils::toRad(0.1f * angles[1]),
+                                       Utils::toRad(0.1f * angles[2])));
+      break;
+    }
     default:
       break;
   }
@@ -81,7 +88,10 @@ int MagSensor::filter()
 
   _model.state.mag.adc = _mag->convert(_model.state.mag.raw);
 
-  align(_model.state.mag.adc, _model.config.mag.align);
+  if (_model.config.mag.align == ALIGN_CUSTOM)
+    _model.state.mag.adc = _sensorRotation.apply(_model.state.mag.adc);
+  else
+    align(_model.state.mag.adc, _model.config.mag.align);
   _model.state.mag.adc = _model.state.boardAlignment.apply(_model.state.mag.adc);
 
   for (size_t i = 0; i < AXIS_COUNT_RPY; i++)

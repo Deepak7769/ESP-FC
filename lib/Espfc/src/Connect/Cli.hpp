@@ -110,7 +110,11 @@ public:
 
     Param bind(ModelConfig& config) const
     {
-      return Param(name, type, reinterpret_cast<char*>(&config) + offset, choices, maxLen);
+      auto* address = reinterpret_cast<char*>(&config) + offset;
+      constexpr size_t dMaxStart = offsetof(ModelConfig, dMaxProfiles);
+      if (offset >= dMaxStart && offset < dMaxStart + sizeof(DMaxConfig))
+        address = reinterpret_cast<char*>(&config.dMax()) + (offset - dMaxStart);
+      return Param(name, type, address, choices, maxLen);
     }
   };
 

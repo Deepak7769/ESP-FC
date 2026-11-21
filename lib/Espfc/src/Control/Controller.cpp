@@ -868,7 +868,17 @@ else
     _model.state.debug[7] = std::clamp(lrintf(innerPid[AXIS_THRUST].fTerm * 1000.0f), -3000l, 3000l);
   }
 
-  // debug
+  if (_model.config.debug.mode == DEBUG_D_MAX)
+  {
+    const auto axis = std::min<unsigned>(_model.config.debug.axis, AXIS_YAW);
+    const auto& pid = innerPid[axis];
+    auto debugValue = [](float value) { return int16_t(std::lround(std::clamp(value, 0.f, 32767.f))); };
+    _model.state.debug[0] = debugValue(pid.dMaxGyroDemand * 100.f);
+    _model.state.debug[1] = debugValue(pid.dMaxStickDemand * 100.f);
+    _model.state.debug[2] = debugValue(_model.config.pid[axis].D * pid.dMaxMultiplier * 10.f);
+    _model.state.debug[3] = debugValue(pid.dMaxMultiplier * 100.f);
+  }
+
   if (_model.config.debug.mode == DEBUG_ITERM_RELAX)
   {
     _model.state.debug[0] = lrintf(Utils::toDeg(innerPid[AXIS_ROLL].itermRelaxBase));
@@ -1806,6 +1816,8 @@ void Controller::reloadPid()
     pid.oLimitLow = -0.66f;
     pid.oLimitHigh = 0.66f;
     pid.rate = pidFilterRate;
+    const auto& dMax = _model.config.dMax();
+    pid.configureDMax(pc.D, dMax.ceiling[axis], dMax.gain, dMax.advance);
     if (axis == AXIS_YAW)
     {
       pid.itermRelax =

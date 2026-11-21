@@ -19,6 +19,21 @@ void Pid::begin()
   dt = 1.f / rate;
 }
 
+void Pid::configureDMax(uint8_t base, uint8_t ceiling, uint8_t gain, uint8_t advance)
+{
+  _dMaxRatio = base && ceiling > base ? static_cast<float>(ceiling) / base : 1.f;
+  // D-Max gains operate on angular acceleration in degrees/s²; ESP-FC uses radians.
+  constexpr float gainScale = Utils::toDeg(1.f) * 0.00008f / 35.f;
+  _dMaxGyroGain = gain * gainScale;
+  _dMaxSetpointGain = advance * gainScale;
+  _dMaxRange.init(std::max(rate, 1.f), 85.f);
+  _dMaxBoost.init(std::max(rate, 1.f), 35.f);
+  _dMaxRange.reset();
+  _dMaxBoost.reset();
+  dMaxMultiplier = 1.f;
+  dMaxGyroDemand = dMaxStickDemand = 0.f;
+}
+
 void Pid::resetIterm()
 {
   iTerm = iReset;
@@ -88,11 +103,22 @@ float FAST_CODE_ATTR Pid::update(
     dTerm = dtermNotchFilter.update(dTerm);
     dTerm = dtermFilter.update(dTerm);
     dTerm = dtermFilter2.update(dTerm);
-      dTerm *= tpa;
+    if (_dMaxRatio > 1.f)
+    {
+      const float acceleration = dTerm / (Kd * dScale);
+      dMaxGyroDemand = std::abs(_dMaxRange.update(acceleration)) * _dMaxGyroGain;
+      dMaxStickDemand = std::abs((setpoint - prevSetpoint) * rate) * _dMaxSetpointGain;
+      const float boost = _dMaxBoost.update(std::max(dMaxGyroDemand, dMaxStickDemand));
+      dMaxMultiplier = 1.f + (_dMaxRatio - 1.f) * std::clamp(boost, 0.f, 1.f);
+      dTerm *= dMaxMultiplier;
+    }
+    dTerm *= tpa;
   }
   else
   {
     dTerm = 0;
+    dMaxMultiplier = 1.f;
+    dMaxGyroDemand = dMaxStickDemand = 0.f;
   }
 
   // F-term

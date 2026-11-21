@@ -897,7 +897,7 @@ struct SimplifiedTuningConfig
   uint8_t iGain = 100;
   uint8_t dGain = 80;
   uint8_t piGain = 100;
-  uint8_t dMaxGain = 0;  // unused, ESP-FC has no D-Max
+  uint8_t dMaxGain = 0;
   uint8_t ffGain = 80;
   uint8_t pitchPiGain = 100;
   uint8_t dtermFilter = 1;
@@ -929,6 +929,13 @@ struct PidTuningProfile
   SimplifiedTuningConfig simplified;
   uint8_t antiGravityGain = 80;
   int8_t motorLimit = 100;
+};
+
+struct DMaxConfig
+{
+  uint8_t ceiling[3] = {};
+  uint8_t gain = 37;
+  uint8_t advance = 20;
 };
 
 struct PidProfileBank
@@ -1086,6 +1093,11 @@ class ModelConfig
 
     alignas(4) RateProfileBank rateProfiles;
     alignas(4) PidProfileBank pidProfiles;
+    alignas(4) DMaxConfig dMaxProfiles[PidProfileBank::COUNT];
+    int16_t magAlignment[3] = {}; // sensor mounting angles in tenths of a degree
+
+    DMaxConfig& dMax() { return dMaxProfiles[pidProfiles.selected]; }
+    const DMaxConfig& dMax() const { return dMaxProfiles[pidProfiles.selected]; }
 
     void capturePidProfile(PidTuningProfile& profile) const
     {
@@ -1146,6 +1158,7 @@ class ModelConfig
       if (source == dest) return true;
       if (source == pidProfiles.selected) capturePidProfile(pidProfiles.settings[source]);
       pidProfiles.settings[dest] = pidProfiles.settings[source];
+      dMaxProfiles[dest] = dMaxProfiles[source];
       std::copy_n(pidProfiles.names[source], sizeof(pidProfiles.names[dest]), pidProfiles.names[dest]);
       if (dest == pidProfiles.selected) applyPidProfile(pidProfiles.settings[dest]);
       return true;
@@ -1155,6 +1168,7 @@ class ModelConfig
     {
       PidTuningProfile defaults;
       applyPidProfile(defaults);
+      dMax() = {};
       pidProfiles.names[pidProfiles.selected][0] = 0;
     }
 
