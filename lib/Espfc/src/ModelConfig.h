@@ -2,6 +2,7 @@
 #define _ESPFC_MODEL_CONFIG_H_
 
 #include "Target/Target.h"
+#include <algorithm>
 #include "EscDriver.h"
 #include "Utils/Filter.h"
 #include "Device/BusDevice.hpp"
@@ -789,6 +790,51 @@ struct ThrottleCurveConfig
   uint8_t hover = 50;
 };
 
+struct ControlRateProfile
+{
+  uint8_t expo[3] = {};
+  uint8_t rate[3] = {};
+  uint8_t superRate[3] = {};
+  int16_t rateLimit[3] = {};
+  int8_t rateType = 0;
+  int8_t throttleLimitType = 0;
+  int8_t throttleLimitPercent = 100;
+  ThrottleCurveConfig curve;
+
+  void capture(const InputConfig& input, const OutputConfig& output, const ThrottleCurveConfig& throttle)
+  {
+    std::copy_n(input.expo, 3, expo);
+    std::copy_n(input.rate, 3, rate);
+    std::copy_n(input.superRate, 3, superRate);
+    std::copy_n(input.rateLimit, 3, rateLimit);
+    rateType = input.rateType;
+    throttleLimitType = output.throttleLimitType;
+    throttleLimitPercent = output.throttleLimitPercent;
+    curve = throttle;
+  }
+
+  void apply(InputConfig& input, OutputConfig& output, ThrottleCurveConfig& throttle) const
+  {
+    std::copy_n(expo, 3, input.expo);
+    std::copy_n(rate, 3, input.rate);
+    std::copy_n(superRate, 3, input.superRate);
+    for (size_t i = 0; i < 3; ++i)
+      input.rateLimit[i] = std::clamp<int16_t>(rateLimit[i], 1, 1998);
+    input.rateType = rateType >= 0 && rateType <= 4 ? rateType : 3;
+    output.throttleLimitType = throttleLimitType >= 0 && throttleLimitType <= 2 ? throttleLimitType : 0;
+    output.throttleLimitPercent = std::clamp<int8_t>(throttleLimitPercent, 1, 100);
+    throttle = curve;
+  }
+};
+
+struct RateProfileBank
+{
+  static constexpr uint8_t COUNT = 4;
+  uint8_t selected = 0;
+  ControlRateProfile settings[COUNT];
+  char names[COUNT][9] = {};
+};
+
 struct GpsReceiverConfig
 {
   uint8_t provider = GPS_UBLOX;
@@ -1016,6 +1062,40 @@ class ModelConfig
     SurfaceSensorConfig surface;
     ThrottleCurveConfig throttleCurve;
 
+    alignas(4) RateProfileBank rateProfiles;
+
+    void initializeRateProfiles()
+    {
+      rateProfiles = {};
+      for (auto& profile : rateProfiles.settings)
+        profile.capture(input, output, throttleCurve);
+    }
+
+    bool selectRateProfile(uint8_t index)
+    {
+      if (index >= RateProfileBank::COUNT || rateProfiles.selected >= RateProfileBank::COUNT) return false;
+      if (index != rateProfiles.selected)
+      {
+        rateProfiles.settings[rateProfiles.selected].capture(input, output, throttleCurve);
+        rateProfiles.settings[index].apply(input, output, throttleCurve);
+        rateProfiles.selected = index;
+      }
+      return true;
+    }
+
+    bool copyRateProfile(uint8_t dest, uint8_t source)
+    {
+      if (dest >= RateProfileBank::COUNT || source >= RateProfileBank::COUNT ||
+          rateProfiles.selected >= RateProfileBank::COUNT) return false;
+      if (source == dest) return true;
+      if (source == rateProfiles.selected)
+        rateProfiles.settings[source].capture(input, output, throttleCurve);
+      rateProfiles.settings[dest] = rateProfiles.settings[source];
+      std::copy_n(rateProfiles.names[source], sizeof(rateProfiles.names[dest]), rateProfiles.names[dest]);
+      if (dest == rateProfiles.selected) rateProfiles.settings[dest].apply(input, output, throttleCurve);
+      return true;
+    }
+
     ModelConfig()
     {
       for(size_t i = 0; i < INPUT_CHANNELS; i++)
@@ -1043,6 +1123,7 @@ class ModelConfig
 #if !defined(ESPFC_REVISION)
       devPreset();
 #endif
+      initializeRateProfiles();
     }
 
     void devPreset()

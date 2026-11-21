@@ -1,3 +1,4 @@
+#include "Control/Rates.h"
 #include "Sensor/GpsSensor.hpp"
 #include "Sensor/SurfaceSensor.hpp"
 #include "Connect/MspProcessor.hpp"
@@ -319,7 +320,7 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       if (m.cmd == MSP_STATUS_EX)
       {
         r.writeU8(1); // max profile count
-        r.writeU8(0); // current rate profile index
+        r.writeU8(_model.config.rateProfiles.selected); // current rate profile index
       }
       else // MSP_STATUS
       {
@@ -333,7 +334,7 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU8(_model.getRebootRequired());             // reboot required
       // 1.46
       r.writeU16(0); // getCoreTemperatureCelsius() // cpu temperature
-      r.writeU8(1);  // CONTROL_RATE_PROFILE_COUNT
+      r.writeU8(RateProfileBank::COUNT);
       // 1.48
       r.writeU8(1); // BATTERY_PROFILE_COUNT
       r.writeU8(0); // getCurrentBatteryProfileIndex
@@ -356,6 +357,9 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU8(textType);
       switch (textType)
       {
+        case MSP2TEXT_RATE_PROFILE_NAME:
+          r.writePString(_model.config.rateProfiles.names[_model.config.rateProfiles.selected]);
+          break;
         case MSP2TEXT_CRAFT_NAME:
           r.writePString(_model.config.modelName);
           break;
@@ -367,21 +371,29 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
     }
 
     case MSP2_SET_TEXT: {
+      if (m.remain() < 2) { r.result = -1; break; }
       const uint8_t textType = m.readU8();
       const uint8_t textLength = m.readU8();
+      if (m.remain() < textLength) { r.result = -1; break; }
+      char* dest = nullptr;
+      size_t capacity = 0;
       if (textType == MSP2TEXT_CRAFT_NAME)
       {
-        std::fill_n(&_model.config.modelName[0], MODEL_NAME_LEN + 1, 0);
-        for (size_t i = 0; i < textLength; i++)
-        {
-          const uint8_t c = m.readU8();
-          if (i < MODEL_NAME_LEN) _model.config.modelName[i] = c;
-        }
+        dest = _model.config.modelName;
+        capacity = sizeof(_model.config.modelName);
       }
-      else
+      else if (textType == MSP2TEXT_RATE_PROFILE_NAME)
       {
-        m.advance(textLength); // ignore unsupported text types
+        dest = _model.config.rateProfiles.names[_model.config.rateProfiles.selected];
+        capacity = sizeof(_model.config.rateProfiles.names[0]);
       }
+      if (dest)
+      {
+        const size_t length = std::min<size_t>(textLength, capacity - 1);
+        std::copy_n(m.buffer + m.read, length, dest);
+        dest[length] = 0;
+      }
+      m.advance(textLength);
       break;
     }
 
@@ -1165,6 +1177,26 @@ _model.config.failsafe.procedure =
       }
       break;
 
+    case MSP_SELECT_SETTING: {
+      if (m.remain() != 1) { r.result = -1; break; }
+      const uint8_t selection = m.readU8();
+      if (selection & 0x80)
+      {
+        if (!_model.config.selectRateProfile(selection & 0x7f)) { r.result = -1; break; }
+        _model.notifyConfigChange(MODEL_CHANGE_RATES);
+      }
+      else if (selection != 0) r.result = -1; // Single PID profile.
+      break;
+    }
+    case MSP_COPY_PROFILE: {
+      if (m.remain() != 3 || m.readU8() != 1) { r.result = -1; break; }
+      const uint8_t dest = m.readU8();
+      const uint8_t source = m.readU8();
+      if (!_model.config.copyRateProfile(dest, source)) { r.result = -1; break; }
+      if (dest == _model.config.rateProfiles.selected) _model.notifyConfigChange(MODEL_CHANGE_RATES);
+      break;
+    }
+
     case MSP_RC_TUNING:
       r.writeU8(_model.config.input.rate[AXIS_ROLL]);
       r.writeU8(_model.config.input.expo[AXIS_ROLL]);
@@ -1194,6 +1226,19 @@ _model.config.failsafe.procedure =
       break;
 
     case MSP_SET_RC_TUNING:
+      if (m.remain() >= 16 && (m.buffer[m.read + 14] > 2 || m.buffer[m.read + 15] == 0 ||
+                              m.buffer[m.read + 15] > 100)) { r.result = -1; break; }
+      if (m.remain() >= 23 && m.buffer[m.read + 22] > RATES_TYPE_QUICK) { r.result = -1; break; }
+      if (m.remain() >= 22)
+      {
+        for (int axis = 0; axis < 3; ++axis)
+        {
+          const auto* bytes = m.buffer + m.read + 16 + 2 * axis;
+          const int limit = bytes[0] | (bytes[1] << 8);
+          if (limit < 1 || limit > 1998) r.result = -1;
+        }
+        if (r.result == -1) break;
+      }
       if (m.remain() >= 10 && (m.buffer[m.read + 6] > 100 || m.buffer[m.read + 7] > 100 ||
           (m.remain() >= 24 && m.buffer[m.read + 23] > 100)))
       { r.result = -1; break; }

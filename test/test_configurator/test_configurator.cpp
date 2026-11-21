@@ -178,6 +178,53 @@ static void test_battery_wire_round_trip_alarm_and_atomic_bad_write()
   TEST_ASSERT_EQUAL(361,model.config.vbat.cellWarning);
 }
 
+static void test_rate_profiles_switch_copy_persist_and_apply()
+{
+  clocks();
+  Model model;
+  auto tuning = command(model, MSP_RC_TUNING);
+  std::vector<uint8_t> wire(tuning.data, tuning.data + tuning.len);
+  wire[0] = 43;
+  wire[6] = 36;
+  wire[7] = 50;
+  wire[23] = 39;
+  Control::Rates controllerRates;
+  model.setConfigChangeListener([&](ModelChangeEvent event) {
+    if (event == MODEL_CHANGE_RATES) controllerRates.begin(model.config.input);
+  });
+  TEST_ASSERT_EQUAL(1,command(model,MSP_SET_RC_TUNING,wire).result);
+  TEST_ASSERT_EQUAL(1,command(model,MSP2_SET_TEXT,{MSP2TEXT_RATE_PROFILE_NAME,4,'T','e','s','t'}).result);
+  const float custom = controllerRates.getSetpoint(AXIS_ROLL, 0.5f);
+  TEST_ASSERT_EQUAL(1,command(model,MSP_SELECT_SETTING,{0x83}).result);
+  TEST_ASSERT_TRUE(std::fabs(custom - controllerRates.getSetpoint(AXIS_ROLL, 0.5f)) > 0.01f);
+  TEST_ASSERT_EQUAL(50,model.config.throttleCurve.mid);
+  TEST_ASSERT_EQUAL(1,command(model,MSP_COPY_PROFILE,{1,3,0}).result);
+  TEST_ASSERT_EQUAL(36,model.config.throttleCurve.mid);
+  TEST_ASSERT_FLOAT_WITHIN(0.001f,custom,controllerRates.getSetpoint(AXIS_ROLL, 0.5f));
+  auto name = command(model,MSP2_GET_TEXT,{MSP2TEXT_RATE_PROFILE_NAME});
+  TEST_ASSERT_EQUAL_MEMORY("Test",name.data+2,4);
+  TEST_ASSERT_EQUAL(-1,command(model,MSP_SELECT_SETTING,{0x84}).result);
+  TEST_ASSERT_EQUAL(-1,command(model,MSP_COPY_PROFILE,{1,0,4}).result);
+  TEST_ASSERT_EQUAL(-1,command(model,MSP2_SET_TEXT,{MSP2TEXT_RATE_PROFILE_NAME,4,'X'}).result);
+  auto status = command(model,MSP_STATUS_EX);
+  TEST_ASSERT_EQUAL_UINT8(3,status.data[14]);
+  TEST_ASSERT_EQUAL_UINT8(4,status.data[status.len-3]);
+
+  // Like the CLI, edit the live config directly, save, then switch away and back.
+  model.config.input.rate[0] = 74;
+  const auto size = sizeof(ModelConfig);
+  std::vector<uint8_t> image{0xa5,4,static_cast<uint8_t>(size),static_cast<uint8_t>(size >> 8)};
+  const auto* bytes = reinterpret_cast<const uint8_t*>(&model.config);
+  image.insert(image.end(), bytes, bytes + size);
+  Model restored;
+  TEST_ASSERT_EQUAL(STORAGE_LOAD_SUCCESS,Utils::Storage::readConfig(restored.config, [&](size_t i){return image.at(i);}));
+  TEST_ASSERT_EQUAL(3,restored.config.rateProfiles.selected);
+  TEST_ASSERT_TRUE(restored.config.selectRateProfile(0));
+  TEST_ASSERT_EQUAL(43,restored.config.input.rate[0]);
+  TEST_ASSERT_TRUE(restored.config.selectRateProfile(3));
+  TEST_ASSERT_EQUAL(74,restored.config.input.rate[0]);
+}
+
 static void test_legacy_battery_packet_and_eeprom_migration()
 {
   Model model;
@@ -186,9 +233,10 @@ static void test_legacy_battery_packet_and_eeprom_migration()
   TEST_ASSERT_EQUAL(430,model.config.batteryProfile.cellMax);
   model.config.input.serialRxProvider = SERIALRX_IBUS;
   model.config.antiGravityGain = 98;
-  for (auto version : {2,3})
+  for (auto version : {2,3,4})
   {
-    const size_t size = version == 2 ? offsetof(ModelConfig,batteryProfile) : sizeof(ModelConfig);
+    const size_t size = version == 2 ? offsetof(ModelConfig,batteryProfile) :
+                        version == 3 ? offsetof(ModelConfig,rateProfiles) : sizeof(ModelConfig);
     std::vector<uint8_t> image = {0xa5, static_cast<uint8_t>(version), static_cast<uint8_t>(size), static_cast<uint8_t>(size>>8)};
     const auto* bytes = reinterpret_cast<const uint8_t*>(&model.config);
     image.insert(image.end(), bytes, bytes + size);
@@ -198,6 +246,9 @@ static void test_legacy_battery_packet_and_eeprom_migration()
     TEST_ASSERT_EQUAL(98,restored.antiGravityGain);
     TEST_ASSERT_EQUAL(SERIALRX_IBUS,restored.input.serialRxProvider);
     TEST_ASSERT_EQUAL(version == 2 ? 340 : 320,restored.batteryProfile.cellMin);
+    TEST_ASSERT_EQUAL(0,restored.rateProfiles.selected);
+    TEST_ASSERT_TRUE(restored.selectRateProfile(2));
+    TEST_ASSERT_EQUAL(model.config.input.rate[0],restored.input.rate[0]);
     --image[2];
     TEST_ASSERT_EQUAL(STORAGE_ERR_BAD_SIZE,Utils::Storage::readConfig(restored, reader));
   }
@@ -551,6 +602,7 @@ int main()
   RUN_TEST(test_xbus_mode_b_and_rj01_nested_checksums);
   RUN_TEST(test_msp_receiver_selection_survives_sanitize_and_rejects_unknown);
   RUN_TEST(test_battery_wire_round_trip_alarm_and_atomic_bad_write);
+  RUN_TEST(test_rate_profiles_switch_copy_persist_and_apply);
   RUN_TEST(test_legacy_battery_packet_and_eeprom_migration);
   RUN_TEST(test_virtual_meter_calibration_and_elapsed_charge);
   RUN_TEST(test_esc_meter_uses_fresh_voltage_and_current_in_physical_units);
