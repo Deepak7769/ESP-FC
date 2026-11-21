@@ -1,4 +1,4 @@
-# Anti-Gravity active controller and bench validation
+# Dare Devil — Anti-Gravity active controller and bench validation
 
 Anti-Gravity now uses one controller implementation for both production and
 validation. The standard `esp32` production environment defines

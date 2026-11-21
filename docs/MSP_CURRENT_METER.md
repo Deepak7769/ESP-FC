@@ -1,6 +1,6 @@
-# MSP current-meter companion bridge
+# Dare Devil — MSP current-meter companion bridge
 
-ESP-FC supports Betaflight-compatible `CURRENT_METER_MSP` as a telemetry-only
+Dare Devil supports Betaflight-compatible `CURRENT_METER_MSP` as a telemetry-only
 current source. The intended use is a companion processor that reads an INA219
 and publishes current/consumption to the flight controller over an MSP serial
 link.
@@ -18,7 +18,7 @@ The companion periodically sends an MSPv1 `MSP_ANALOG` reply. A 10 Hz update
 rate is suitable and matches the cadence used by Betaflight's MSP current-meter
 path.
 
-The payload fields used by ESP-FC are:
+The payload fields used by Dare Devil are:
 
 | Offset | Size | Field | Unit |
 | ---: | ---: | --- | --- |
@@ -28,7 +28,7 @@ The payload fields used by ESP-FC are:
 | 5 | 2 | current | 0.01 A |
 
 Modern `MSP_ANALOG` replies may include additional bytes after these first
-seven bytes. ESP-FC accepts the extended form and only consumes the fields
+seven bytes. Dare Devil accepts the extended form and only consumes the fields
 listed above.
 
 ## FC configuration
@@ -46,7 +46,7 @@ The serial port receiving the companion frames must have the MSP function
 enabled. USB VCP remains available for Configurator independently.
 
 The current-meter stream must **not** be interleaved onto a port that is already
-carrying an RC receiver protocol such as iBUS, SBUS, or CRSF. ESP-FC gives
+carrying an RC receiver protocol such as iBUS, SBUS, or CRSF. Dare Devil gives
 `SERIAL_FUNCTION_RX_SERIAL` ownership of that stream, so MSP frames on the same
 wire would be ignored or would disturb receiver framing. Use a dedicated MSP
 serial input for this bridge. On hardware where the companion-to-FC UART is

@@ -1,4 +1,4 @@
-# WEMOS D1 MINI pinout
+# Dare Devil — WEMOS D1 MINI pinout
 ```
 Pin | Function         | ESP-8266 Pin | ESPFC external device
 ----+------------------+--------------+----------------------------------------------

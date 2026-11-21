@@ -1,11 +1,11 @@
-# Assisted V2 integration contract
+# Dare Devil — Assisted V2 integration contract
 
 This document defines the radio/channel contract and active-controller policy for
 Angle V2, AltHold V2, and failsafe LAND V2.
 
 ## Channel contract
 
-ESP-FC uses logical AETR input indices after receiver mapping:
+Dare Devil uses logical AETR input indices after receiver mapping:
 
 | Logical index | Meaning | Assisted V2 use |
 | ---: | --- | --- |

@@ -1,4 +1,4 @@
-# Development
+# Dare Devil — Development
 
 ## Building and flashing
 
@@ -42,7 +42,7 @@ This project is based on [platformio](https://platformio.org/), it is recommende
 
 If you want to include your changes in this project, you need to make PR (Pull Request) on github.
 
-### How to contribute to Esp-fc project
+### How to contribute to Dare Devil project
 
 1. Fork the repository
 
