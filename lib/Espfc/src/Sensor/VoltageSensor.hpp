@@ -22,6 +22,10 @@ public:
   int readIbat();
 
 private:
+  float escMeter(bool voltage) const;
+  void integrateCurrent(float amps, uint32_t now);
+  uint32_t _lastCurrentUs = 0;
+  int _integrationSource = CURRENT_METER_NONE;
   Model& _model;
   Utils::Filter _vFilterFast;
   Utils::Filter _vFilter;

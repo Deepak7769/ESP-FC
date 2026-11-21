@@ -55,7 +55,7 @@ static void reenumerateUsb()
 }
 
 SerialManager::SerialManager(Model& model, TelemetryManager& telemetry): _model(model), _current(0), _msp(model), _cli(model), _vtx(model),
-  _telemetry(telemetry), _gps(model)
+  _telemetry(telemetry), _gps(model), _surface(model)
 #ifdef ESPFC_SERIAL_SOFT_0_WIFI
   , _wireless(model)
 #endif
@@ -64,6 +64,7 @@ SerialManager::SerialManager(Model& model, TelemetryManager& telemetry): _model(
 int SerialManager::begin()
 {
   reenumerateUsb();
+  _surface.beginUltrasonic();
 
   for(int i = 0; i < SERIAL_UART_COUNT; i++)
   {
@@ -111,6 +112,12 @@ int SerialManager::begin()
           sdc.stop_bits = Hal::SDC_SERIAL_STOP_BITS_2;
           sdc.inverted = true;
           break;
+        case SERIALRX_XBUS_MODE_B_RJ01:
+          sdc.baud = 250000ul;
+          break;
+        case SERIALRX_SUMD:
+        case SERIALRX_SUMH:
+        case SERIALRX_XBUS_MODE_B:
         case SERIALRX_IBUS:
           sdc.baud = 115200ul;
           break;
@@ -123,11 +130,24 @@ int SerialManager::begin()
     }
     else if(spc.functionMask & SERIAL_FUNCTION_BLACKBOX)
     {
-      //sdc.baud = spc.blackboxBaud;
+      if (spc.blackboxBaud && !(spc.functionMask & SERIAL_FUNCTION_MSP)) sdc.baud = spc.blackboxBaud;
       if(sdc.baud == 230400 || sdc.baud == 460800)
       {
         sdc.stop_bits = Hal::SDC_SERIAL_STOP_BITS_2;
       }
+    }
+    else if(spc.functionMask & SERIAL_FUNCTION_GPS)
+    {
+      if (_model.config.serialSensorRates[i].gps) sdc.baud = _model.config.serialSensorRates[i].gps;
+    }
+    else if(spc.functionMask & SERIAL_FUNCTION_TELEMETRY_LTM)
+    {
+      if (!(spc.functionMask & SERIAL_FUNCTION_MSP))
+        sdc.baud = _model.config.serialSensorRates[i].telemetry ? _model.config.serialSensorRates[i].telemetry : 19200;
+    }
+    else if(spc.functionMask & SERIAL_FUNCTION_LIDAR_TF)
+    {
+      sdc.baud = 115200;
     }
     else if(spc.functionMask & SERIAL_FUNCTION_TELEMETRY_IBUS)
     {
@@ -146,7 +166,8 @@ int SerialManager::begin()
       continue;
     }
 
-    port->begin(sdc);   
+    port->begin(sdc);
+    if (spc.functionMask == SERIAL_FUNCTION_LIDAR_TF) _surface.beginSerial(port);
     _model.state.serial[i].stream = port;
 
     if(i == ESPFC_SERIAL_DEBUG_PORT)
@@ -161,7 +182,7 @@ int SerialManager::begin()
     {
       _vtx.begin(port);
     }
-    if(spc.functionMask & SERIAL_FUNCTION_GPS)
+    if((spc.functionMask & SERIAL_FUNCTION_GPS) && _model.config.gpsReceiver.provider != GPS_MSP)
     {
       _gps.begin(port, sdc.baud);
     }
@@ -184,13 +205,30 @@ int SerialManager::reload(ModelChangeEvent event)
 
 int FAST_CODE_ATTR SerialManager::update()
 {
+  if (_current == 0)
+  {
+    const uint32_t now = micros();
+    Sensor::GpsSensor::expireSolution(_model.state.gps, now);
+    _surface.update(now);
+  }
   const SerialPortConfig& sc = _model.config.serial[_current];
   SerialPortState& ss = _model.state.serial[_current];
 
   if(ss.stream && !(sc.functionMask & SERIAL_FUNCTION_RX_SERIAL))
   {
     Utils::Stats::Measure measure(_model.state.stats, COUNTER_SERIAL);
-    if (sc.functionMask & SERIAL_FUNCTION_MSP)
+    const bool sharedLtm = (sc.functionMask & SERIAL_FUNCTION_MSP) &&
+                           (sc.functionMask & SERIAL_FUNCTION_TELEMETRY_LTM);
+    const bool useLtm = (sc.functionMask & SERIAL_FUNCTION_TELEMETRY_LTM) &&
+                        _model.isFeatureActive(FEATURE_TELEMETRY) && (!sharedLtm || _model.isModeActive(MODE_ARMED));
+    if (sharedLtm && ss.ltmActive != useLtm)
+    {
+      const auto rate = _model.config.serialSensorRates[_current].telemetry;
+      ss.stream->updateBaudRate(useLtm ? (rate ? rate : 19200) : sc.baud);
+      ss.mspRequest = {};
+      ss.ltmActive = useLtm;
+    }
+    if ((sc.functionMask & SERIAL_FUNCTION_MSP) && !useLtm)
     {
       processMsp(ss);
 
@@ -224,6 +262,8 @@ int FAST_CODE_ATTR SerialManager::update()
       }
 #endif
     }
+    if (useLtm)
+      _ltm[_current].update(_model, *ss.stream);
     if(sc.functionMask & SERIAL_FUNCTION_TELEMETRY_FRSKY && _model.state.telemetryTimer.check())
     {
       _telemetry.process(*ss.stream, TELEMETRY_PROTOCOL_TEXT);

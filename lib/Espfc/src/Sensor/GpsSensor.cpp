@@ -21,7 +21,7 @@ static constexpr std::array<std::tuple<uint16_t, uint8_t>, 2> UBX_MSG_ON{{
     {Gps::UBX_NAV_SAT, 10u},
 }};
 
-GpsSensor::GpsSensor(Model& model): _model(model) {}
+GpsSensor::GpsSensor(Model& model): _model(model), _port(nullptr) {}
 
 int GpsSensor::begin(Stream::ReadWritable* port, int baud)
 {
@@ -57,7 +57,7 @@ int GpsSensor::update()
   {
     for (size_t i = 0; i < read; i++)
     {
-      updated |= processUbx(buff[i]);
+      if (_model.config.gpsReceiver.provider == GPS_UBLOX) updated |= processUbx(buff[i]);
       processNmea(buff[i]);
     }
   }
@@ -85,6 +85,13 @@ void GpsSensor::processNmea(uint8_t c)
   _nmeaParser.parse(c, _nmeaMsg);
   if (!_nmeaMsg.isReady()) return;
 
+  if (_model.config.gpsReceiver.provider == GPS_NMEA)
+  {
+    if (readNmeaSolution()) _state = RECEIVE;
+    _nmeaMsg = {};
+    return;
+  }
+
   //$GNTXT,01,01,01,More than 100 frame errors, UART RX was disabled*70
   static const char* msg = "GNTXT,01,01,01,More than 100 frame errors";
 
@@ -99,11 +106,100 @@ void GpsSensor::processNmea(uint8_t c)
   _nmeaMsg = Gps::NmeaMessage();
 }
 
+namespace {
+
+bool number(const char* field, double min, double max, double& value)
+{
+  if (!field || !*field) return false;
+  char* end;
+  value = std::strtod(field, &end);
+  return end != field && *end == 0 && value >= min && value <= max;
+}
+
+bool coordinate(const char* value, const char* hemisphere, bool latitude, int32_t& result)
+{
+  const unsigned limit = latitude ? 90 : 180;
+  double raw;
+  if (!number(value, 0, limit * 100, raw) || !hemisphere[0] || hemisphere[1]) return false;
+  const int degrees = static_cast<int>(raw / 100);
+  const double minutes = raw - degrees * 100;
+  if (minutes >= 60) return false;
+  const char direction = hemisphere[0];
+  if (direction != (latitude ? 'N' : 'E') && direction != (latitude ? 'S' : 'W')) return false;
+  result = std::lround((degrees + minutes / 60.0) * 1e7);
+  if (direction == 'S' || direction == 'W') result = -result;
+  return true;
+}
+
+int hexDigit(char c)
+{
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  return -1;
+}
+
+} // namespace
+
+bool GpsSensor::readNmeaSolution()
+{
+  char* sentence = _nmeaMsg.payload;
+  char* star = std::strchr(sentence, '*');
+  if (!star || star - sentence + 3 != static_cast<int>(_nmeaMsg.length)) return false;
+  uint8_t checksum = 0;
+  for (const char* c = sentence; c != star; ++c) checksum ^= *c;
+  const int hi = hexDigit(star[1]), lo = hexDigit(star[2]);
+  if (hi < 0 || lo < 0 || checksum != hi * 16 + lo) return false;
+  *star = 0;
+
+  char* fields[20] = {sentence};
+  size_t count = 1;
+  for (char* c = sentence; *c && count < 20; ++c)
+    if (*c == ',') { *c = 0; fields[count++] = c + 1; }
+  if (std::strlen(sentence) != 5) return false;
+  const char* type = sentence + 2; // accept GP, GN and other talker IDs
+  auto& gps = _model.state.gps;
+  double speed, course;
+  if (std::strcmp(type, "RMC") == 0 && count >= 9)
+  {
+    if (std::strcmp(fields[2], "A") == 0 && number(fields[7], 0, 3000, speed))
+    {
+      gps.velocity.raw.groundSpeed = std::lround(speed * (1852000.0 / 3600.0));
+      if (number(fields[8], 0, 360, course)) gps.velocity.raw.heading = std::lround(course * 1e5);
+    }
+    else gps.velocity.raw.groundSpeed = gps.velocity.raw.heading = 0;
+    return false; // GGA owns position and its freshness timestamp
+  }
+  if (std::strcmp(type, "GSA") == 0 && count >= 18)
+  {
+    double pdop;
+    if (number(fields[15], 0, 655.35, pdop)) gps.accuracy.pDop = std::lround(pdop * 100);
+    return false;
+  }
+  if (std::strcmp(type, "GGA") != 0 || count < 11) return false;
+  double quality, satellites, altitude;
+  if (!number(fields[6], 0, 8, quality) || !number(fields[7], 0, 255, satellites)) return false;
+  int32_t lat, lon;
+  if (quality > 0)
+  {
+    if (!coordinate(fields[2], fields[3], true, lat) || !coordinate(fields[4], fields[5], false, lon) ||
+        !number(fields[9], -20000, 100000, altitude) || std::strcmp(fields[10], "M") != 0) return false;
+    gps.location.raw.lat = lat;
+    gps.location.raw.lon = lon;
+    gps.location.raw.height = std::lround(altitude * 1000);
+  }
+  gps.fix = quality >= 1 && quality <= 5; // exclude estimated, manual and simulated fixes
+  gps.fixType = gps.fix ? 3 : 0;
+  gps.numSats = static_cast<uint8_t>(satellites);
+  recordSolution(gps, micros());
+  return true;
+}
+
 void GpsSensor::onMessage()
 {
   if (_state == DETECT_BAUD)
   {
-    _state = GET_VERSION;
+    _state = _model.config.gpsReceiver.autoConfig ? GET_VERSION : RECEIVE;
     _model.logger.info().log("GPS DET").logln(_currentBaud);
   }
 }
@@ -166,29 +262,25 @@ void GpsSensor::handle()
 
 void GpsSensor::handleReceive()
 {
-  if (_state == RECEIVE)
-  {
-    _model.state.gps.present = true;
-  }
 
   if (_ubxMsg.isReady())
   {
-    if (_ubxMsg.isAck())
+    if (_state == WAIT && _ubxMsg.isAck())
     {
       _state = _ackState;
     }
-    else if (_ubxMsg.isNak())
+    else if (_state == WAIT && _ubxMsg.isNak())
     {
       _state = _timeoutState;
       _model.logger.err().log("GPS NAK").loghex(_ubxMsg.payload[0]).loghex(_ubxMsg.payload[1]).endl();
     }
-    else if (_ubxMsg.isResponse(Gps::UBX_CFG_VALGET))
+    else if (_state == WAIT && _ubxMsg.isResponse(Gps::UBX_CFG_VALGET))
     {
       handleCfgValGet();
       _state = _ackState;
       _counter = 0;
     }
-    else if (_ubxMsg.isResponse(Gps::UbxMonVer::ID))
+    else if (_state == WAIT && _ubxMsg.isResponse(Gps::UbxMonVer::ID))
     {
       handleVersion();
       _state = _ackState;
@@ -216,6 +308,7 @@ void GpsSensor::handleReceive()
 
 void GpsSensor::detectBaud()
 {
+  if (!_model.config.gpsReceiver.autoBaud) return;
   const uint32_t now =
       micros();
 
@@ -230,8 +323,7 @@ void GpsSensor::detectBaud()
     }
     else
     {
-      _state = ERROR; // detection falied, give up
-      // _state = DETECT_BAUD; // restart detection if all baud rates failed
+      // Restart scanning so a receiver powered after USB can be discovered.
       _counter = 0;
       setBaud(_targetBaud);
     }
@@ -383,17 +475,20 @@ void GpsSensor::enableNav5()
 
 void GpsSensor::enableSbas()
 {
+  static constexpr uint32_t masks[] = {0, 0x10048, 0x4a800, 0x20200, 0x1180, 0};
+  const unsigned region = _model.config.gpsReceiver.sbasRegion;
+  const uint32_t mask = region < 6 ? masks[region] : 0;
   if (_model.state.gps.support.sbas)
   {
     if (isLegacyProto())
     {
       send(
           Gps::UbxCfgSbas8{
-              .mode = 1,
+              .mode = static_cast<uint8_t>(_model.config.gps.enableSBAS && region != 5),
               .usage = 1,
               .maxSbas = 3,
               .scanmode2 = 0,
-              .scanmode1 = 0,
+              .scanmode1 = mask,
           },
           DETECT_GPS_L5);
       _model.logger.info().logln("GPS SBAS");
@@ -402,7 +497,7 @@ void GpsSensor::enableSbas()
     {
       Gps::UbxRequest req(Gps::UBX_CFG_VALSET);
       req.write(Gps::UbxCfgValsetHeader{.version = 0, .layers = 0x01});         // RAM only
-      req.write(Gps::UbxCfgValsetItem<Gps::CFG_SBAS_PRNSCANMASK, uint64_t>(0)); // all
+      req.write(Gps::UbxCfgValsetItem<Gps::CFG_SBAS_PRNSCANMASK, uint64_t>(mask));
       send(req, DETECT_GPS_L5);
       _model.logger.info().logln("GPS SBAS*");
     }
@@ -492,7 +587,7 @@ void GpsSensor::configureGnss()
   bool enableGAL = _model.config.gps.enableGalileo;
   bool enableBDS = _model.config.gps.enableBeiDou;
   bool enableQZSS = _model.config.gps.enableQZSS;
-  bool enableSBAS = _model.config.gps.enableSBAS;
+  bool enableSBAS = _model.config.gps.enableSBAS && _model.config.gpsReceiver.sbasRegion != 5;
 
   const auto& support = _model.state.gps.support;
   switch (_model.config.gps.gnssMode)
@@ -659,24 +754,32 @@ void GpsSensor::configureGnss()
   _model.logger.logln(written);
 }
 
-void GpsSensor::calculateHomeVector() const
+void GpsSensor::recordSolution(GpsState& gps, uint32_t now)
 {
-  if (!_model.state.gps.isHomeValid())
+  gps.present = true;
+  gps.interval = now - gps.lastMsgTs;
+  gps.lastMsgTs = now;
+  if (gps.isHomeValid())
   {
-    _model.state.gps.distanceToHome = 0;
-    _model.state.gps.directionToHome = 0;
-    return;
+    const auto [distance, bearing] = Gps::calculateDistanceAndBearing(gps.location.raw.lat, gps.location.raw.lon,
+                                                                     gps.location.home.lat, gps.location.home.lon);
+    gps.distanceToHome = distance;
+    gps.directionToHome = bearing;
   }
+  else
+  {
+    gps.distanceToHome = gps.directionToHome = 0.f;
+  }
+}
 
-  const int32_t lat1 = _model.state.gps.location.home.lat;
-  const int32_t lon1 = _model.state.gps.location.home.lon;
-  const int32_t lat2 = _model.state.gps.location.raw.lat;
-  const int32_t lon2 = _model.state.gps.location.raw.lon;
-
-  const auto [distance, bearing] = Gps::calculateDistanceAndBearing(lat1, lon1, lat2, lon2);
-
-  _model.state.gps.distanceToHome = distance;
-  _model.state.gps.directionToHome = bearing;
+void GpsSensor::expireSolution(GpsState& gps, uint32_t now)
+{
+  if (gps.present && now - gps.lastMsgTs > 2500000u)
+  {
+    gps.present = gps.fix = false;
+    gps.fixType = gps.numSats = gps.numCh = 0;
+    gps.distanceToHome = gps.directionToHome = 0.f;
+  }
 }
 
 void GpsSensor::handleCfgValGet() const
@@ -706,6 +809,7 @@ void GpsSensor::handleCfgValGet() const
 
 void GpsSensor::handleNavPvt() const
 {
+  if (_ubxMsg.length < sizeof(Gps::UbxNavPvt92)) return;
   const auto& m = *_ubxMsg.getAs<Gps::UbxNavPvt92>();
 
   _model.state.gps.fix = m.fixType == 3 && m.flags.gnssFixOk;
@@ -749,17 +853,15 @@ void GpsSensor::handleNavPvt() const
     _model.state.gps.dateTime.msec = msec;
   }
 
-  uint32_t now = micros();
-  _model.state.gps.interval = now - _model.state.gps.lastMsgTs;
-  _model.state.gps.lastMsgTs = now;
-
-  calculateHomeVector();
+  recordSolution(_model.state.gps, micros());
 }
 
 void GpsSensor::handleNavSat() const
 {
   const auto& m = *_ubxMsg.getAs<Gps::UbxNavSat>();
-  _model.state.gps.numCh = m.numSvs;
+  constexpr size_t header = offsetof(Gps::UbxNavSat, sats);
+  if (_ubxMsg.length < header || m.numSvs > (_ubxMsg.length - header) / sizeof(m.sats[0])) return;
+  _model.state.gps.numCh = std::min<size_t>(m.numSvs, SAT_MAX);
   for (uint8_t i = 0; i < SAT_MAX; i++)
   {
     if (i < m.numSvs)

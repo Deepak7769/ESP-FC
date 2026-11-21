@@ -56,6 +56,7 @@ class EscDriverRP2040: public EscDriverBase
 
     EscProtocol _protocol;
     bool _async;
+    bool _servoPwm = false;
     int _rate;
     EscDriverTimer _timer;
     uint16_t _divider;

@@ -24,6 +24,7 @@ struct EscConfig
   int rate;
   bool async;
   bool dshotTelemetry;
+  bool servoPwm = false;
 };
 
 #define PWM_TO_DSHOT(v) (((v - 1000) * 2) + 47)

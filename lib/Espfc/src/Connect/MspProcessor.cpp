@@ -1,3 +1,5 @@
+#include "Sensor/GpsSensor.hpp"
+#include "Sensor/SurfaceSensor.hpp"
 #include "Connect/MspProcessor.hpp"
 #include "Hardware.h"
 #include "Hal/Time.hpp"
@@ -109,39 +111,6 @@ static uint8_t fromGyroDlpf(uint8_t t)
       return 1;
     default:
       return 2;
-  }
-}
-
-static int8_t toVbatSource(uint8_t t)
-{
-  switch (t)
-  {
-    case 0:
-      return 0; // none
-    case 1:
-      return 1; // internal adc
-    default:
-      return 0;
-  }
-}
-
-static int8_t toIbatSource(uint8_t t)
-{
-  switch (t)
-  {
-    case CURRENT_METER_NONE:
-      return CURRENT_METER_NONE;
-
-    case CURRENT_METER_ADC:
-      return CURRENT_METER_ADC;
-
-    case CURRENT_METER_MSP:
-      return CURRENT_METER_MSP;
-
-    // VIRTUAL and ESC are Betaflight IDs, but ESP-FC has no implementation
-    // for those sources yet. Do not silently retain an unsupported source.
-    default:
-      return CURRENT_METER_NONE;
   }
 }
 
@@ -342,7 +311,8 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU16(_model.state.i2cErrorCount); // i2c error count
       //         acc,     baro,    mag,     gps,     sonar,   gyro
       r.writeU16(_model.accelActive() | _model.baroActive() << 1 | _model.magActive() << 2 | _model.gpsActive() << 3 |
-                 0 << 4 | _model.gyroActive() << 5);
+                 Sensor::SurfaceSensor::rangeActive(_model) << 4 | _model.gyroActive() << 5 |
+                 Sensor::SurfaceSensor::flowActive(_model) << 6);
       r.writeU32(_model.state.mode.mask); // flight mode flags
       r.writeU8(0);                       // pid profile
       r.writeU16(lrintf(_model.state.stats.getCpuLoad()));
@@ -474,7 +444,7 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
 
     case MSP_ANALOG:
       r.writeU8(toVbatVoltageLegacy(_model.state.battery.voltage)); // voltage in 0.1V
-      r.writeU16(_model.state.battery.mspMahDrawn);                 // mAh drawn
+      r.writeU16(_model.state.battery.mahDrawn(_model.config.ibat.source));                 // mAh drawn
       r.writeU16(_model.getRssi());                                 // rssi
       r.writeU16(toIbatCurrent(_model.state.battery.current));      // amperage in 0.01A
       r.writeU16(toVbatVoltage(_model.state.battery.voltage));      // voltage in 0.01V
@@ -490,134 +460,139 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       _model.setRebootRequired();
       break;
 
-    case MSP_BATTERY_CONFIG:
-      r.writeU8(34);                                        // vbatmincellvoltage
-      r.writeU8(42);                                        // vbatmaxcellvoltage
-      r.writeU8((_model.config.vbat.cellWarning + 5) / 10); // vbatwarningcellvoltage
-      r.writeU16(0);                                        // batteryCapacity
-      r.writeU8(_model.config.vbat.source);                 // voltageMeterSource
-      r.writeU8(_model.config.ibat.source);                 // currentMeterSource
-      r.writeU16(340);                                      // vbatmincellvoltage
-      r.writeU16(420);                                      // vbatmaxcellvoltage
-      r.writeU16(_model.config.vbat.cellWarning);           // vbatwarningcellvoltage
-      break;
-
-    case MSP_SET_BATTERY_CONFIG:
-      m.readU8();                                           // vbatmincellvoltage
-      m.readU8();                                           // vbatmaxcellvoltage
-      _model.config.vbat.cellWarning = m.readU8() * 10;     // vbatwarningcellvoltage
-      m.readU16();                                          // batteryCapacity
-      _model.config.vbat.source = toVbatSource(m.readU8()); // voltageMeterSource
-      _model.config.ibat.source = toIbatSource(m.readU8()); // currentMeterSource
-      if (m.remain() >= 6)
-      {
-        m.readU16(); // vbatmincellvoltage
-        m.readU16(); // vbatmaxcellvoltage
-        _model.config.vbat.cellWarning = m.readU16();
-      }
-      break;
-
-    case MSP_BATTERY_STATE:
-      // battery characteristics
-      r.writeU8(_model.state.battery.cells); // cell count, 0 indicates battery not detected.
-      r.writeU16(0);                         // capacity in mAh
-
-      // battery state
-      r.writeU8(toVbatVoltageLegacy(_model.state.battery.voltage)); // in 0.1V steps
-      r.writeU16(_model.state.battery.mspMahDrawn);                 // milliamp hours drawn from battery
-      r.writeU16(toIbatCurrent(_model.state.battery.current));      // send current in 0.01 A steps, range is -320A to 320A
-
-      // battery alerts
-      r.writeU8(0);
-      r.writeU16(toVbatVoltage(_model.state.battery.voltage)); // in 0.01 steps
-      break;
-
-    case MSP_VOLTAGE_METERS:
-      for (int i = 0; i < 1; i++)
-      {
-        r.writeU8(i + 10);                                            // meter id (10-19 vbat adc)
-        r.writeU8(toVbatVoltageLegacy(_model.state.battery.voltage)); // meter value
-      }
-      break;
-
-    case MSP_CURRENT_METERS:
-    {
-      const bool mspSource =
-          _model.config.ibat.source ==
-          CURRENT_METER_MSP;
-
-      // Betaflight reserves 10..19 for battery ADC current meters and 90..99
-      // for MSP current meters. Report the ID corresponding to the selected
-      // source so Configurator identifies an external companion meter.
-      r.writeU8(
-          mspSource
-              ? 90
-              : 10);
-
-      r.writeU16(
-          mspSource
-              ? _model.state.battery.mspMahDrawn
-              : 0);
-
-      const long milliAmps =
-          lrintf(
-              _model.state.battery.current *
-              1000.0f);
-
-      r.writeU16(
-          static_cast<uint16_t>(
-              std::clamp<long>(
-                  milliAmps,
-                  0L,
-                  65535L)));
+    case MSP_BATTERY_CONFIG: {
+      const auto& profile = _model.config.batteryProfile;
+      r.writeU8((profile.cellMin + 5) / 10);
+      r.writeU8((profile.cellMax + 5) / 10);
+      r.writeU8((_model.config.vbat.cellWarning + 5) / 10);
+      r.writeU16(profile.capacity);
+      r.writeU8(_model.config.vbat.source);
+      r.writeU8(_model.config.ibat.source);
+      r.writeU16(profile.cellMin);
+      r.writeU16(profile.cellMax);
+      r.writeU16(_model.config.vbat.cellWarning);
       break;
     }
-
-    case MSP_VOLTAGE_METER_CONFIG:
-      r.writeU8(1); // num voltage sensors
-      for (int i = 0; i < 1; i++)
+    case MSP_SET_BATTERY_CONFIG: {
+      if (m.remain() < 7 || (m.remain() > 7 && m.remain() < 13)) { r.result = -1; break; }
+      unsigned minCell = m.readU8() * 10;
+      unsigned maxCell = m.readU8() * 10;
+      unsigned warnCell = m.readU8() * 10;
+      const unsigned capacity = m.readU16();
+      const unsigned vSource = m.readU8();
+      const unsigned iSource = m.readU8();
+      if (m.remain() >= 6)
       {
-        r.writeU8(5);                          // frame size (5)
-        r.writeU8(i + 10);                     // id (10-19 vbat adc)
-        r.writeU8(0);                          // type resistor divider
-        r.writeU8(_model.config.vbat.scale);   // scale
-        r.writeU8(_model.config.vbat.resDiv);  // resdivval
-        r.writeU8(_model.config.vbat.resMult); // resdivmultiplier
+        minCell = m.readU16();
+        maxCell = m.readU16();
+        warnCell = m.readU16();
       }
+      if (minCell < 100 || minCell > warnCell || warnCell > maxCell ||
+          maxCell > 500 || capacity > 20000 || vSource > 2 || iSource >= CURRENT_METER_COUNT)
+      {
+        r.result = -1;
+        break;
+      }
+      auto& profile = _model.config.batteryProfile;
+      profile.cellMin = minCell;
+      profile.cellMax = maxCell;
+      profile.capacity = capacity;
+      _model.config.vbat.cellWarning = warnCell;
+      if (vSource != static_cast<unsigned>(_model.config.vbat.source) ||
+          iSource != static_cast<unsigned>(_model.config.ibat.source)) _model.setRebootRequired();
+      _model.config.vbat.source = vSource;
+      _model.config.ibat.source = iSource;
+      break;
+    }
+    case MSP_BATTERY_STATE: {
+      const auto& battery = _model.state.battery;
+      const auto& profile = _model.config.batteryProfile;
+      r.writeU8(battery.cells);
+      r.writeU16(profile.capacity);
+      r.writeU8(toVbatVoltageLegacy(battery.voltage));
+      r.writeU16(battery.mahDrawn(_model.config.ibat.source));
+      r.writeU16(toIbatCurrent(battery.current));
+      r.writeU8(battery.alert(_model.config.vbat.cellWarning, profile.cellMin));
+      r.writeU16(toVbatVoltage(battery.voltage));
+      break;
+    }
+    case MSP_VOLTAGE_METERS:
+      r.writeU8(10); // ADC
+      r.writeU8(_model.config.vbat.source == 1 ? toVbatVoltageLegacy(_model.state.battery.voltage) : 0);
+      if (_model.config.vbat.source == 2)
+      {
+        r.writeU8(50); // combined ESC voltage
+        r.writeU8(toVbatVoltageLegacy(_model.state.battery.voltage));
+      }
+      break;
+
+    case MSP_CURRENT_METERS: {
+      // Keep calibration subframes and readings at matching indices in the app.
+      const unsigned source = _model.config.ibat.source;
+      const unsigned ids[] = {10, 80, 50, 90};
+      for (unsigned i = 0; i < 4; ++i)
+      {
+        if (i >= 2 && source != i + 1) continue;
+        const bool selected = source == i + 1;
+        r.writeU8(ids[i]);
+        r.writeU16(selected ? _model.state.battery.mahDrawn(source) : 0);
+        r.writeU16(selected ? std::clamp<long>(lrintf(_model.state.battery.current * 1000.f), 0, 65535) : 0);
+      }
+      break;
+    }
+    case MSP_VOLTAGE_METER_CONFIG:
+      r.writeU8(1);
+      r.writeU8(5);
+      r.writeU8(10);
+      r.writeU8(0); // resistor divider
+      r.writeU8(_model.config.vbat.scale);
+      r.writeU8(_model.config.vbat.resDiv);
+      r.writeU8(_model.config.vbat.resMult);
       break;
 
     case MSP_SET_VOLTAGE_METER_CONFIG: {
-      int id = m.readU8();
-      if (id == 10 + 0) // id (10-19 vbat adc, allow only 10)
-      {
-        _model.config.vbat.scale = m.readU8();
-        _model.config.vbat.resDiv = m.readU8();
-        _model.config.vbat.resMult = m.readU8();
-      }
+      if (m.remain() < 4 || m.readU8() != 10) { r.result = -1; break; }
+      const auto scale = m.readU8();
+      const auto divisor = m.readU8();
+      const auto multiplier = m.readU8();
+      if (!scale || !divisor || !multiplier) { r.result = -1; break; }
+      _model.config.vbat.scale = scale;
+      _model.config.vbat.resDiv = divisor;
+      _model.config.vbat.resMult = multiplier;
+      break;
     }
-    break;
-
     case MSP_CURRENT_METER_CONFIG:
-      r.writeU8(1); // num voltage sensors
-      for (int i = 0; i < 1; i++)
-      {
-        r.writeU8(6);                          // frame size (6)
-        r.writeU8(i + 10);                     // id (10-19 ibat adc)
-        r.writeU8(1);                          // type adc
-        r.writeU16(_model.config.ibat.scale);  // scale
-        r.writeU16(_model.config.ibat.offset); // offset
-      }
+      r.writeU8(2);
+      r.writeU8(6);
+      r.writeU8(10);
+      r.writeU8(1); // ADC
+      r.writeU16(_model.config.ibat.scale);
+      r.writeU16(_model.config.ibat.offset);
+      r.writeU8(6);
+      r.writeU8(80);
+      r.writeU8(0); // virtual
+      r.writeU16(_model.config.batteryProfile.virtualScale);
+      r.writeU16(_model.config.batteryProfile.virtualOffset);
       break;
 
     case MSP_SET_CURRENT_METER_CONFIG: {
-      int id = m.readU8();
-      if (id == 10 + 0) // id (10-19 ibat adc, allow only 10)
+      if (m.remain() < 5) { r.result = -1; break; }
+      const unsigned id = m.readU8();
+      const int16_t scale = m.readU16();
+      const int16_t offset = m.readU16();
+      if (id == 10)
       {
-        _model.config.ibat.scale = m.readU16();
-        _model.config.ibat.offset = m.readU16();
+        _model.config.ibat.scale = scale;
+        _model.config.ibat.offset = offset;
       }
+      else if (id == 80)
+      {
+        _model.config.batteryProfile.virtualScale = scale;
+        _model.config.batteryProfile.virtualOffset = offset;
+      }
+      else r.result = -1;
+      break;
     }
-    break;
 
     case MSP_DATAFLASH_SUMMARY:
 #ifdef USE_FLASHFS
@@ -696,27 +671,29 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU8(toAccHw(_model.config.accel.dev)); // 3 acc mpu6050
       r.writeU8(_model.config.baro.dev);           // 2 baro bmp085
       r.writeU8(_model.config.mag.dev);            // 3 mag hmc5883l
-      // 1.46
-      r.writeU8(0); // rangefinder 0=none
-      r.writeU8(0); // opticalflow 0=none
+      r.writeU8(_model.config.surface.rangefinder);
+      r.writeU8(_model.config.surface.opticalFlow);
       break;
 
-    case MSP_SET_SENSOR_CONFIG:
-      _model.config.accel.dev = fromAccHw(m.readU8()); // 3 acc mpu6050
-      _model.config.baro.dev = m.readU8();             // 2 baro bmp085
-      _model.config.mag.dev = m.readU8();              // 3 mag hmc5883l
-      // 1.46
-      if (m.remain() >= 1)
-      {
-        m.readU8(); // rangefinder skip
-      }
-      if (m.remain() >= 1)
-      {
-        m.readU8(); // opticalflow skip
-      }
+    case MSP_SET_SENSOR_CONFIG: {
+      if (m.remain() < 3) { r.result = -1; break; }
+      const auto accel = fromAccHw(m.readU8());
+      const auto baro = m.readU8();
+      const auto mag = m.readU8();
+      const auto range = m.remain() ? m.readU8() : _model.config.surface.rangefinder;
+      const auto flow = m.remain() ? m.readU8() : _model.config.surface.opticalFlow;
+      if (range > RANGE_TFNOVA || flow > 1) { r.result = -1; break; }
+      if (_model.config.surface.rangefinder != range || _model.config.surface.opticalFlow != flow)
+        _model.state.surface = {};
+      _model.config.accel.dev = accel;
+      _model.config.baro.dev = baro;
+      _model.config.mag.dev = mag;
+      _model.config.surface.rangefinder = range;
+      _model.config.surface.opticalFlow = flow;
       _model.reload();
       _model.setRebootRequired();
       break;
+    }
 
     case MSP2_SENSOR_CONFIG_ACTIVE: {
       const auto& state = _model.state;
@@ -726,8 +703,8 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
                                                        : toAccHw(GYRO_NONE));                   // acc
       r.writeU8(_model.baroActive() && state.baro.dev ? state.baro.dev->getType() : BARO_NONE); // baro
       r.writeU8(_model.magActive() && state.mag.dev ? state.mag.dev->getType() : MAG_NONE);     // mag
-      r.writeU8(SENSOR_NOT_AVAILABLE);                                                          // rangefinder
-      r.writeU8(SENSOR_NOT_AVAILABLE);                                                          // opticalflow
+      r.writeU8(Sensor::SurfaceSensor::rangeActive(_model) ? state.surface.source : SENSOR_NOT_AVAILABLE);
+      r.writeU8(Sensor::SurfaceSensor::flowActive(_model) ? 1 : SENSOR_NOT_AVAILABLE);
       break;
     }
 
@@ -769,99 +746,52 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
     }
 
     case MSP_CF_SERIAL_CONFIG:
-      for (int i = 0; i < SERIAL_UART_COUNT; i++)
-      {
-        if (_model.config.serial[i].id >= SERIAL_ID_SOFTSERIAL_1 && !_model.isFeatureActive(FEATURE_SOFTSERIAL))
-        {
-          continue;
-        }
-        r.writeU8(_model.config.serial[i].id);                        // identifier
-        r.writeU16(_model.config.serial[i].functionMask);             // functionMask
-        r.writeU8(toBaudIndex(_model.config.serial[i].baud));         // msp_baudrateIndex
-        r.writeU8(0);                                                 // gps_baudrateIndex
-        r.writeU8(0);                                                 // telemetry_baudrateIndex
-        r.writeU8(toBaudIndex(_model.config.serial[i].blackboxBaud)); // blackbox_baudrateIndex
-      }
-      break;
-
     case MSP2_COMMON_SERIAL_CONFIG: {
-      uint8_t count = 0;
-      for (int i = 0; i < SERIAL_UART_COUNT; i++)
+      const bool v2 = m.cmd == MSP2_COMMON_SERIAL_CONFIG;
+      unsigned count = 0;
+      if (v2) r.writeU8(0);
+      for (int i = 0; i < SERIAL_UART_COUNT; ++i)
       {
-        if (_model.config.serial[i].id >= SERIAL_ID_SOFTSERIAL_1 && !_model.isFeatureActive(FEATURE_SOFTSERIAL))
-        {
-          continue;
-        }
-        count++;
+        const auto& port = _model.config.serial[i];
+        if (port.id >= SERIAL_ID_SOFTSERIAL_1 && !_model.isFeatureActive(FEATURE_SOFTSERIAL)) continue;
+        ++count;
+        r.writeU8(port.id);
+        if (v2) r.writeU32(port.functionMask);
+        else r.writeU16(port.functionMask);
+        r.writeU8(toBaudIndex(port.baud));
+        r.writeU8(toBaudIndex(_model.config.serialSensorRates[i].gps));
+        r.writeU8(toBaudIndex(_model.config.serialSensorRates[i].telemetry));
+        r.writeU8(toBaudIndex(port.blackboxBaud));
       }
-      r.writeU8(count);
-      for (int i = 0; i < SERIAL_UART_COUNT; i++)
-      {
-        if (_model.config.serial[i].id >= SERIAL_ID_SOFTSERIAL_1 && !_model.isFeatureActive(FEATURE_SOFTSERIAL))
-        {
-          continue;
-        }
-        r.writeU8(_model.config.serial[i].id);                        // identifier
-        r.writeU32(_model.config.serial[i].functionMask);             // functionMask
-        r.writeU8(toBaudIndex(_model.config.serial[i].baud));         // msp_baudrateIndex
-        r.writeU8(0);                                                 // gps_baudrateIndex
-        r.writeU8(0);                                                 // telemetry_baudrateIndex
-        r.writeU8(toBaudIndex(_model.config.serial[i].blackboxBaud)); // blackbox_baudrateIndex
-      }
+      if (v2) r.data[0] = count;
       break;
     }
 
-    case MSP_SET_CF_SERIAL_CONFIG: {
-      const int packetSize = 1 + 2 + 4;
-      if (m.remain() % packetSize != 0)
-      {
-        r.result = -1;
-        return;
-      }
-      while (m.remain() >= packetSize)
-      {
-        int id = m.readU8();
-        int k = _model.getSerialIndex((SerialPortId)id);
-        if (k == -1)
-        {
-          m.advance(packetSize - 1);
-          continue;
-        }
-        _model.config.serial[k].id = id;
-        _model.config.serial[k].functionMask = m.readU16();
-        _model.config.serial[k].baud = fromBaudIndex((SerialSpeedIndex)m.readU8());
-        m.readU8();
-        m.readU8();
-        _model.config.serial[k].blackboxBaud = fromBaudIndex((SerialSpeedIndex)m.readU8());
-      }
-      _model.reload();
-      _model.setRebootRequired();
-      break;
-    }
-
+    case MSP_SET_CF_SERIAL_CONFIG:
     case MSP2_COMMON_SET_SERIAL_CONFIG: {
-      m.readU8(); // was count - ignore
-      const int packetSize = 1 + 4 + 4;
-      if (m.remain() % packetSize != 0)
+      const bool v2 = m.cmd == MSP2_COMMON_SET_SERIAL_CONFIG;
+      const unsigned width = v2 ? 9 : 7;
+      if (v2 && !m.remain()) { r.result = -1; break; }
+      const unsigned count = v2 ? m.readU8() : m.remain() / width;
+      if (count * width != static_cast<unsigned>(m.remain())) { r.result = -1; break; }
+      const unsigned start = m.read;
+      for (unsigned row = 0; row < count; ++row)
       {
-        r.result = -1;
-        return;
+        const uint8_t* rates = m.buffer + start + (row + 1) * width - 4;
+        if (*std::max_element(rates, rates + 4) > SERIAL_SPEED_INDEX_2470000) { r.result = -1; break; }
       }
-      while (m.remain() >= packetSize)
+      if (r.result < 0) break;
+      for (unsigned row = 0; row < count; ++row)
       {
-        int id = m.readU8();
-        int k = _model.getSerialIndex((SerialPortId)id);
-        if (k == -1)
-        {
-          m.advance(packetSize - 1);
-          continue;
-        }
-        _model.config.serial[k].id = id;
-        _model.config.serial[k].functionMask = m.readU32();
-        _model.config.serial[k].baud = fromBaudIndex((SerialSpeedIndex)m.readU8());
-        m.readU8();
-        m.readU8();
-        _model.config.serial[k].blackboxBaud = fromBaudIndex((SerialSpeedIndex)m.readU8());
+        const int i = _model.getSerialIndex(static_cast<SerialPortId>(m.readU8()));
+        if (i < 0) { m.advance(width - 1); continue; }
+        auto& port = _model.config.serial[i];
+        auto& rates = _model.config.serialSensorRates[i];
+        port.functionMask = v2 ? m.readU32() : m.readU16();
+        port.baud = fromBaudIndex(static_cast<SerialSpeedIndex>(m.readU8()));
+        rates.gps = fromBaudIndex(static_cast<SerialSpeedIndex>(m.readU8()));
+        rates.telemetry = fromBaudIndex(static_cast<SerialSpeedIndex>(m.readU8()));
+        port.blackboxBaud = fromBaudIndex(static_cast<SerialSpeedIndex>(m.readU8()));
       }
       _model.reload();
       _model.setRebootRequired();
@@ -932,6 +862,28 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU16((int16_t)lrintf(q.x * scale));
       r.writeU16((int16_t)lrintf(q.y * scale));
       r.writeU16((int16_t)lrintf(q.z * scale));
+      break;
+    }
+
+    case MSP2_SENSOR_RANGEFINDER_LIDARMT: {
+      const uint8_t source = _model.config.surface.rangefinder;
+      if (!Sensor::SurfaceSensor::isMt(source) || m.remain() != 5) { r.result = -1; break; }
+      m.readU8(); // MT reports out-of-range using negative distance.
+      Sensor::SurfaceSensor::recordRange(_model, source, static_cast<int32_t>(m.readU32()), micros());
+      break;
+    }
+    case MSP2_SENSOR_OPTICALFLOW_MT: {
+      if (!_model.config.surface.opticalFlow || !Sensor::SurfaceSensor::isMt(_model.config.surface.rangefinder) ||
+          m.remain() != 9) { r.result = -1; break; }
+      const auto quality = m.readU8();
+      const int32_t x = m.readU32();
+      const int32_t y = m.readU32();
+      Sensor::SurfaceSensor::recordFlow(_model, quality, x, y, micros());
+      break;
+    }
+    case MSP_SONAR_ALTITUDE: {
+      const auto& surface = _model.state.surface;
+      r.writeU32(Sensor::SurfaceSensor::rangeActive(_model) && surface.distanceMm >= 0 ? surface.distanceMm / 10 : -1);
       break;
     }
 
@@ -1084,7 +1036,13 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       break;
 
     case MSP_SET_RX_CONFIG:
-      _model.config.input.serialRxProvider = m.readU8(); // serialrx_provider
+      if (m.remain() < 12 || !serialRxProviderSupported(m.buffer[m.read]))
+      {
+        r.result = -1;
+        break;
+      }
+      if (m.buffer[m.read] != _model.config.input.serialRxProvider) _model.setRebootRequired();
+      _model.config.input.serialRxProvider = m.readU8();
       _model.config.input.maxCheck = m.readU16();        // maxcheck
       _model.config.input.midRc = m.readU16();           // midrc
       _model.config.input.minCheck = m.readU16();        // mincheck
@@ -1215,8 +1173,8 @@ _model.config.failsafe.procedure =
         r.writeU8(_model.config.input.superRate[i]);
       }
       r.writeU8(0);                                    // was tpa scale
-      r.writeU8(50);                                   // thrMid8
-      r.writeU8(0);                                    // thr expo
+      r.writeU8(_model.config.throttleCurve.mid);
+      r.writeU8(_model.config.throttleCurve.expo);
       r.writeU16(0);                                   // was tpa breakpoint
       r.writeU8(_model.config.input.expo[AXIS_YAW]);   // yaw expo
       r.writeU8(_model.config.input.rate[AXIS_YAW]);   // yaw rate
@@ -1232,10 +1190,13 @@ _model.config.failsafe.procedure =
       // 1.43+
       r.writeU8(_model.config.input.rateType); // rates type
       // 1.47
-      r.writeU8(50); // thrHover8
+      r.writeU8(_model.config.throttleCurve.hover);
       break;
 
     case MSP_SET_RC_TUNING:
+      if (m.remain() >= 10 && (m.buffer[m.read + 6] > 100 || m.buffer[m.read + 7] > 100 ||
+          (m.remain() >= 24 && m.buffer[m.read + 23] > 100)))
+      { r.result = -1; break; }
       if (m.remain() >= 10)
       {
         const uint8_t rate = m.readU8();
@@ -1257,8 +1218,9 @@ _model.config.failsafe.procedure =
           _model.config.input.superRate[i] = m.readU8();
         }
         m.readU8();  // was tpa scale
-        m.readU8();  // thrMid8
-        m.readU8();  // thr expo
+        _model.config.throttleCurve.mid = m.readU8();
+        _model.config.throttleCurve.expo = m.readU8();
+        _model.config.throttleCurve.hover = _model.config.throttleCurve.mid; // API 1.46
         m.readU16(); // was tpa breakpoint
         if (m.remain() >= 1)
         {
@@ -1297,7 +1259,7 @@ _model.config.failsafe.procedure =
         // 1.47
         if (m.remain() >= 1)
         {
-          m.readU8(); // thrHover8
+          _model.config.throttleCurve.hover = m.readU8();
         }
         _model.notifyConfigChange(MODEL_CHANGE_RATES);
       }
@@ -1899,8 +1861,8 @@ constexpr int REQUIRED_PID_BYTES =
           rpm = lrintf(_model.state.output.telemetry.rpm[i]);
           invalidPct = _model.state.output.telemetry.errors[i];
           escTemperature = _model.state.output.telemetry.temperature[i];
-          escVoltage = _model.state.output.telemetry.voltage[i];
-          escCurrent = _model.state.output.telemetry.current[i];
+          escVoltage = _model.state.output.telemetry.voltage[i] * 25;
+          escCurrent = _model.state.output.telemetry.current[i] * 100;
         }
 
         r.writeU32(rpm);
@@ -1924,55 +1886,55 @@ constexpr int REQUIRED_PID_BYTES =
       break;
 
     case MSP_SERVO:
-      for (size_t i = 0; i < OUTPUT_CHANNELS; i++)
+      for (size_t i = 0; i < OUTPUT_CHANNELS; ++i)
       {
-        if (i >= OUTPUT_CHANNELS || _model.config.pin[i + PIN_OUTPUT_0] == -1)
-        {
-          r.writeU16(1500);
-          continue;
-        }
-        r.writeU16(_model.state.output.us[i]);
+        const auto& ch = _model.config.output.channel[i];
+        const bool connected = ch.servo && _model.config.pin[PIN_OUTPUT_0 + i] >= 0;
+        r.writeU16(connected ? _model.state.output.us[i] : ch.neutral);
       }
       break;
 
+    case MSP_SERVO_MIX_RULES:
+      // ESP-FC's mixer uses MixerEntry records; it has no BF servo-rule table.
+      break;
+
     case MSP_SERVO_CONFIGURATIONS:
-      for (size_t i = 0; i < 8; i++)
+      for (size_t i = 0; i < OUTPUT_CHANNELS; ++i)
       {
-        if (i < OUTPUT_CHANNELS)
-        {
-          r.writeU16(_model.config.output.channel[i].min);
-          r.writeU16(_model.config.output.channel[i].max);
-          r.writeU16(_model.config.output.channel[i].neutral);
-        }
-        else
-        {
-          r.writeU16(1000);
-          r.writeU16(2000);
-          r.writeU16(1500);
-        }
-        r.writeU8(100);
-        r.writeU8(-1);
+        const auto& ch = _model.config.output.channel[i];
+        const auto& routing = _model.config.servoRouting[i];
+        r.writeU16(ch.min);
+        r.writeU16(ch.max);
+        r.writeU16(ch.neutral);
+        r.writeU8(routing.rate);
+        r.writeU8(routing.forwardChannel);
         r.writeU32(0);
       }
       break;
 
     case MSP_SET_SERVO_CONFIGURATION: {
-      uint8_t i = m.readU8();
-      if (i < OUTPUT_CHANNELS)
-      {
-        _model.config.output.channel[i].min = m.readU16();
-        _model.config.output.channel[i].max = m.readU16();
-        _model.config.output.channel[i].neutral = m.readU16();
-        m.readU8();
-        m.readU8();
-        m.readU32();
-      }
-      else
+      if (m.remain() < 13) { r.result = -1; break; }
+      const unsigned i = m.readU8();
+      const int min = m.readU16(), max = m.readU16(), middle = m.readU16();
+      const int8_t rate = m.readU8();
+      const unsigned forward = m.readU8();
+      const uint32_t reversedSources = m.readU32();
+      if (i >= OUTPUT_CHANNELS || min < 500 || max > 2500 || min > middle || middle > max ||
+          rate < -100 || rate > 100 || (forward >= INPUT_CHANNELS && forward != 255) || reversedSources)
       {
         r.result = -1;
+        break;
       }
+      auto& ch = _model.config.output.channel[i];
+      if (!ch.servo && (min < 750 || max > 2250)) { r.result = -1; break; }
+      if (ch.servo && _model.state.output.disarmed[i] == ch.neutral) _model.state.output.disarmed[i] = middle;
+      ch.min = min;
+      ch.max = max;
+      ch.neutral = middle;
+      _model.config.servoRouting[i].rate = rate;
+      _model.config.servoRouting[i].forwardChannel = forward;
+      break;
     }
-    break;
 
     case MSP_ACC_CALIBRATION:
       if (!_model.isModeActive(MODE_ARMED)) _model.calibrateGyro();
@@ -2014,23 +1976,25 @@ constexpr int REQUIRED_PID_BYTES =
       break;
 
     case MSP_SET_VTX_CONFIG: {
+      if (m.remain() < 2) { r.result = -1; break; }
+      auto config = _model.config.vtx;
       uint16_t freq = m.readU16();
       if (freq <= VTXCOMMON_MSP_BANDCHAN_CHKVAL)
       {
         // Value is band and channel
-        // const uint8_t newBand = (freq / 8) + 1;
-        // const uint8_t newChannel = (freq % 8) + 1;
+        config.band = (freq / 8) + 1;
+        config.channel = (freq % 8) + 1;
       }
 
       if (m.remain() >= 2)
       {
-        _model.config.vtx.power = m.readU8();
+        config.power = m.readU8();
         /*const uint8_t newPitmode = */ m.readU8();
       }
 
       if (m.remain())
       {
-        _model.config.vtx.lowPowerDisarm = m.readU8();
+        config.lowPowerDisarm = m.readU8();
       }
 
       // API version 1.42 - this parameter kept separate since clients may already be supplying
@@ -2044,10 +2008,13 @@ constexpr int REQUIRED_PID_BYTES =
       {
         // Added standalone values for band, channel and frequency to move
         // away from the flawed encoded combined method originally implemented.
-        _model.config.vtx.band = m.readU8();
-        _model.config.vtx.channel = m.readU8();
+        config.band = m.readU8();
+        config.channel = m.readU8();
         /*uint16_t newFreq = */ m.readU16();
       }
+      if (config.band > 5 || config.channel > 8 || config.lowPowerDisarm > 2)
+      { r.result = -1; break; }
+      _model.config.vtx = config;
     }
     break;
 
@@ -2099,31 +2066,102 @@ constexpr int REQUIRED_PID_BYTES =
       }
       break;
 
-    case MSP_SET_GPS_CONFIG:
-      m.readU8(); // provider
-      m.readU8(); // sbas mode
-      m.readU8(); // auto config
-      m.readU8(); // auto baud
+    case MSP_SET_GPS_CONFIG: {
+      if (m.remain() < 4 || m.remain() == 5) { r.result = -1; break; }
+      GpsReceiverConfig cfg;
+      cfg.provider = m.readU8();
+      cfg.sbasRegion = m.readU8();
+      cfg.autoConfig = m.readU8();
+      cfg.autoBaud = m.readU8();
+      if (cfg.provider > GPS_MSP || cfg.sbasRegion > 5 || cfg.autoConfig > 1 || cfg.autoBaud > 1)
+      { r.result = -1; break; }
       if (m.remain() >= 2)
       {
-        // Added in API version 1.43
-        _model.config.gps.setHomeOnce = m.readU8(); // gps_set_home_point_once
-        m.readU8();                                 // gps_ublox_use_galileo
+        const unsigned home = m.readU8(), galileo = m.readU8();
+        if (home > 1 || galileo > 1) { r.result = -1; break; }
+        _model.config.gps.setHomeOnce = home;
+        if (galileo != _model.config.gps.enableGalileo) _model.config.gps.gnssMode = 0;
+        _model.config.gps.enableGalileo = galileo;
       }
+      _model.config.gpsReceiver = cfg;
+      _model.config.gps.enableSBAS = cfg.sbasRegion != 5;
+      _model.setRebootRequired();
+      break;
+    }
+    case MSP_GPS_CONFIG:
+      r.writeU8(_model.config.gpsReceiver.provider);
+      r.writeU8(_model.config.gps.enableSBAS ? _model.config.gpsReceiver.sbasRegion : 5);
+      r.writeU8(_model.config.gpsReceiver.autoConfig);
+      r.writeU8(_model.config.gpsReceiver.autoBaud);
+      r.writeU8(_model.config.gps.setHomeOnce);
+      r.writeU8(_model.config.gps.enableGalileo);
       break;
 
-    case MSP_GPS_CONFIG:
-      r.writeU8(1); // provider
-      r.writeU8(0); // sbasMode, 0: auto
-      r.writeU8(1); // autoConfig, 0: off, 1: on
-      r.writeU8(1); // autoBaud, 0: off, 1: on
-      // Added in API version 1.43
-      r.writeU8(_model.config.gps.setHomeOnce); // gps_set_home_point_once
-      r.writeU8(1);                             // gps_ublox_use_galileo
+    case MSP2_SENSOR_GPS: {
+      if (_model.config.gpsReceiver.provider != GPS_MSP || !_model.isFeatureActive(FEATURE_GPS) || m.remain() < 52)
+      { r.result = -1; break; }
+      m.advance(3); // instance, GPS week
+      const auto tow = m.readU32();
+      const auto fix = m.readU8(), sats = m.readU8();
+      const auto hAcc = m.readU16(), vAcc = m.readU16(), sAcc = m.readU16(), pdop = m.readU16();
+      const int32_t lon = m.readU32(), lat = m.readU32(), altCm = m.readU32();
+      const int32_t north = m.readU32(), east = m.readU32(), down = m.readU32();
+      const auto heading = m.readU16();
+      m.advance(2); // optional true yaw
+      if (lat < -900000000 || lat > 900000000 || lon < -1800000000 || lon > 1800000000 ||
+          altCm < -2000000 || altCm > 10000000 || std::abs(static_cast<int64_t>(north)) > 100000 ||
+          std::abs(static_cast<int64_t>(east)) > 100000 || std::abs(static_cast<int64_t>(down)) > 100000)
+      { r.result = -1; break; }
+      auto& gps = _model.state.gps;
+      gps.time = tow;
+      gps.numSats = sats;
+      gps.fix = fix >= 3 && fix <= 8;
+      gps.fixType = fix <= 8 ? fix : 0;
+      gps.accuracy.horizontal = hAcc * 10;
+      gps.accuracy.vertical = vAcc * 10;
+      gps.accuracy.speed = sAcc * 10;
+      gps.accuracy.pDop = pdop;
+      gps.location.raw.lat = lat;
+      gps.location.raw.lon = lon;
+      gps.location.raw.height = altCm * 10;
+      gps.velocity.raw.north = north * 10;
+      gps.velocity.raw.east = east * 10;
+      gps.velocity.raw.down = down * 10;
+      gps.velocity.raw.groundSpeed = lrintf(std::hypot(static_cast<float>(north), static_cast<float>(east)) * 10.f);
+      gps.velocity.raw.heading = (heading % 36000) * 1000;
+      gps.velocity.raw.speed3d = lrintf(std::hypot(static_cast<float>(gps.velocity.raw.groundSpeed),
+                                                   static_cast<float>(gps.velocity.raw.down)));
+      gps.dateTime.year = m.readU16();
+      gps.dateTime.month = m.readU8();
+      gps.dateTime.day = m.readU8();
+      gps.dateTime.hour = m.readU8();
+      gps.dateTime.minute = m.readU8();
+      gps.dateTime.second = m.readU8();
+      gps.dateTime.msec = tow % 1000;
+      Sensor::GpsSensor::recordSolution(gps, micros());
       break;
+    }
+    case MSP_SET_RAW_GPS: {
+      if (_model.config.gpsReceiver.provider != GPS_MSP || !_model.isFeatureActive(FEATURE_GPS) || m.remain() < 14)
+      { r.result = -1; break; }
+      const unsigned fix = m.readU8(), sats = m.readU8();
+      const int32_t lat = m.readU32(), lon = m.readU32();
+      if (fix > 1 || lat < -900000000 || lat > 900000000 || lon < -1800000000 || lon > 1800000000)
+      { r.result = -1; break; }
+      auto& gps = _model.state.gps;
+      gps.fix = fix;
+      gps.fixType = fix ? 3 : 0;
+      gps.numSats = sats;
+      gps.location.raw.lat = lat;
+      gps.location.raw.lon = lon;
+      gps.location.raw.height = m.readU16() * 1000;
+      gps.velocity.raw.groundSpeed = m.readU16() * 10;
+      Sensor::GpsSensor::recordSolution(gps, micros());
+      break;
+    }
 
     case MSP_RAW_GPS:
-      r.writeU8(_model.state.gps.fixType > 2);       // STATE(GPS_FIX));
+      r.writeU8(_model.state.gps.present && _model.state.gps.fix);       // STATE(GPS_FIX));
       r.writeU8(_model.state.gps.numSats);           // numSat
       r.writeU32(_model.state.gps.location.raw.lat); // lat
       r.writeU32(_model.state.gps.location.raw.lon); // lon

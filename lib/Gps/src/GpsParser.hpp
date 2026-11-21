@@ -79,11 +79,16 @@ class NmeaParser
 public:
   void parse(uint8_t c, NmeaMessage& m)
   {
+    if (c == '$')
+    {
+      m.length = 0;
+      m.status = NMEA_STATE_PAYLOAD;
+      return;
+    }
     switch(m.status)
     {
       case NMEA_STATE_READY:
       case NMEA_STATE_IDLE:
-        if(c == '$') m.status = NMEA_STATE_PAYLOAD;
         break;
 
       case NMEA_STATE_PAYLOAD:

@@ -18,6 +18,9 @@
 #define ESPFC_GYRO_I2C_RATE_MAX 2000
 #define ESPFC_GYRO_SPI_RATE_MAX 8000
 
+// Give the native target a configurable serial endpoint without a hardware UART.
+#define ESPFC_SERIAL_SOFT_0
+#define ESPFC_SERIAL_SOFT_0_FN SERIAL_FUNCTION_MSP
 #define ESPFC_SERIAL_DEBUG_PORT 0
 #define ESPFC_BUZZER_PIN -1
 #define ESPFC_BUTTON_PIN -1

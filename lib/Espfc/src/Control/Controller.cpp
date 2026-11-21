@@ -382,10 +382,9 @@ else
   }
   else
   {
-    _model.state.setpoint.rate[
-        AXIS_THRUST] =
-        _model.state.input.ch[
-            AXIS_THRUST];
+    const float stick = _model.state.input.ch[AXIS_THRUST];
+    _model.state.setpoint.rate[AXIS_THRUST] = _model.state.input.rxLoss || _model.isModeActive(MODE_FAILSAFE)
+        ? stick : Rates::manualThrottle(_model.config.throttleCurve, stick);
   }
 
   // debug

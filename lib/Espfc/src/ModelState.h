@@ -39,6 +39,7 @@ class SerialPortState
     Connect::MspResponse mspResponse;
     CliCmd cliCmd;
     Stream::ReadWritable * stream;
+    bool ltmActive = false;
 };
 
 class BuzzerState
@@ -131,6 +132,30 @@ class BatteryState
       return !samples && cellVoltage < vbatCellWarning * 0.01f;
     }
 
+    uint8_t alert(int warning, int critical) const
+    {
+      if (voltage < 2.0f || !cells) return 3; // MSP BATTERY_NOT_PRESENT
+      if (samples) return 4;                  // MSP BATTERY_INIT
+      if (cellVoltage <= critical * 0.01f) return 2;
+      return warn(warning) ? 1 : 0;
+    }
+
+    uint16_t mahDrawn(int source) const
+    {
+      if (source == CURRENT_METER_MSP) return mspMahDrawn;
+      if (source == CURRENT_METER_NONE) return 0;
+      return static_cast<uint16_t>(std::clamp(integratedMah, 0.f, 65535.f));
+    }
+
+    float remaining(int source, const BatteryProfile& profile) const
+    {
+      if (profile.capacity > 0 && source != CURRENT_METER_NONE &&
+          (source != CURRENT_METER_MSP || mspCurrentValid))
+        return std::clamp(100.f * (1.f - static_cast<float>(mahDrawn(source)) / profile.capacity), 0.f, 100.f);
+      return percentage;
+    }
+
+    float integratedMah = 0;
     int16_t rawVoltage;
     int16_t rawCurrent;
     float voltage;
@@ -268,6 +293,8 @@ struct OutputTelemetryState
   uint8_t temperature[OUTPUT_CHANNELS];
   uint8_t voltage[OUTPUT_CHANNELS];
   uint8_t current[OUTPUT_CHANNELS];
+  uint32_t voltageTimeMs[OUTPUT_CHANNELS] = {};
+  uint32_t currentTimeMs[OUTPUT_CHANNELS] = {};
   uint8_t debug1[OUTPUT_CHANNELS];
   uint8_t debug2[OUTPUT_CHANNELS];
   uint8_t debug3[OUTPUT_CHANNELS];
@@ -655,6 +682,18 @@ struct GpsState
   bool isHomeValid() const { return homeSet && fix && fixType >= 2; }
 };
 
+struct SurfaceSensorState
+{
+  uint8_t source = RANGE_NONE;
+  int32_t distanceMm = -1;
+  uint32_t rangeTimeUs = 0;
+  bool flowPresent = false;
+  uint32_t flowTimeUs = 0;
+  int32_t flowX = 0;
+  int32_t flowY = 0;
+  uint8_t flowQuality = 0;
+};
+
 // runtime data
 struct ModelState
 {
@@ -663,6 +702,7 @@ struct ModelState
   MagState mag;
   BaroState baro;
   GpsState gps;
+  SurfaceSensorState surface;
 
   InputState input;
   FailsafeState failsafe;

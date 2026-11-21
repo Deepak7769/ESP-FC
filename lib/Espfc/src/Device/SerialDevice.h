@@ -63,7 +63,7 @@ enum SerialFunction
 
 enum SerialRXProvider
 {
-  SERIALRX_SPEKTRUM1024 = 0,
+  SERIALRX_NONE = 0,
   SERIALRX_SPEKTRUM2048 = 1,
   SERIALRX_SBUS = 2,
   SERIALRX_SUMD = 3,
@@ -76,6 +76,26 @@ enum SerialRXProvider
   SERIALRX_SRXL = 10,
   SERIALRX_TARGET_CUSTOM = 11,
   SERIALRX_FPORT = 12,
+  SERIALRX_SPEKTRUM1024 = 15, // MSP API 1.46+
 };
+
+inline bool serialRxProviderSupported(unsigned provider)
+{
+  switch (provider)
+  {
+    case SERIALRX_SBUS:
+    case SERIALRX_NONE:
+    case SERIALRX_SUMD:
+    case SERIALRX_SUMH:
+    case SERIALRX_XBUS_MODE_B:
+    case SERIALRX_XBUS_MODE_B_RJ01:
+    case SERIALRX_IBUS:
+    case SERIALRX_CRSF:
+      return true;
+
+    default:
+      return false;
+  }
+}
 
 } // namespace Espfc

@@ -15,9 +15,11 @@ public:
   int begin(Stream::ReadWritable* port, int baud);
   int reload(ModelChangeEvent event);
   int update();
+  static void recordSolution(GpsState& gps, uint32_t now);
+  static void expireSolution(GpsState& gps, uint32_t now);
 
 private:
-  void calculateHomeVector() const;
+  bool readNmeaSolution();
 
   enum State
   {

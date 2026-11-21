@@ -6,8 +6,10 @@
 #include "Model.h"
 #include "Output/OutputIBUS.hpp"
 #include "Sensor/GpsSensor.hpp"
+#include "Sensor/SurfaceSensor.hpp"
 #include "Stream/ReadWritable.hpp"
 #include "TelemetryManager.h"
+#include "Telemetry/TelemetryLtm.hpp"
 #ifdef ESPFC_SERIAL_SOFT_0_WIFI
 #include "Wireless.h"
 #endif
@@ -40,8 +42,10 @@ private:
   Connect::Cli _cli;
   Connect::Vtx _vtx;
   TelemetryManager& _telemetry;
+  Telemetry::TelemetryLtm _ltm[SERIAL_UART_COUNT];
   Output::OutputIBUS _ibus;
   Sensor::GpsSensor _gps;
+  Sensor::SurfaceSensor _surface;
 
 #if defined(ESPFC_MSP_CURRENT_METER_POLLING)
   // Per-port schedule used only by explicitly bidirectional builds.

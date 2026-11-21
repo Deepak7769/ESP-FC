@@ -96,6 +96,7 @@ void EscDriverEsp32::end()
 int EscDriverEsp32::begin(const EscConfig& conf)
 {
   _protocol = ESC_PROTOCOL_SANITIZE(conf.protocol);
+  _servoPwm = conf.servoPwm && _protocol == ESC_PROTOCOL_PWM;
   _async = _protocol == ESC_PROTOCOL_BRUSHED ? true : conf.async; // force async for brushed
   _rate = std::clamp(conf.rate, 50, 8000);
   _interval = TO_INTERVAL_US(_rate);
@@ -364,8 +365,8 @@ void IRAM_ATTR EscDriverEsp32::readTelemetry()
 void IRAM_ATTR EscDriverEsp32::writeAnalogCommand(uint32_t channel, int32_t pulse)
 {
   Slot &slot = _channel[channel];
-  int minPulse = 800;
-  int maxPulse = 2200;
+  int minPulse = _servoPwm ? 500 : 800;
+  int maxPulse = _servoPwm ? 2500 : 2200;
   if (_protocol == ESC_PROTOCOL_BRUSHED)
   {
     minPulse = 1000;

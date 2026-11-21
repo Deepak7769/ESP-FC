@@ -20,8 +20,6 @@ enum State
 {
   INACTIVE,
   INIT,
-  SET_POWER,
-  SET_CHANNEL,
   IDLE,
 };
 
@@ -40,7 +38,11 @@ private:
   Stream::ReadWritable* _serial;
   Model& _model;
   State _state = State::INACTIVE;
-  bool _armed = false;
+  uint8_t desiredPower() const;
+  bool _wasArmed = false;
+  uint8_t _lastBand = 0xff;
+  uint8_t _lastChannel = 0xff;
+  uint8_t _lastPower = 0xff;
   Utils::Timer _timer;
 };
 

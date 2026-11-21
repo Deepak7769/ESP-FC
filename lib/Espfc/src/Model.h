@@ -454,6 +454,12 @@ class Model
   }
 #endif
 
+  if (config.surface.rangefinder == RANGE_HCSR04)
+  {
+    reservePin(config.surface.triggerPin);
+    reservePin(config.surface.echoPin);
+  }
+
   reservePin(
       config.pin[
           PIN_BUTTON]);
@@ -733,18 +739,7 @@ if (config.input.ppmMode != PPM_MODE_NORMAL &&
       PPM_MODE_NORMAL;
 }
 
-switch (config.input.serialRxProvider)
-{
-  case SERIALRX_SBUS:
-  case SERIALRX_IBUS:
-  case SERIALRX_CRSF:
-    break;
-
-  default:
-    config.input.serialRxProvider =
-        SERIALRX_SBUS;
-    break;
-}
+if (!serialRxProviderSupported(config.input.serialRxProvider)) config.input.serialRxProvider = SERIALRX_SBUS;
 
 config.input.minCheck =
     std::clamp<int16_t>(
@@ -867,10 +862,17 @@ if (config.vbat.resDiv == 0)
   config.vbat.resDiv = 1;
 }
 
+config.vbat.cellWarning = std::clamp<int16_t>(config.vbat.cellWarning, 100, 500);
+config.batteryProfile.cellMin = std::clamp<int16_t>(config.batteryProfile.cellMin, 100, config.vbat.cellWarning);
+config.batteryProfile.cellMax = std::clamp<int16_t>(config.batteryProfile.cellMax, config.vbat.cellWarning, 500);
+config.batteryProfile.capacity = std::clamp<int16_t>(config.batteryProfile.capacity, 0, 20000);
+
 switch (config.ibat.source)
 {
   case CURRENT_METER_NONE:
   case CURRENT_METER_ADC:
+  case CURRENT_METER_VIRTUAL:
+  case CURRENT_METER_ESC:
   case CURRENT_METER_MSP:
     break;
 
@@ -948,18 +950,13 @@ for (size_t i = 0;
      i++)
 {
   auto& ch = config.output.channel[i];
-
-  ch.min =
-      std::clamp<int16_t>(
-          ch.min,
-          750,
-          2250);
-
-  ch.max =
-      std::clamp<int16_t>(
-          ch.max,
-          750,
-          2250);
+  auto& routing = config.servoRouting[i];
+  routing.rate = std::clamp<int8_t>(routing.rate, -100, 100);
+  if (routing.forwardChannel >= INPUT_CHANNELS) routing.forwardChannel = 255;
+  const int16_t low = ch.servo ? 500 : 750;
+  const int16_t high = ch.servo ? 2500 : 2250;
+  ch.min = std::clamp(ch.min, low, high);
+  ch.max = std::clamp(ch.max, low, high);
 
   if (ch.min > ch.max)
   {
@@ -1061,7 +1058,7 @@ if(config.output.protocol == ESC_PROTOCOL_PWM)
 
       // configure serial ports
       constexpr uint32_t serialFunctionAllowedMask = SERIAL_FUNCTION_MSP | SERIAL_FUNCTION_RX_SERIAL | SERIAL_FUNCTION_BLACKBOX | 
-        SERIAL_FUNCTION_GPS | SERIAL_FUNCTION_TELEMETRY_FRSKY | SERIAL_FUNCTION_TELEMETRY_HOTT | SERIAL_FUNCTION_TELEMETRY_IBUS | SERIAL_FUNCTION_VTX_SMARTAUDIO;
+        SERIAL_FUNCTION_LIDAR_TF | SERIAL_FUNCTION_GPS | SERIAL_FUNCTION_TELEMETRY_LTM | SERIAL_FUNCTION_TELEMETRY_FRSKY | SERIAL_FUNCTION_TELEMETRY_HOTT | SERIAL_FUNCTION_TELEMETRY_IBUS | SERIAL_FUNCTION_VTX_SMARTAUDIO;
       uint32_t featureAllowMask =  FEATURE_RX_PPM | FEATURE_RX_SERIAL | FEATURE_MOTOR_STOP | FEATURE_SOFTSERIAL | FEATURE_GPS |
         FEATURE_TELEMETRY | FEATURE_RX_SPI | FEATURE_ANTI_GRAVITY;// | FEATURE_AIRMODE;
 

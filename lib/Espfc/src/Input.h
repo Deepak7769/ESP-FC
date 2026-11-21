@@ -3,6 +3,7 @@
 #include "Device/InputCRSF.h"
 #include "Device/InputDevice.h"
 #include "Device/InputIBUS.hpp"
+#include "Device/InputSumXbus.hpp"
 #include "Device/InputPPM.h"
 #include "Device/InputSBUS.h"
 #include "Model.h"
@@ -59,6 +60,7 @@ private:
   Utils::Filter _filter[INPUT_CHANNELS];
   Device::InputPPM _ppm;
   Device::InputIBUS _ibus;
+  Device::InputSumXbus _sumXbus;
   Device::InputSBUS _sbus;
   Device::InputCRSF _crsf;
 #if defined(ESPFC_ESPNOW)

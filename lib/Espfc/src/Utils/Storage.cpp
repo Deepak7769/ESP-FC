@@ -14,37 +14,13 @@ namespace Espfc::Utils {
 int Storage::begin()
 {
   EEPROM.begin(EEPROM_SIZE);
-  static_assert(sizeof(ModelConfig) <= EEPROM_SIZE, "ModelConfig Size too big");
+  static_assert(sizeof(ModelConfig) + 4 <= EEPROM_SIZE, "ModelConfig Size too big");
   return 1;
 }
 
 StorageResult Storage::load(ModelConfig& config) const
 {
-  // return STORAGE_ERR_BAD_MAGIC;
-
-  int addr = 0;
-  uint8_t magic = EEPROM.read(addr++);
-  if (EEPROM_MAGIC != magic)
-  {
-    return STORAGE_ERR_BAD_MAGIC;
-  }
-
-  uint8_t version = EEPROM.read(addr++);
-  if (EEPROM_VERSION != version)
-  {
-    return STORAGE_ERR_BAD_VERSION;
-  }
-
-  uint16_t size = 0;
-  size = EEPROM.read(addr++);
-  size |= EEPROM.read(addr++) << 8;
-  if (size != sizeof(ModelConfig))
-  {
-    return STORAGE_ERR_BAD_SIZE;
-  }
-
-  EEPROM.get(addr, config);
-  return STORAGE_LOAD_SUCCESS;
+  return readConfig(config, [](size_t address) { return EEPROM.read(address); });
 }
 
 StorageResult Storage::save(const ModelConfig& config)

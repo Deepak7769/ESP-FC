@@ -20,6 +20,7 @@ class Rates
 {
 public:
   void begin(const InputConfig& config);
+  static float manualThrottle(const ThrottleCurveConfig& curve, float stick);
   float getSetpoint(const int axis, float input) const;
 
 private:

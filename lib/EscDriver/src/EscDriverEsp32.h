@@ -111,6 +111,7 @@ class EscDriverEsp32: public EscDriverBase
     Slot _channel[ESC_CHANNEL_COUNT];
     EscProtocol _protocol;
     int32_t _async;
+    bool _servoPwm = false;
     int32_t _rate;
     int32_t _interval;
     bool _digital;

@@ -392,8 +392,8 @@ const Cli::Param* Cli::initialize(ModelConfig& c)
   static const char* throtleLimitTypeChoices[] = { "NONE", "SCALE", "CLIP", nullptr };
   static const char* inputItermRelaxChoices[] = { "OFF", "RP", "RPY", "RP_INC", "RPY_INC", nullptr };
 
-  static const char* voltageSourceChoices[] = { "NONE", "ADC", nullptr };
-  static const char* currentSourceChoices[] = { "NONE", "ADC", nullptr };
+  static const char* voltageSourceChoices[] = { "NONE", "ADC", "ESC", nullptr };
+  static const char* currentSourceChoices[] = { "NONE", "ADC", "VIRTUAL", "ESC", "MSP", nullptr };
   static const char* blackboxDevChoices[] = { "NONE", "FLASH", "SD_CARD", "SERIAL", nullptr };
   static const char* blackboxModeChoices[] = { "NORMAL", "TEST", "ALWAYS", nullptr };
   static const char* ledTypeChoices[] = { "SIMPLE", "STRIP", nullptr };
@@ -503,6 +503,11 @@ failsafeProcedureChoices[] = {
       Param("vbat_scale", &c.vbat.scale),
       Param("vbat_mul", &c.vbat.resMult),
       Param("vbat_div", &c.vbat.resDiv),
+      Param("battery_capacity", &c.batteryProfile.capacity),
+      Param("vbat_cell_min", &c.batteryProfile.cellMin),
+      Param("vbat_cell_max", &c.batteryProfile.cellMax),
+      Param("ibat_virtual_scale", &c.batteryProfile.virtualScale),
+      Param("ibat_virtual_offset", &c.batteryProfile.virtualOffset),
       Param("vbat_cell_warn", &c.vbat.cellWarning),
 
       Param("ibat_source", &c.ibat.source, currentSourceChoices),
@@ -514,6 +519,9 @@ failsafeProcedureChoices[] = {
       Param("fusion_gain_i", &c.fusion.gainI),
       Param("fusion_use_mag", &c.fusion.useMag),
 
+      Param("thr_mid", &c.throttleCurve.mid),
+      Param("thr_expo", &c.throttleCurve.expo),
+      Param("thr_hover", &c.throttleCurve.hover),
       Param("input_rate_type", &c.input.rateType, inputRateTypeChoices),
 
       Param("input_roll_rate", &c.input.rate[0]),
@@ -737,6 +745,8 @@ Param(
 #if ESPFC_OUTPUT_COUNT > 7
       Param("pin_output_7", &c.pin[PIN_OUTPUT_7]),
 #endif
+      Param("pin_range_trigger", &c.surface.triggerPin),
+      Param("pin_range_echo", &c.surface.echoPin),
       Param("pin_button", &c.pin[PIN_BUTTON]),
       Param("pin_buzzer", &c.pin[PIN_BUZZER]),
       Param("pin_led", &c.pin[PIN_LED_BLINK]),
@@ -1179,8 +1189,8 @@ void Cli::execute(CliCmd& cmd, Stream::Printer& s)
     }
     s.println();
 
-    s.println("rangefinder: NONE");
-    s.println("opticalflow: NONE");
+    s.println("rangefinder: NONE,HCSR04,TFMINI,TF02,MTF01,MTF02,MTF01P,MTF02P,TFNOVA");
+    s.println("opticalflow: NONE,MT");
   }
   else if (std::strcmp(cmd.args[0], "cal") == 0)
   {

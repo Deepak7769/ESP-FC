@@ -1981,11 +1981,10 @@ void test_model_config_antigravity_tail_layout_stays_packed()
           ModelConfig,
           antiGravityConfigTag) +
           sizeof(uint16_t),
-      sizeof(
-          ModelConfig));
+      offsetof(ModelConfig, batteryProfile));
 
   // Reconstruct the size the legacy class had when modelName was its final
-  // member. If this rounded legacy end equals the current size, the new bytes
+  // member. If this rounded legacy end equals the v2 prefix size, the new bytes
   // are consuming tail padding rather than growing the EEPROM image.
   const size_t legacyRoundedSize =
       ((modelNameEnd +
@@ -1996,8 +1995,7 @@ void test_model_config_antigravity_tail_layout_stays_packed()
 
   TEST_ASSERT_EQUAL_UINT32(
       legacyRoundedSize,
-      sizeof(
-          ModelConfig));
+      offsetof(ModelConfig, batteryProfile));
 }
 
 

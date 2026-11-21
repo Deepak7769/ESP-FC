@@ -62,9 +62,9 @@ int Blackbox::begin()
     rp->rates[i] = _model.config.input.superRate[i];
     rp->rate_limit[i] = _model.config.input.rateLimit[i];
   }
-  rp->thrMid8 = 50;
-  rp->thrExpo8 = 0;
-  rp->thrHover8 = 50;
+  rp->thrMid8 = _model.config.throttleCurve.mid;
+  rp->thrExpo8 = _model.config.throttleCurve.expo;
+  rp->thrHover8 = _model.config.throttleCurve.hover;
   rp->dynThrPID = _model.config.controller.tpaScale;
   rp->tpa_breakpoint = _model.config.controller.tpaBreakpoint;
   rp->rates_type = _model.config.input.rateType;
@@ -130,8 +130,8 @@ int Blackbox::begin()
   cp->rateAccelLimit = 0;
 
   auto* bp = currentBatteryProfile = batteryProfilesMutable(systemConfig()->activeBatteryProfile);
-  bp->vbatmaxcellvoltage = 430;
-  bp->vbatmincellvoltage = 330;
+  bp->vbatmaxcellvoltage = _model.config.batteryProfile.cellMax;
+  bp->vbatmincellvoltage = _model.config.batteryProfile.cellMin;
   bp->vbatwarningcellvoltage = _model.config.vbat.cellWarning;
 
   rcControlsConfigMutable()->deadband = _model.config.input.deadband;

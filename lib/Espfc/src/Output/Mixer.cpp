@@ -53,6 +53,7 @@ int Mixer::begin()
         .rate = _model.config.output.servoRate,
         .async = true,
         .dshotTelemetry = false,
+        .servoPwm = true,
     };
 
     escServo.begin(servoConf);
@@ -109,7 +110,9 @@ else
     _model.state.output.telemetry.errorsCount[i] = 0;
     _model.state.output.telemetry.temperature[i] = 0;
     _model.state.output.telemetry.current[i] = 0;
+    _model.state.output.telemetry.currentTimeMs[i] = 0;
     _model.state.output.telemetry.voltage[i] = 0;
+    _model.state.output.telemetry.voltageTimeMs[i] = 0;
     _model.state.output.telemetry.erpm[i] = 0;
     _model.state.output.telemetry.rpm[i] = 0;
     _model.state.output.telemetry.freq[i] = 0;
@@ -450,7 +453,12 @@ void FAST_CODE_ATTR Mixer::writeOutput(const MixerConfig& mixer, float* out)
   for (size_t i = 0; i < OUTPUT_CHANNELS; i++)
   {
     const OutputChannelConfig& och = _model.config.output.channel[i];
-    if (i >= mixerCount || stop)
+    const auto& routing = _model.config.servoRouting[i];
+    const bool forward = mixer.mixes && mixer.count <= OUTPUT_CHANNELS && och.servo && routing.forwardChannel < INPUT_CHANNELS &&
+                         routing.forwardChannel < _model.state.input.channelCount &&
+                         _model.state.input.channelsValid && !_model.state.input.rxLoss &&
+                         !_model.state.input.rxFailSafe;
+    if ((i >= mixerCount && !forward) || stop)
     {
       _model.state.output.us[i] =
           och.servo && _model.state.output.disarmed[i] == 1000 ? och.neutral : _model.state.output.disarmed[i];
@@ -459,9 +467,12 @@ void FAST_CODE_ATTR Mixer::writeOutput(const MixerConfig& mixer, float* out)
     {
       if (och.servo)
       {
-        const int16_t tmp = lrintf(
-            Utils::map3(out[i], -1.f, 0.f, 1.f, och.reverse ? 2000 : 1000, och.neutral, och.reverse ? 1000 : 2000));
-        _model.state.output.us[i] = std::clamp(tmp, och.min, och.max);
+        const float mixed = i < mixerCount ? out[i] : 0.f;
+        const float pulse = Utils::map3(mixed, -1.f, 0.f, 1.f, och.reverse ? 2000 : 1000,
+                                       och.neutral, och.reverse ? 1000 : 2000);
+        const float base = forward ? _model.state.input.us[routing.forwardChannel] : och.neutral;
+        const long target = lrintf(base + (pulse - och.neutral) * routing.rate * 0.01f);
+        _model.state.output.us[i] = std::clamp<long>(target, och.min, och.max);
       }
       else
       {
@@ -523,6 +534,9 @@ void FAST_CODE_ATTR Mixer::writeOutput(const MixerConfig& mixer, float* out)
     const OutputChannelConfig& och = _model.config.output.channel[i];
     if (och.servo)
     {
+      // The PWM period must include a low interval, even at high servo rates.
+      if (_model.config.output.servoRate > 0)
+        _model.state.output.us[i] = std::min<int>(_model.state.output.us[i], 1000000 / _model.config.output.servoRate - 1);
       if (_servo) _servo->write(i, _model.state.output.us[i]);
     }
     else
@@ -573,10 +587,12 @@ void FAST_CODE_ATTR Mixer::readTelemetry()
       case 0x0400:
         // Voltage range (0-63,75V step 0,25V)
         _model.state.output.telemetry.voltage[i] = value & 0x00ff;
+        _model.state.output.telemetry.voltageTimeMs[i] = millis();
         break;
       case 0x0600:
         // Current range (0-255A step 1A)
         _model.state.output.telemetry.current[i] = value & 0x00ff;
+        _model.state.output.telemetry.currentTimeMs[i] = millis();
         break;
       case 0x0800:
         // Debug 1 value

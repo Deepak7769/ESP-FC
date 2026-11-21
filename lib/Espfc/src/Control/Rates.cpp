@@ -6,6 +6,27 @@ namespace Espfc::Control {
 constexpr float SETPOINT_RATE_LIMIT = 1998.0f;
 constexpr float RC_RATE_INCREMENTAL = 14.54f;
 
+float FAST_CODE_ATTR Rates::manualThrottle(const ThrottleCurveConfig& curve, float stick)
+{
+  stick = std::clamp(stick, -1.f, 1.f);
+  if ((curve.mid == curve.hover && curve.expo == 0) || stick == -1.f || stick == 1.f)
+    return stick;
+  const float x = (stick + 1.f) * 0.5f;
+  const float mid = std::min<uint8_t>(curve.mid, 100) * 0.01f;
+  const float hover = std::min<uint8_t>(curve.hover, 100) * 0.01f;
+  const float expo = std::min<uint8_t>(curve.expo, 100) * 0.01f;
+  // Each of the configurator's two quadratic segments has its control point
+  // halfway between its endpoints in X, so its Bezier parameter is linear in X.
+  if (x <= mid)
+  {
+    const float t = x / mid;
+    return 2.f * hover * t * (1.f + expo * (1.f - t)) - 1.f;
+  }
+  const float t = (x - mid) / (1.f - mid);
+  const float y = hover + (1.f - hover) * t * (1.f - expo * (1.f - t));
+  return 2.f * y - 1.f;
+}
+
 void Rates::begin(const InputConfig& config)
 {
   rateType = (RateType)config.rateType;

@@ -1118,6 +1118,13 @@ Device::InputDevice* Input::getInputDevice()
   {
     switch (_model.config.input.serialRxProvider)
     {
+      case SERIALRX_SUMD:
+      case SERIALRX_SUMH:
+      case SERIALRX_XBUS_MODE_B:
+      case SERIALRX_XBUS_MODE_B_RJ01:
+        _sumXbus.begin(serial, static_cast<SerialRXProvider>(_model.config.input.serialRxProvider));
+        return &_sumXbus;
+
       case SERIALRX_IBUS:
         _ibus.begin(serial);
         _model.logger.info().logln("RX IBUS");

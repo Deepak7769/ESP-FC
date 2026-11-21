@@ -343,6 +343,12 @@ struct ActuatorCondition
   uint8_t linkId = 0;
 };
 
+struct SerialSensorRates
+{
+  int32_t gps = 0;
+  int32_t telemetry = 0;
+};
+
 struct SerialPortConfig
 {
   int8_t id;
@@ -627,6 +633,21 @@ struct VBatConfig
   int8_t source = 0;
 };
 
+struct ServoRouting
+{
+  int8_t rate = 100;
+  uint8_t forwardChannel = 255;
+};
+
+struct BatteryProfile
+{
+  int16_t cellMin = 340; // centivolts per cell
+  int16_t cellMax = 420;
+  int16_t capacity = 0; // mAh; zero selects voltage-based estimation
+  int16_t virtualScale = 0;
+  int16_t virtualOffset = 0;
+};
+
 struct IBatConfig
 {
   // Values follow Betaflight currentMeterSource_e so Configurator/MSP source
@@ -744,6 +765,36 @@ struct VtxConfig
   uint8_t band = 0x1;
   uint8_t power = 0;
   uint8_t lowPowerDisarm = 0;
+};
+
+enum RangefinderType : uint8_t
+{
+  RANGE_NONE, RANGE_HCSR04, RANGE_TFMINI, RANGE_TF02, RANGE_MTF01, RANGE_MTF02,
+  RANGE_MTF01P, RANGE_MTF02P, RANGE_TFNOVA
+};
+
+struct SurfaceSensorConfig
+{
+  uint8_t rangefinder = RANGE_NONE;
+  uint8_t opticalFlow = 0;
+  int8_t triggerPin = -1;
+  int8_t echoPin = -1;
+};
+
+enum GpsProvider { GPS_NMEA, GPS_UBLOX, GPS_MSP };
+struct ThrottleCurveConfig
+{
+  uint8_t mid = 50;
+  uint8_t expo = 0;
+  uint8_t hover = 50;
+};
+
+struct GpsReceiverConfig
+{
+  uint8_t provider = GPS_UBLOX;
+  uint8_t autoConfig = 1;
+  uint8_t autoBaud = 1;
+  uint8_t sbasRegion = 0;
 };
 
 struct GpsConfig
@@ -951,11 +1002,19 @@ class ModelConfig
 
     // These three bytes deliberately occupy the tail padding that followed
     // modelName in the legacy ModelConfig layout. Existing field offsets and
-    // sizeof(ModelConfig) therefore stay stable across this firmware update.
+    // the size of the v2 EEPROM prefix therefore stay stable.
     // The tag detects old EEPROM images whose padding did not contain a valid
     // Anti-Gravity setting.
     uint8_t antiGravityGain = ANTI_GRAVITY_GAIN_DEFAULT;
     uint16_t antiGravityConfigTag = ANTI_GRAVITY_CONFIG_TAG;
+
+    // Append-only extension. Storage reads the original prefix for v2 images.
+    alignas(4) BatteryProfile batteryProfile;
+    ServoRouting servoRouting[ESPFC_OUTPUT_COUNT];
+    SerialSensorRates serialSensorRates[SERIAL_UART_COUNT];
+    GpsReceiverConfig gpsReceiver;
+    SurfaceSensorConfig surface;
+    ThrottleCurveConfig throttleCurve;
 
     ModelConfig()
     {
