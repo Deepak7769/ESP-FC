@@ -1,92 +1,40 @@
 #include "BaroSPL06.hpp"
-#include <Arduino.h>
+#include "Hal/Time.hpp"
+#include <algorithm>
+#include <cmath>
 
 namespace Espfc::Device::Baro {
+namespace {
+constexpr uint8_t RESULT = 0x00;
+constexpr uint8_t STATUS = 0x08;
+constexpr float SCALE_8X = 7864320.f;
 
-#define SPL06_ADDRESS_FIRST 0x76
-#define SPL06_ADDRESS_SECOND 0x77
-
-#define SPL06_WHOAMI_ID 0x10
-#define SPL06_WHOAMI_REG 0x0D
-
-#define SPL06_VERSION_REG 0xD1
-#define SPL06_RESET_REG 0x0C
-#define SPL06_RESET_VAL 0x89
-
-#define SPL06_CALIB_REG 0x10
-#define SPL06_CALIB_REG_COEF_LEN 18
-
-#define SPL06_PRESSURE_CFG_REG (0x06)    /* Pressure configuration Reg */
-#define SPL06_TEMPERATURE_CFG_REG (0x07) /* Temperature configuration Reg */
-#define SPL06_MODE_CFG_REG (0x08)        /* Mode and Status Configuration */
-#define SPL06_INT_FIFO_CFG_REG (0x09)    /* Interrupt and FIFO Configuration */
-#define SPL06_INT_STATUS_REG (0x0A)      /* Interrupt Status Reg */
-#define SPL06_FIFO_STATUS_REG (0x0B)     /* FIFO Status Reg */
-#define SPL06_RST_REG (0x0C)             /* Softreset Register */
-
-#define SPL06_PRESSURE_REG 0x00
-#define SPL06_TEMPERATURE_REG 0x03
-
-#define SPL06_DATA_FRAME_SIZE (6)
-
-#define SPL06_CONTINUOUS_MODE (0x07)
-
-#define TEMPERATURE_INTERNAL_SENSOR (0)
-#define TEMPERATURE_EXTERNAL_SENSOR (1)
-
-#define SPL06_MWASURE_1 (0x00)
-#define SPL06_MWASURE_2 (0x01)
-#define SPL06_MWASURE_4 (0x02)
-#define SPL06_MWASURE_8 (0x03)
-#define SPL06_MWASURE_16 (0x04)
-#define SPL06_MWASURE_32 (0x05)
-#define SPL06_MWASURE_64 (0x06)
-#define SPL06_MWASURE_128 (0x07)
-
-#define SPL06_OVERSAMP_1 (0x00)
-#define SPL06_OVERSAMP_2 (0x01)
-#define SPL06_OVERSAMP_4 (0x02)
-#define SPL06_OVERSAMP_8 (0x03)
-#define SPL06_OVERSAMP_16 (0x04)
-#define SPL06_OVERSAMP_32 (0x05)
-#define SPL06_OVERSAMP_64 (0x06)
-#define SPL06_OVERSAMP_128 (0x07)
-
-#define P_MEASURE_RATE SPL06_MWASURE_16
-#define P_OVERSAMP_RATE SPL06_OVERSAMP_64
-#define SPL06_PRESSURE_CFG (P_MEASURE_RATE << 4 | P_OVERSAMP_RATE)
-
-#define T_MEASURE_RATE SPL06_MWASURE_16
-#define T_OVERSAMP_RATE SPL06_OVERSAMP_8
-#define SPL06_TEMPERATURE_CFG (TEMPERATURE_EXTERNAL_SENSOR << 7 | T_MEASURE_RATE << 4 | T_OVERSAMP_RATE)
-
-#define SPL06_MODE (SPL06_CONTINUOUS_MODE)
-#define SPL06_TIME_MS 10
-
-static const uint32_t scaleFactor[8] = {524288, 1572864, 3670016, 7864320, 253952, 516096, 1040384, 2088960};
+int32_t signed24(const uint8_t* data)
+{
+  const int32_t raw = (data[0] << 16) | (data[1] << 8) | data[2];
+  return raw & 0x800000 ? raw - 0x1000000 : raw;
+}
+}
 
 int BaroSPL06::begin(BusDevice* bus)
 {
-  return begin(bus, SPL06_ADDRESS_FIRST) ? 1 : begin(bus, SPL06_ADDRESS_SECOND) ? 1 : 0;
+  return begin(bus, 0x76) || begin(bus, 0x77);
 }
 
 int BaroSPL06::begin(BusDevice* bus, uint8_t addr)
 {
-
-  uint8_t buffer[SPL06_CALIB_REG_COEF_LEN] = {0};
-
   setBus(bus, addr);
-
-  if (!testConnection()) return 0;
-
-  writeReg(SPL06_RESET_REG, SPL06_RESET_VAL); // device reset
+  _running = _haveTemperature = false;
+  if (!bus || !testConnection() || !bus->writeByte(addr, 0x0c, 0x89)) return 0;
   delay(50);
+  uint8_t status;
+  if (bus->readByte(addr, STATUS, &status) != 1 || (status & 0xc0) != 0xc0) return 0;
 
-  kt = 0;
-
-  kp = 0;
-
-  _bus->read(_addr, SPL06_CALIB_REG, SPL06_CALIB_REG_COEF_LEN, buffer); // read callibration
+  uint8_t buffer[18];
+  // Short bursts also fit the MPU auxiliary I2C master transfer count.
+  if (bus->read(addr, 0x10, 9, buffer) != 9 || bus->read(addr, 0x19, 9, buffer + 9) != 9 ||
+      std::all_of(buffer, buffer+18, [](uint8_t b){ return b == 0; }) ||
+      std::all_of(buffer, buffer+18, [](uint8_t b){ return b == 0xff; })) return 0;
 
   _cal.c0 = (int16_t)buffer[0] << 4 | buffer[1] >> 4;
   _cal.c0 = (_cal.c0 & 0x0800) ? (_cal.c0 | 0xF000) : _cal.c0;
@@ -106,97 +54,55 @@ int BaroSPL06::begin(BusDevice* bus, uint8_t addr)
   _cal.c21 = (int16_t)buffer[14] << 8 | buffer[15];
   _cal.c30 = (int16_t)buffer[16] << 8 | buffer[17];
 
-  kp = scaleFactor[SPL06_OVERSAMP_64];
-  writeReg(SPL06_PRESSURE_CFG_REG, SPL06_MWASURE_16 << 4 | SPL06_OVERSAMP_64);
+  uint8_t source = 0x80; // The SPL06-001 is calibrated for the MEMS temperature sensor.
+  if (_type == BARO_DPS310 && bus->readByte(addr, 0x28, &source) != 1) return 0;
+  // Both conversions at 8x oversampling fit within a 32 Hz measurement cycle.
+  if (!bus->writeByte(addr, 0x06, 0x53) || !bus->writeByte(addr, 0x07, 0x53 | (source & 0x80)) ||
+      !bus->writeByte(addr, 0x09, 0) || !bus->writeByte(addr, STATUS, 7)) return 0;
 
-  kt = scaleFactor[SPL06_OVERSAMP_64];
-  writeReg(SPL06_TEMPERATURE_CFG_REG, SPL06_MWASURE_16 << 4 | SPL06_OVERSAMP_64 | 0x80); // Using mems temperature
-  writeReg(SPL06_INT_FIFO_CFG_REG, 0x04 | 0x08);
-
-  writeReg(SPL06_MODE_CFG_REG, SPL06_MODE); // set sampling mode
-
-  delay(20);
-
+  if (bus->getType() == BUS_SLV && bus->read(addr, RESULT, 6, buffer) != 6) return 0;
+  _running = true;
   return 1;
-}
-
-BaroDeviceType BaroSPL06::getType() const
-{
-  return BARO_SPL06;
-}
-
-float BaroSPL06::readTemperature()
-{
-  float fTCompensate;
-  float fTsc;
-
-  fTsc = _raw_temp / (float)kt;
-  fTCompensate = _cal.c0 * 0.5 + _cal.c1 * fTsc;
-
-  return fTCompensate;
-}
-
-float BaroSPL06::readPressure()
-{
-  float fTsc, fPsc;
-  float qua2, qua3;
-  float fPCompensate;
-
-  readMesurment();
-
-  fTsc = _raw_temp / (float)kt;
-  fPsc = _raw_pressure / (float)kp;
-  qua2 = _cal.c10 + fPsc * (_cal.c20 + fPsc * _cal.c30);
-  qua3 = fTsc * fPsc * (_cal.c11 + fPsc * _cal.c21);
-  // qua3 = 0.9f *fTsc * fPsc * (spl06Calib.c11 + fPsc * spl06Calib.c21);
-
-  fPCompensate = _cal.c00 + fPsc * qua2 + fTsc * _cal.c01 + qua3;
-  // fPCompensate = spl06Calib.c00 + fPsc * qua2 + 0.9f *fTsc  * spl06Calib.c01 + qua3;
-  return fPCompensate;
-}
-
-void BaroSPL06::setMode(BaroDeviceMode mode)
-{
-  (void)mode;
-}
-
-int BaroSPL06::getDelay(BaroDeviceMode mode) const
-{
-  switch (mode)
-  {
-    case BARO_MODE_TEMP:
-      return 0;
-    default:
-      // return 5500; // if sapling X1
-      // return 7500; // if sampling X2
-      return 11500; // if sampling X4
-  }
 }
 
 bool BaroSPL06::testConnection()
 {
-  uint8_t whoami = 0;
-  if (_bus->read(_addr, SPL06_WHOAMI_REG, 1, &whoami) != 1) return false;
-  setChipId(whoami);
-  if (whoami != SPL06_WHOAMI_ID) return false;
-  return true;
+  uint8_t id;
+  if (!_bus || _bus->readByte(_addr, 0x0d, &id) != 1) return false;
+  setChipId(id);
+  return id == 0x10;
 }
 
-void BaroSPL06::readMesurment()
+float BaroSPL06::readTemperature()
 {
-  uint8_t buffer[6] = {};
-  if (_bus->readFast(_addr, SPL06_PRESSURE_REG, 6, buffer) != 6) return;
-
-  _raw_pressure = buffer[2] | (buffer[1] << 8) | (buffer[0] << 16);
-  _raw_pressure = (_raw_pressure & 0x800000) ? (0xFF000000 | _raw_pressure) : _raw_pressure;
-
-  _raw_temp = buffer[5] | (buffer[4] << 8) | (buffer[3] << 16);
-  _raw_temp = (_raw_temp & 0x800000) ? (0xFF000000 | _raw_temp) : _raw_temp;
+  return _haveTemperature ? _temperature : NAN;
 }
 
-int8_t BaroSPL06::writeReg(uint8_t reg, uint8_t val)
+float BaroSPL06::readPressure()
 {
-  return _bus->write(_addr, reg, 1, &val);
+  _haveTemperature = false;
+  if (!_running) return NAN;
+  const bool bridge = _bus->getType() == BUS_SLV;
+  uint8_t status;
+  if (!bridge && (_bus->readByte(_addr, STATUS, &status) != 1 || (status & 0x30) != 0x30)) return NAN;
+
+  uint8_t data[6];
+  const int count = bridge ? _bus->readFast(_addr, RESULT, 6, data) : _bus->read(_addr, RESULT, 6, data);
+  if (count != 6) return NAN;
+  const float p = signed24(data) / SCALE_8X;
+  const float t = signed24(data+3) / SCALE_8X;
+  _temperature = _cal.c0 * 0.5f + _cal.c1 * t;
+  if (_temperature < -40.f || _temperature > 85.f) return NAN;
+  _haveTemperature = true;
+  return _cal.c00 + p * (_cal.c10 + p * (_cal.c20 + p * _cal.c30)) +
+         t * (_cal.c01 + p * (_cal.c11 + p * _cal.c21));
+}
+
+void BaroSPL06::setMode(BaroDeviceMode) {}
+
+int BaroSPL06::getDelay(BaroDeviceMode mode) const
+{
+  return mode == BARO_MODE_PRESS ? 31250 : 1;
 }
 
 } // namespace Espfc::Device::Baro

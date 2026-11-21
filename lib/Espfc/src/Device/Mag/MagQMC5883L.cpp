@@ -55,11 +55,17 @@ int MagQMC5883L::begin(BusDevice* bus, uint8_t addr)
 
   if (!testConnection()) return 0;
 
-  setMode(QMC5883L_OSR_64, QMC5883L_RANGE_2G, QMC5883L_RATE_100, QMC5883L_MODE_CONTINUOUS);
-
-  uint8_t buffer[6];
-  _bus->read(_addr, QMC5883L_RA_DATAX_H, 6, buffer);
-
+  constexpr uint8_t mode = (QMC5883L_OSR_64 << 6) | (QMC5883L_RANGE_2G << 4) |
+                           (QMC5883L_RATE_100 << 2) | QMC5883L_MODE_CONTINUOUS;
+  if (!bus->writeByte(addr, QMC5883L_RA_RST_TIME, 1) || !bus->writeByte(addr, QMC5883L_RA_MODE, mode))
+    return 0;
+  uint8_t readback;
+  if (bus->readByte(addr, QMC5883L_RA_MODE, &readback) != 1 || readback != mode) return 0;
+  if (bus->getType() == BUS_SLV)
+  {
+    uint8_t sample[6];
+    if (bus->read(addr, QMC5883L_RA_DATAX_L, 6, sample) != 6) return 0;
+  }
   return 1;
 }
 
@@ -77,26 +83,18 @@ int MagQMC5883L::readMag(VectorInt16& v)
 
 const VectorFloat MagQMC5883L::convert(const VectorInt16& v) const
 {
-  constexpr float scale = 1.f / 1090.f;
+  constexpr float scale = 1.f / 12000.f;
   return VectorFloat{v} * scale;
 }
 
 int MagQMC5883L::getRate() const
 {
-  return 75;
+  return 100;
 }
 
 MagDeviceType MagQMC5883L::getType() const
 {
   return MAG_QMC5883L;
-}
-
-void MagQMC5883L::setMode(uint8_t osr, uint8_t rng, uint8_t odr, uint8_t mode)
-{
-  _mode = (osr << 6) | (rng << 4) | (odr << 2) | (mode);
-  uint8_t res = _bus->writeByte(_addr, QMC5883L_RA_MODE, ((osr << 6) | (rng << 4) | (odr << 2) | (mode)));
-
-  (void)res;
 }
 
 bool MagQMC5883L::testConnection()

@@ -20,7 +20,7 @@ public:
   // readFast() ignores devAddr and regAddr args and read ext sensor data reg from master
   int8_t readFast(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8_t* data) override;
 
-  // writes only one byte, length is ignored
+  // The auxiliary master accepts a single data byte per write.
   bool write(uint8_t devAddr, uint8_t regAddr, uint8_t length, const uint8_t* data) override;
 
   int8_t writeMaster(uint8_t regAddr, uint8_t data);

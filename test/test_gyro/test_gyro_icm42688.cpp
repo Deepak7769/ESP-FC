@@ -2,6 +2,9 @@
 #include "Device/Baro/BaroBMP085.hpp"
 #include "Device/Baro/BaroMS5611.hpp"
 #include "Device/Baro/BaroLPS.hpp"
+#include "Device/Baro/BaroSPL06.hpp"
+#include "Device/BusSlave.hpp"
+#include "Device/Mag/MagQMC5883L.hpp"
 #include "Device/Gyro/GyroICM42688.hpp"
 #include "Device/GyroDevice.hpp"
 #include "Device/Mag/MagHMC5883L.hpp"
@@ -423,6 +426,74 @@ static void test_bmp085_factory_calibration_and_failed_transactions()
   TEST_ASSERT_FALSE(dev.begin(&bus));
 }
 
+static void test_dps310_spl06_compensation_and_stale_data()
+{
+  for (auto type : {BARO_SPL06, BARO_DPS310})
+  {
+    MockBusDevice bus;
+    BaroSPL06 dev;
+    dev.setType(type);
+    bus.readRegs[0x0d] = 0x10;
+    bus.readRegs[0x08] = 0xf7;
+    // c0 = -20, c1 = 2, c00 = 100000, c10 = 1000, c01 = -100.
+    const uint8_t coeff[] = {0xfe,0xc0,2,0x18,0x6a,0,3,0xe8,0xff,0x9c};
+    std::copy(coeff, coeff + sizeof(coeff), bus.readRegs + 0x10);
+    bus.readRegs[0] = 0x3c; // pressure = scale / 2
+    bus.readRegs[3] = 0xc4; // temperature = -scale / 2
+    TEST_ASSERT_TRUE(dev.begin(&bus, 0x77));
+    TEST_ASSERT_EQUAL_HEX8(type == BARO_DPS310 ? 0x53 : 0xd3, bus.writeRegs[7]);
+    TEST_ASSERT_TRUE(std::isnan(dev.readTemperature()));
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 100550.f, dev.readPressure());
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, -11.f, dev.readTemperature());
+    bus.readRegs[8] = 0xc7; // neither result is ready
+    TEST_ASSERT_TRUE(std::isnan(dev.readPressure()));
+    bus.readRegs[8] = 0xf7;
+    bus.failReadReg = 0;
+    TEST_ASSERT_TRUE(std::isnan(dev.readPressure()));
+    TEST_ASSERT_TRUE(std::isnan(dev.readTemperature()));
+    bus.failReadReg = 0x19; // second calibration block unreadable
+    TEST_ASSERT_FALSE(dev.begin(&bus, 0x77));
+    TEST_ASSERT_TRUE(std::isnan(dev.readPressure()));
+  }
+}
+
+static void test_mpu_bridge_rejects_missing_sensor_and_chunks_long_reads()
+{
+  MockBusDevice master;
+  BusSlave bridge;
+  bridge.begin(&master, 0x68);
+  uint8_t data[24] = {};
+  TEST_ASSERT_EQUAL_INT(24, bridge.read(0x76, 0x88, sizeof(data), data));
+  TEST_ASSERT_EQUAL_HEX8(0x97, master.writeRegs[0x26]);
+  TEST_ASSERT_EQUAL_HEX8(0x89, master.writeRegs[0x27]);
+  for (uint8_t status : {0x01, 0x20})
+  {
+    master.readRegs[0x36] = status;
+    TEST_ASSERT_EQUAL_INT(0, bridge.readFast(0x76, 0xf7, 6, data));
+    TEST_ASSERT_FALSE(bridge.writeByte(0x76, 0xf4, 0x33));
+  }
+  TEST_ASSERT_FALSE(bridge.write(0x76, 0, 0, nullptr));
+}
+
+static void test_qmc5883l_field_scale_and_config_write_failure()
+{
+  MockBusDevice bus;
+  MagQMC5883L dev;
+  bus.readRegs[0x0d] = 0xff;
+  bus.readRegs[9] = 0xc9;
+  TEST_ASSERT_TRUE(dev.begin(&bus));
+  TEST_ASSERT_EQUAL_UINT8(1, bus.writeRegs[0x0b]);
+  TEST_ASSERT_EQUAL_UINT8(0xc9, bus.writeRegs[9]);
+  TEST_ASSERT_EQUAL_INT(100, dev.getRate());
+  bus.readRegs[0] = 0xe0;
+  bus.readRegs[1] = 0x2e;
+  VectorInt16 raw;
+  TEST_ASSERT_TRUE(dev.readMag(raw));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 1.f, dev.convert(raw).x);
+  bus.failWriteReg = 9;
+  TEST_ASSERT_FALSE(dev.begin(&bus));
+}
+
 static void test_lps_temperature_pressure_and_status()
 {
   for (uint8_t id : {0xbd, 0xb1, 0xb4})
@@ -486,6 +557,9 @@ static void test_ms5611_factory_crc_and_second_order_compensation()
 int main(int argc, char** argv)
 {
   UNITY_BEGIN();
+  RUN_TEST(test_dps310_spl06_compensation_and_stale_data);
+  RUN_TEST(test_mpu_bridge_rejects_missing_sensor_and_chunks_long_reads);
+  RUN_TEST(test_qmc5883l_field_scale_and_config_write_failure);
   RUN_TEST(test_lps_temperature_pressure_and_status);
   RUN_TEST(test_bmp085_factory_calibration_and_failed_transactions);
   RUN_TEST(test_ms5611_factory_crc_and_second_order_compensation);

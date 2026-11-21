@@ -527,6 +527,9 @@ void Hardware::detectBaro()
   const int8_t configuredBus =
       _model.config.baro.bus;
 
+  // The DPS310 and SPL06-001 share product ID 0x10 and their coefficient layout.
+  // Explicit selection determines the temperature sensor calibration source.
+  spl06.setType(configuredDev == BARO_DPS310 ? BARO_DPS310 : BARO_SPL06);
   if (configuredDev == BARO_NONE)
   {
     return;
@@ -637,6 +640,7 @@ void Hardware::detectBaro()
 #endif
 
   if (!detectedBaro &&
+      (!_model.state.mag.dev || _model.state.mag.dev->getBus() != &gyroSlaveBus) &&
       busAllowed(configuredBus, BUS_SLV) &&
       gyroSlaveBus.getBus())
   {

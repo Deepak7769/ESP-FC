@@ -14,6 +14,7 @@ enum BaroDeviceType : uint8_t
   BARO_BMP280 = 4,
   BARO_SPL06 = 5,
   BARO_LPS = 6,
+  BARO_DPS310 = 7,
   BARO_MAX
 };
 

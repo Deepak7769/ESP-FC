@@ -88,6 +88,11 @@ int MagHMC5883L::begin(BusDevice* bus, uint8_t addr)
     return 0;
   }
 
+  if (bus->getType() == BUS_SLV)
+  {
+    uint8_t sample[6];
+    if (bus->read(addr, HMC5883L_RA_DATAX_H, 6, sample) != 6) return 0;
+  }
   return 1;
 }
 

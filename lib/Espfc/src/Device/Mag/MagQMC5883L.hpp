@@ -19,10 +19,6 @@ public:
 
   bool testConnection() final;
 
-private:
-  void setMode(uint8_t osr, uint8_t rng, uint8_t odr, uint8_t mode);
-
-  uint8_t _mode;
 };
 
 } // namespace Espfc::Device::Mag

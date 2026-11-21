@@ -97,7 +97,12 @@ int BaroBMP280::begin(BusDevice* bus, uint8_t addr)
   }
 
   delay(20);
-
+  if (bus->getType() == BUS_SLV)
+  {
+    // Select the six streaming output registers after the configuration writes.
+    uint8_t sample[6];
+    if (bus->read(addr, BMP280_PRESSURE_REG, 6, sample) != 6) return 0;
+  }
   return 1;
 }
 

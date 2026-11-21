@@ -24,7 +24,8 @@ public:
   int begin(BusDevice* bus) final;
   int begin(BusDevice* bus, uint8_t addr) final;
 
-  BaroDeviceType getType() const final;
+  void setType(BaroDeviceType type) { _type = type; }
+  BaroDeviceType getType() const final { return _type; }
 
   float readTemperature() final;
   float readPressure() final;
@@ -34,17 +35,12 @@ public:
 
   bool testConnection() final;
 
-protected:
-  void readMesurment();
-  int8_t writeReg(uint8_t reg, uint8_t val);
-
-  int8_t _mode;
-  int32_t _t_fine;
-  int32_t _raw_temp;
-  int32_t _raw_pressure;
-  CalibrationData _cal;
-  int32_t kp;
-  int32_t kt;
+private:
+  BaroDeviceType _type = BARO_SPL06;
+  CalibrationData _cal = {};
+  float _temperature = 0;
+  bool _haveTemperature = false;
+  bool _running = false;
 };
 
 } // namespace Espfc::Device::Baro

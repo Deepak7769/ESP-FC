@@ -27,7 +27,15 @@ BusType BusSlave::getType() const
 
 int8_t BusSlave::read(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8_t* data)
 {
-  // set slave 0 to the AK8963 and set for read
+  if (!data || length == 0 || length > 127) return 0;
+  if (length > 15)
+  {
+    // SLV0_CTRL has a four-bit transfer count.
+    if (read(devAddr, regAddr, 15, data) != 15) return 0;
+    const uint8_t rest = length - 15;
+    return read(devAddr, regAddr + 15, rest, data + 15) == rest ? length : 0;
+  }
+  // Program slave 0 for a register read.
   if (!writeMaster(MPU6050_I2C_SLV0_ADDR, devAddr | 0x80))
   {
     return 0;
@@ -47,21 +55,23 @@ int8_t BusSlave::read(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8_t*
   delay(1);
 
   // read the bytes off the EXT_SENS_DATA registers
-  int8_t res = readMaster(MPU6050_EXT_SENS_DATA_00, length, data);
-
-  return res;
+  return readFast(devAddr, regAddr, length, data);
 }
 
 // readFast() ignores devAddr and regAddr args and read ext sensor data reg from master
 int8_t FAST_CODE_ATTR BusSlave::readFast(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8_t* data)
 {
+  // The MPU can acknowledge the host even when the auxiliary sensor has disconnected.
+  uint8_t status;
+  if (_bus->readByte(_addr, 0x36, &status) != 1 || (status & 0x21)) return 0;
   return _bus->readFast(_addr, MPU6050_EXT_SENS_DATA_00, length, data);
 }
 
-// writes only one byte, length is ignored
+// The slave-0 data-out register holds one byte.
 bool BusSlave::write(uint8_t devAddr, uint8_t regAddr, uint8_t length, const uint8_t* data)
 {
-  // set slave 0 to the AK8963 and set for write
+  if (!data || length != 1) return false;
+  // Configure slave 0 for a register write.
   if (!writeMaster(MPU6050_I2C_SLV0_ADDR, devAddr))
   {
     return false;
@@ -82,7 +92,8 @@ bool BusSlave::write(uint8_t devAddr, uint8_t regAddr, uint8_t length, const uin
     return false;
   }
 
-  return true;
+  uint8_t status;
+  return _bus->readByte(_addr, 0x36, &status) == 1 && !(status & 0x21);
 }
 
 int8_t BusSlave::writeMaster(uint8_t regAddr, uint8_t data)
