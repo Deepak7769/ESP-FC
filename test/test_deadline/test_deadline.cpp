@@ -1,4 +1,11 @@
 #include "Utils/DeadlineTracker.hpp"
+// PlatformIO's library dependency finder needs the same transitive embedded
+// library visibility as other ESP-FC native suites; otherwise it attempts to
+// compile lib/betaflight without the EscDriver/Gps include paths.
+#include <EscDriver.h>
+#include <Gps.hpp>
+#include <helper_3dmath.hpp>
+#include <platform.h>
 #include <unity.h>
 
 using Espfc::Utils::DeadlineRelease;
