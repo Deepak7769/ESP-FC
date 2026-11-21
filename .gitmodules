@@ -1,0 +1,3 @@
+[submodule "upstream/betaflight"]
+	path = upstream/betaflight
+	url = https://github.com/betaflight/betaflight.git
