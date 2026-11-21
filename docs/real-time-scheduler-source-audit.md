@@ -196,7 +196,7 @@ prerequisites pass. **No hardcoded universal ESP32 / SPI / IBUS board.**
 
 | Gate | Test and expected evidence | Status |
 |---|---|---|
-| RT-T01 | Native unit tests for phase-locked deadline arithmetic, wraparound, saturation and missed-release accounting | NOT STARTED |
+| RT-T01 | Native unit tests for phase-locked deadline arithmetic, wraparound, saturation and missed-release accounting | ISOLATED COMPONENT + NATIVE TESTS ADDED; CI and runtime integration tracked separately |
 | RT-T02 | Instrument baseline flight pipeline with separate per-core CPU, loop jitter and sensor-to-motor latency | NOT STARTED |
 | RT-T03 | Stress serial MSP bursts, configuration saves and logging; demonstrate worst-case flight-loop and failsafe servicing | NOT STARTED |
 | RT-T04 | Inject gyro timeouts, duplicate timestamps, stalled IMU buses and delayed interrupts | NOT STARTED |
@@ -204,7 +204,7 @@ prerequisites pass. **No hardcoded universal ESP32 / SPI / IBUS board.**
 | RT-T06 | SITL/HITL: overload above 85% and above 95%, GPS failure, sensor loss, LAND handover, no motor-stop during valid vertical control | NOT STARTED |
 | RT-T07 | Compare baseline vs. modified builds across available MCU targets; record target-by-target limitations | NOT STARTED |
 
-**Explicit decision:** RTA-001 is a *research-only* milestone. We will not
+**Update (2026-11-21):** RT-T01 now has an original header-only \`DeadlineTracker\` and isolated native tests at \`test/test_deadline/\`. The component is not connected to any runtime flight-control or motor path. Test pass/fail is determined by GitHub CI.\n\n**Explicit decision:** RTA-001 is a *research-only* milestone. We will not
 rewrite the scheduler or claim performance improvements until baseline
 instrumentation and its native tests are green. The next **one** change is
 RT-T01: implement and test a small, target-independent deadline accounting
