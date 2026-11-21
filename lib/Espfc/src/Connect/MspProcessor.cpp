@@ -315,11 +315,11 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
                  Sensor::SurfaceSensor::rangeActive(_model) << 4 | _model.gyroActive() << 5 |
                  Sensor::SurfaceSensor::flowActive(_model) << 6);
       r.writeU32(_model.state.mode.mask); // flight mode flags
-      r.writeU8(0);                       // pid profile
+      r.writeU8(_model.config.pidProfiles.selected); // pid profile
       r.writeU16(lrintf(_model.state.stats.getCpuLoad()));
       if (m.cmd == MSP_STATUS_EX)
       {
-        r.writeU8(1); // max profile count
+        r.writeU8(PidProfileBank::COUNT);
         r.writeU8(_model.config.rateProfiles.selected); // current rate profile index
       }
       else // MSP_STATUS
@@ -357,6 +357,9 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       r.writeU8(textType);
       switch (textType)
       {
+        case MSP2TEXT_PID_PROFILE_NAME:
+          r.writePString(_model.config.pidProfiles.names[_model.config.pidProfiles.selected]);
+          break;
         case MSP2TEXT_RATE_PROFILE_NAME:
           r.writePString(_model.config.rateProfiles.names[_model.config.rateProfiles.selected]);
           break;
@@ -381,6 +384,11 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Stream::ReadWri
       {
         dest = _model.config.modelName;
         capacity = sizeof(_model.config.modelName);
+      }
+      else if (textType == MSP2TEXT_PID_PROFILE_NAME)
+      {
+        dest = _model.config.pidProfiles.names[_model.config.pidProfiles.selected];
+        capacity = sizeof(_model.config.pidProfiles.names[0]);
       }
       else if (textType == MSP2TEXT_RATE_PROFILE_NAME)
       {
@@ -1185,17 +1193,44 @@ _model.config.failsafe.procedure =
         if (!_model.config.selectRateProfile(selection & 0x7f)) { r.result = -1; break; }
         _model.notifyConfigChange(MODEL_CHANGE_RATES);
       }
-      else if (selection != 0) r.result = -1; // Single PID profile.
+      else
+      {
+        if (_model.isModeActive(MODE_ARMED) || !_model.config.selectPidProfile(selection)) { r.result = -1; break; }
+        _model.notifyConfigChange(MODEL_CHANGE_FILTER);
+        _model.notifyConfigChange(MODEL_CHANGE_PID);
+      }
       break;
     }
     case MSP_COPY_PROFILE: {
-      if (m.remain() != 3 || m.readU8() != 1) { r.result = -1; break; }
+      if (m.remain() != 3) { r.result = -1; break; }
+      const uint8_t type = m.readU8();
       const uint8_t dest = m.readU8();
       const uint8_t source = m.readU8();
-      if (!_model.config.copyRateProfile(dest, source)) { r.result = -1; break; }
-      if (dest == _model.config.rateProfiles.selected) _model.notifyConfigChange(MODEL_CHANGE_RATES);
+      if (type == 0)
+      {
+        const bool active = dest == _model.config.pidProfiles.selected;
+        if ((active && _model.isModeActive(MODE_ARMED)) || !_model.config.copyPidProfile(dest, source))
+        { r.result = -1; break; }
+        if (active)
+        {
+          _model.notifyConfigChange(MODEL_CHANGE_FILTER);
+          _model.notifyConfigChange(MODEL_CHANGE_PID);
+        }
+      }
+      else if (type == 1 && _model.config.copyRateProfile(dest, source))
+      {
+        if (dest == _model.config.rateProfiles.selected) _model.notifyConfigChange(MODEL_CHANGE_RATES);
+      }
+      else r.result = -1;
       break;
     }
+
+    case MSP_SET_RESET_CURR_PID:
+      if (m.remain() || _model.isModeActive(MODE_ARMED)) { r.result = -1; break; }
+      _model.config.resetPidProfile();
+      _model.notifyConfigChange(MODEL_CHANGE_FILTER);
+      _model.notifyConfigChange(MODEL_CHANGE_PID);
+      break;
 
     case MSP_RC_TUNING:
       r.writeU8(_model.config.input.rate[AXIS_ROLL]);

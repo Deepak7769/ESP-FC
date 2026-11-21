@@ -178,6 +178,56 @@ static void test_battery_wire_round_trip_alarm_and_atomic_bad_write()
   TEST_ASSERT_EQUAL(361,model.config.vbat.cellWarning);
 }
 
+static void test_pid_profiles_change_active_gains_copy_reset_and_armed_guard()
+{
+  clocks();
+  Model model;
+  Control::Controller controller(model);
+  model.state.loopTimer.rate = 1000;
+  controller.begin();
+  const float defaultGain = model.state.innerPid[AXIS_ROLL].Kp;
+  int pidReloads = 0;
+  int filterReloads = 0;
+  model.setConfigChangeListener([&](ModelChangeEvent event) {
+    controller.reload(event);
+    if (event == MODEL_CHANGE_PID) ++pidReloads;
+    if (event == MODEL_CHANGE_FILTER) ++filterReloads;
+  });
+  const auto factoryP = model.config.pid[FC_PID_ROLL].P;
+  model.config.pid[FC_PID_ROLL].P = factoryP + 10;
+  model.config.output.motorLimit = 77;
+  model.config.dterm.filter.freq = 61;
+  model.config.input.rate[0] = 44;
+  TEST_ASSERT_EQUAL(1,command(model,MSP2_SET_TEXT,{MSP2TEXT_PID_PROFILE_NAME,3,'P','I','D'}).result);
+  TEST_ASSERT_EQUAL(1,command(model,MSP_SELECT_SETTING,{2}).result);
+  TEST_ASSERT_EQUAL(factoryP,model.config.pid[FC_PID_ROLL].P);
+  TEST_ASSERT_EQUAL(100,model.config.output.motorLimit);
+  TEST_ASSERT_EQUAL(44,model.config.input.rate[0]);
+  TEST_ASSERT_EQUAL(1,pidReloads);
+  TEST_ASSERT_EQUAL(1,filterReloads);
+  TEST_ASSERT_FLOAT_WITHIN(0.0001f,defaultGain,model.state.innerPid[AXIS_ROLL].Kp);
+  model.config.simplifiedTuning.gyroFilterMultiplier = 88;
+  TEST_ASSERT_EQUAL(1,command(model,MSP_COPY_PROFILE,{0,2,0}).result);
+  TEST_ASSERT_EQUAL(61,model.config.dterm.filter.freq);
+  TEST_ASSERT_EQUAL(88,model.config.simplifiedTuning.gyroFilterMultiplier);
+  TEST_ASSERT_EQUAL(factoryP + 10,model.config.pid[FC_PID_ROLL].P);
+  TEST_ASSERT_TRUE(model.state.innerPid[AXIS_ROLL].Kp > defaultGain);
+  auto status = command(model,MSP_STATUS_EX);
+  TEST_ASSERT_EQUAL(2,status.data[10]);
+  TEST_ASSERT_EQUAL(3,status.data[13]);
+  model.state.mode.mask |= 1u << MODE_ARMED;
+  TEST_ASSERT_EQUAL(-1,command(model,MSP_SELECT_SETTING,{0}).result);
+  TEST_ASSERT_EQUAL(-1,command(model,MSP_COPY_PROFILE,{0,2,1}).result);
+  TEST_ASSERT_EQUAL(-1,command(model,MSP_SET_RESET_CURR_PID).result);
+  model.state.mode.mask = 0;
+  TEST_ASSERT_EQUAL(1,command(model,MSP_SET_RESET_CURR_PID).result);
+  TEST_ASSERT_EQUAL(factoryP,model.config.pid[FC_PID_ROLL].P);
+  TEST_ASSERT_EQUAL(0,command(model,MSP2_GET_TEXT,{MSP2TEXT_PID_PROFILE_NAME}).data[1]);
+  TEST_ASSERT_EQUAL(1,command(model,MSP_SELECT_SETTING,{0}).result);
+  TEST_ASSERT_EQUAL(77,model.config.output.motorLimit);
+  TEST_ASSERT_EQUAL(3,command(model,MSP2_GET_TEXT,{MSP2TEXT_PID_PROFILE_NAME}).data[1]);
+}
+
 static void test_rate_profiles_switch_copy_persist_and_apply()
 {
   clocks();
@@ -212,12 +262,19 @@ static void test_rate_profiles_switch_copy_persist_and_apply()
 
   // Like the CLI, edit the live config directly, save, then switch away and back.
   model.config.input.rate[0] = 74;
+  model.config.pid[FC_PID_ROLL].P = 81;
+  TEST_ASSERT_TRUE(model.config.selectPidProfile(2));
+  model.config.pid[FC_PID_ROLL].P = 64;
   const auto size = sizeof(ModelConfig);
-  std::vector<uint8_t> image{0xa5,4,static_cast<uint8_t>(size),static_cast<uint8_t>(size >> 8)};
+  std::vector<uint8_t> image{0xa5,5,static_cast<uint8_t>(size),static_cast<uint8_t>(size >> 8)};
   const auto* bytes = reinterpret_cast<const uint8_t*>(&model.config);
   image.insert(image.end(), bytes, bytes + size);
   Model restored;
   TEST_ASSERT_EQUAL(STORAGE_LOAD_SUCCESS,Utils::Storage::readConfig(restored.config, [&](size_t i){return image.at(i);}));
+  TEST_ASSERT_EQUAL(2,restored.config.pidProfiles.selected);
+  TEST_ASSERT_EQUAL(64,restored.config.pid[FC_PID_ROLL].P);
+  TEST_ASSERT_TRUE(restored.config.selectPidProfile(0));
+  TEST_ASSERT_EQUAL(81,restored.config.pid[FC_PID_ROLL].P);
   TEST_ASSERT_EQUAL(3,restored.config.rateProfiles.selected);
   TEST_ASSERT_TRUE(restored.config.selectRateProfile(0));
   TEST_ASSERT_EQUAL(43,restored.config.input.rate[0]);
@@ -233,10 +290,11 @@ static void test_legacy_battery_packet_and_eeprom_migration()
   TEST_ASSERT_EQUAL(430,model.config.batteryProfile.cellMax);
   model.config.input.serialRxProvider = SERIALRX_IBUS;
   model.config.antiGravityGain = 98;
-  for (auto version : {2,3,4})
+  for (auto version : {2,3,4,5})
   {
     const size_t size = version == 2 ? offsetof(ModelConfig,batteryProfile) :
-                        version == 3 ? offsetof(ModelConfig,rateProfiles) : sizeof(ModelConfig);
+                        version == 3 ? offsetof(ModelConfig,rateProfiles) :
+                        version == 4 ? offsetof(ModelConfig,pidProfiles) : sizeof(ModelConfig);
     std::vector<uint8_t> image = {0xa5, static_cast<uint8_t>(version), static_cast<uint8_t>(size), static_cast<uint8_t>(size>>8)};
     const auto* bytes = reinterpret_cast<const uint8_t*>(&model.config);
     image.insert(image.end(), bytes, bytes + size);
@@ -602,6 +660,7 @@ int main()
   RUN_TEST(test_xbus_mode_b_and_rj01_nested_checksums);
   RUN_TEST(test_msp_receiver_selection_survives_sanitize_and_rejects_unknown);
   RUN_TEST(test_battery_wire_round_trip_alarm_and_atomic_bad_write);
+  RUN_TEST(test_pid_profiles_change_active_gains_copy_reset_and_armed_guard);
   RUN_TEST(test_rate_profiles_switch_copy_persist_and_apply);
   RUN_TEST(test_legacy_battery_packet_and_eeprom_migration);
   RUN_TEST(test_virtual_meter_calibration_and_elapsed_charge);

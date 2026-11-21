@@ -906,6 +906,39 @@ struct SimplifiedTuningConfig
   uint8_t gyroFilterMultiplier = 100;
 };
 
+struct PidTuningProfile
+{
+  PidConfig pid[FC_PID_ITEM_COUNT] = {
+      [FC_PID_ROLL]  = { .P = 45, .I = 80, .D = 24, .F = 88 },  // ROLL
+      [FC_PID_PITCH] = { .P = 47, .I = 84, .D = 27, .F = 92 },  // PITCH
+      [FC_PID_YAW]   = { .P = 45, .I = 80, .D =  0, .F = 88 },  // YAW
+      [FC_PID_LEVEL] = { .P = 45, .I =  0, .D =  0, .F =  0 },  // ANGLE/LEVEL
+      [FC_PID_MAG]   = { .P =  0, .I =  0, .D =  0, .F =  0 },  // MAG
+      [FC_PID_ALT]   = { .P =  0, .I =  0, .D =  0, .F =  0 },  // ALTHOLD POS
+      [FC_PID_VEL]   = { .P = 80, .I = 60, .D = 40, .F = 20 },  // ALTHOLD VEL
+      [FC_PID_POS]   = { .P =  0, .I =  0, .D =  0, .F =  0 },  // POSHOLD_P * 100, POSHOLD_I * 100,
+      [FC_PID_POSR]  = { .P =  0, .I =  0, .D =  0, .F =  0 },  // POSHOLD_RATE_P * 10, POSHOLD_RATE_I * 100, POSHOLD_RATE_D * 1000,
+      [FC_PID_NAVR]  = { .P =  0, .I =  0, .D =  0, .F =  0 },  // NAV_P * 10, NAV_I * 100, NAV_D * 1000
+    };
+  YawConfig yaw;
+  LevelConfig level;
+  DtermConfig dterm;
+  ItermConfig iterm;
+  AltHoldConfig altHold;
+  ControllerConfig controller;
+  SimplifiedTuningConfig simplified;
+  uint8_t antiGravityGain = 80;
+  int8_t motorLimit = 100;
+};
+
+struct PidProfileBank
+{
+  static constexpr uint8_t COUNT = 3;
+  uint8_t selected = 0;
+  PidTuningProfile settings[COUNT];
+  char names[COUNT][9] = {};
+};
+
 // persistent data
 class ModelConfig
 {
@@ -931,18 +964,7 @@ class ModelConfig
     ScalerConfig scaler[SCALER_COUNT];
 
     // pid controller
-    PidConfig pid[FC_PID_ITEM_COUNT] = {
-      [FC_PID_ROLL]  = { .P = 45, .I = 80, .D = 24, .F = 88 },  // ROLL
-      [FC_PID_PITCH] = { .P = 47, .I = 84, .D = 27, .F = 92 },  // PITCH
-      [FC_PID_YAW]   = { .P = 45, .I = 80, .D =  0, .F = 88 },  // YAW
-      [FC_PID_LEVEL] = { .P = 45, .I =  0, .D =  0, .F =  0 },  // ANGLE/LEVEL
-      [FC_PID_MAG]   = { .P =  0, .I =  0, .D =  0, .F =  0 },  // MAG
-      [FC_PID_ALT]   = { .P =  0, .I =  0, .D =  0, .F =  0 },  // ALTHOLD POS
-      [FC_PID_VEL]   = { .P = 80, .I = 60, .D = 40, .F = 20 },  // ALTHOLD VEL
-      [FC_PID_POS]   = { .P =  0, .I =  0, .D =  0, .F =  0 },  // POSHOLD_P * 100, POSHOLD_I * 100,
-      [FC_PID_POSR]  = { .P =  0, .I =  0, .D =  0, .F =  0 },  // POSHOLD_RATE_P * 10, POSHOLD_RATE_I * 100, POSHOLD_RATE_D * 1000,
-      [FC_PID_NAVR]  = { .P =  0, .I =  0, .D =  0, .F =  0 },  // NAV_P * 10, NAV_I * 100, NAV_D * 1000
-    };
+    PidConfig pid[FC_PID_ITEM_COUNT];
     YawConfig yaw;
     LevelConfig level;
     DtermConfig dterm;
@@ -1063,6 +1085,79 @@ class ModelConfig
     ThrottleCurveConfig throttleCurve;
 
     alignas(4) RateProfileBank rateProfiles;
+    alignas(4) PidProfileBank pidProfiles;
+
+    void capturePidProfile(PidTuningProfile& profile) const
+    {
+      std::copy_n(pid, FC_PID_ITEM_COUNT, profile.pid);
+      profile.yaw = yaw;
+      profile.level = level;
+      profile.dterm = dterm;
+      profile.iterm = iterm;
+      profile.altHold = altHold;
+      profile.controller = controller;
+      profile.simplified = simplifiedTuning;
+      profile.antiGravityGain = antiGravityGain;
+      profile.motorLimit = output.motorLimit;
+    }
+
+    void applyPidProfile(const PidTuningProfile& profile)
+    {
+      std::copy_n(profile.pid, FC_PID_ITEM_COUNT, pid);
+      yaw = profile.yaw;
+      level = profile.level;
+      dterm = profile.dterm;
+      iterm = profile.iterm;
+      altHold = profile.altHold;
+      controller = profile.controller;
+      // Gyro filtering is a board-wide setting; only D-term filters follow the PID profile.
+      const auto gyroFilter = simplifiedTuning.gyroFilter;
+      const auto gyroMultiplier = simplifiedTuning.gyroFilterMultiplier;
+      simplifiedTuning = profile.simplified;
+      simplifiedTuning.gyroFilter = gyroFilter;
+      simplifiedTuning.gyroFilterMultiplier = gyroMultiplier;
+      antiGravityGain = profile.antiGravityGain;
+      output.motorLimit = profile.motorLimit;
+    }
+
+    void initializePidProfiles()
+    {
+      pidProfiles.selected = 0;
+      for (auto& name : pidProfiles.names) std::fill_n(name, sizeof(name), 0);
+      for (auto& profile : pidProfiles.settings) capturePidProfile(profile);
+    }
+
+    bool selectPidProfile(uint8_t index)
+    {
+      if (index >= PidProfileBank::COUNT || pidProfiles.selected >= PidProfileBank::COUNT) return false;
+      if (index != pidProfiles.selected)
+      {
+        capturePidProfile(pidProfiles.settings[pidProfiles.selected]);
+        applyPidProfile(pidProfiles.settings[index]);
+        pidProfiles.selected = index;
+      }
+      return true;
+    }
+
+    bool copyPidProfile(uint8_t dest, uint8_t source)
+    {
+      if (dest >= PidProfileBank::COUNT || source >= PidProfileBank::COUNT ||
+          pidProfiles.selected >= PidProfileBank::COUNT) return false;
+      if (source == dest) return true;
+      if (source == pidProfiles.selected) capturePidProfile(pidProfiles.settings[source]);
+      pidProfiles.settings[dest] = pidProfiles.settings[source];
+      std::copy_n(pidProfiles.names[source], sizeof(pidProfiles.names[dest]), pidProfiles.names[dest]);
+      if (dest == pidProfiles.selected) applyPidProfile(pidProfiles.settings[dest]);
+      return true;
+    }
+
+    void resetPidProfile()
+    {
+      PidTuningProfile defaults;
+      applyPidProfile(defaults);
+      pidProfiles.names[pidProfiles.selected][0] = 0;
+    }
+
 
     void initializeRateProfiles()
     {
@@ -1098,6 +1193,7 @@ class ModelConfig
 
     ModelConfig()
     {
+      std::copy_n(pidProfiles.settings[0].pid, FC_PID_ITEM_COUNT, pid);
       for(size_t i = 0; i < INPUT_CHANNELS; i++)
       {
         input.channel[i].map = i;
@@ -1124,6 +1220,7 @@ class ModelConfig
       devPreset();
 #endif
       initializeRateProfiles();
+      initializePidProfiles();
     }
 
     void devPreset()
